@@ -1,3 +1,4 @@
+import { supabase } from '../supabaseClient';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5177/api';
 
 // Types
@@ -58,6 +59,112 @@ export interface WikiNote {
   title: string;
   content: string;
   createdAt: string;
+}
+
+// 🌸 Admin: Tüm kullanıcıların siparişlerini çekme fonksiyonu
+export async function fetchAllOrders() {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (*)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Siparişler çekilirken hata oluştu:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+// 🌸 Admin: Sipariş durumunu güncelleme fonksiyonu
+export async function updateOrderStatus(orderId: string, newStatus: string) {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status: newStatus })
+    .eq('id', orderId)
+    .select();
+
+  if (error) {
+    console.error('Sipariş durumu güncellenirken hata oluştu:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+// 🌸 Onay bekleyen tüm şirket başvurularını çek
+export async function fetchPendingCompanies() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('role', 'company')
+    .eq('is_approved', false);
+
+  if (error) {
+    console.error('Bekleyen şirketler çekilemedi:', error);
+    throw error;
+  }
+  return data;
+}
+
+// 🌸 Şirketi Onayla (is_approved = true yap)
+export async function approveCompany(userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ is_approved: true })
+    .eq('id', userId)
+    .select();
+
+  if (error) {
+    console.error('Şirket onaylanırken hata oluştu:', error);
+    throw error;
+  }
+  return data;
+}
+
+// 🌸 Admin: Yeni Ürün Ekle
+export async function addProduct(productData: any) {
+  const { data, error } = await supabase
+    .from('products')
+    .insert([productData])
+    .select();
+
+  if (error) {
+    console.error('Ürün eklenirken hata oluştu:', error);
+    throw error;
+  }
+  return data;
+}
+
+// 🌸 Admin: Ürün Güncelle (Fiyat, Stok vb.)
+export async function updateProduct(productId: string, updates: any) {
+  const { data, error } = await supabase
+    .from('products')
+    .update(updates)
+    .eq('id', productId)
+    .select();
+
+  if (error) {
+    console.error('Ürün güncellenirken hata oluştu:', error);
+    throw error;
+  }
+  return data;
+}
+
+// 🌸 Admin: Ürün Sil
+export async function deleteProduct(productId: string) {
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', productId);
+
+  if (error) {
+    console.error('Ürün silinirken hata oluştu:', error);
+    throw error;
+  }
 }
 
 // API Service

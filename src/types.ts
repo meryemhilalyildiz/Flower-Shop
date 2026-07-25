@@ -7,6 +7,7 @@ export type Category = {
   icon: string;
 };
 
+
 export type Product = {
   id: string;
   name: string;
@@ -53,4 +54,9 @@ export type Route =
   | { name: 'order-success'; orderId: string }
   | { name: 'about' }
   | { name: 'contact' }
-  | { name: 'faq' };
+  | { name: 'faq' }
+  | { name: 'orders' }
+  | { name: 'admin-orders' }
+  | { name: 'admin-companies' }
+  | { name: 'company-dashboard' }
+  | { name: 'admin-dashboard' };; // 🌸 Tek Route tanımı burada bitti.

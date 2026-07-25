@@ -1,6 +1,7 @@
 import { apiService } from './api';
 import { transformApiProducts, transformApiCategories, transformApiDistricts } from './dataAdapter';
 import type { Category, Product } from '../types';
+import { mockProducts, mockCategories } from '../data';
 
 // Cache for data
 let productsCache: Product[] | null = null;
@@ -11,11 +12,14 @@ export async function fetchProducts(): Promise<Product[]> {
   if (productsCache) return productsCache;
   try {
     const apiProducts = await apiService.getProducts();
-    productsCache = transformApiProducts(apiProducts);
-    return productsCache;
+    if (apiProducts && apiProducts.length > 0) {
+      productsCache = transformApiProducts(apiProducts);
+      return productsCache;
+    }
+    return mockProducts;
   } catch (error) {
-    console.error('Error fetching products:', error);
-    throw error;
+    console.warn('API bağlantısı sağlanamadı, Mock Ürünler yükleniyor:', error);
+    return mockProducts; // Sunucu kapalıysa çökme, mock veriyi dön!
   }
 }
 
@@ -23,11 +27,14 @@ export async function fetchCategories(): Promise<Category[]> {
   if (categoriesCache) return categoriesCache;
   try {
     const apiCategories = await apiService.getCategories();
-    categoriesCache = transformApiCategories(apiCategories);
-    return categoriesCache;
+    if (apiCategories && apiCategories.length > 0) {
+      categoriesCache = transformApiCategories(apiCategories);
+      return categoriesCache;
+    }
+    return mockCategories;
   } catch (error) {
-    console.error('Error fetching categories:', error);
-    throw error;
+    console.warn('API bağlantısı sağlanamadı, Mock Kategoriler yükleniyor:', error);
+    return mockCategories; // Sunucu kapalıysa çökme, mock veriyi dön!
   }
 }
 
