@@ -166,6 +166,7 @@ export function AdminDashboard() {
           description: newProduct.description,
           freshness_score: newProduct.freshness_score,
           vase_life_days: newProduct.vase_life_days,
+          is_active: true,
         });
         alert('Yeni çiçek başarıyla eklendi!');
       }
