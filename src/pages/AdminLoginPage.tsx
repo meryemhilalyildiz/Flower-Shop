@@ -13,12 +13,17 @@ export default function AdminLoginPage({ onLoginSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const handleSuccessfulAdminLogin = () => {
+    window.location.hash = '#/admin/dashboard';
+    onLoginSuccess();
+  };
+
   useEffect(() => {
     // Eğer zaten admin olarak giriş yapılmışsa, direkt dashboard'a yönlendir
     supabase.auth.getSession().then(async ({ data }) => {
       const uid = data.session?.user.id;
       if (uid && (await checkAdminAccess(uid))) {
-        onLoginSuccess();
+        handleSuccessfulAdminLogin();
       }
     });
   }, [onLoginSuccess]);
@@ -46,7 +51,7 @@ export default function AdminLoginPage({ onLoginSuccess }: Props) {
         return;
       }
 
-      onLoginSuccess();
+      handleSuccessfulAdminLogin();
     } catch (err) {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {

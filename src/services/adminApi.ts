@@ -2,14 +2,32 @@ import { supabase } from '../supabaseClient';
 
 // Admin erişim kontrolü
 export async function checkAdminAccess(userId: string): Promise<boolean> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const authRole =
+    session?.user?.user_metadata?.role ??
+    session?.user?.app_metadata?.role ??
+    session?.user?.user_metadata?.is_admin ??
+    session?.user?.app_metadata?.is_admin;
+
+  if (authRole === 'admin' || authRole === 'super_admin' || authRole === true) {
+    return true;
+  }
+
   const { data, error } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', userId)
     .maybeSingle();
-  
-  if (error || !data) return false;
-  return data.role === 'admin';
+
+  if (error) {
+    console.error('Admin erişim kontrolü hatası:', error);
+    return false;
+  }
+
+  return data?.role === 'admin';
 }
 
 // B2B özelliklerini kaldırmak için SQL komutları

@@ -33,6 +33,8 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
       if (user) {
         const adminCheck = await checkAdminAccess(user.id);
         setIsAdmin(adminCheck);
+      } else {
+        setIsAdmin(false);
       }
     });
 
