@@ -13,6 +13,7 @@ function parseHash(): Route {
   if (parts[0] === 'urun' && parts[1]) return { name: 'product', slug: decodeURIComponent(parts[1]) };
   if (parts[0] === 'sepet') return { name: 'cart' };
   if (parts[0] === 'odeme') return { name: 'checkout' };
+  if (parts[0] === 'siparislerim') return { name: 'orders' }; // 🌸 Siparişlerim rotası yakalanıyor
   if (parts[0] === 'siparis-tamamlandi' && parts[1]) return { name: 'order-success', orderId: decodeURIComponent(parts[1]) };
   if (parts[0] === 'hakkimizda') return { name: 'about' };
   if (parts[0] === 'iletisim') return { name: 'contact' };
@@ -32,6 +33,8 @@ export function routeToHash(route: Route): string {
       return '#/sepet';
     case 'checkout':
       return '#/odeme';
+    case 'orders':
+      return '#/siparislerim'; // 🌸 'orders' rotasını hash adresine çevirir
     case 'order-success':
       return `#/siparis-tamamlandi/${route.orderId}`;
     case 'about':
@@ -40,6 +43,8 @@ export function routeToHash(route: Route): string {
       return '#/iletisim';
     case 'faq':
       return '#/sss';
+    default:
+      return '#/';
   }
 }
 

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, CreditCard, MapPin, Check, Lock } from 'lucide-react';
+import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck } from 'lucide-react';
 import type { CartItem, Route, OrderInfo } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { fetchDistricts } from '../services/dataFetching';
+import { CITIES_DATA, fetchDistrictsByCity } from '../services/dataFetching';
+import type { City, District } from '../services/dataFetching';
+import { supabase } from '../supabaseClient';
 
 type Props = {
   items: CartItem[];
@@ -42,28 +44,69 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
     cardCvv: '',
   });
 
+  // 🌸 Kayıtlı Adres / Alıcı State'leri
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [saveForNextTime, setSaveForNextTime] = useState(false);
+  const [addressTitle, setAddressTitle] = useState('');
+
+  // 🌸 İl ve İlçe State'leri
+  const [cities, setCities] = useState<City[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [districts, setDistricts] = useState<Array<{ id: number; name: string; deliveryFee: number }>>([]);
 
-  // Load districts from API
+  // 🌸 81 İli Sabitten Alıyoruz ve Kayıtlı Adresleri Yüklüyoruz
   useEffect(() => {
-    const loadDistricts = async () => {
-      try {
-        const fetchedDistricts = await fetchDistricts();
-        setDistricts(fetchedDistricts);
-      } catch (error) {
-        console.warn('Could not load districts from API, using empty list:', error);
-        // Fallback to empty list - user will need to handle this case
-      }
-    };
+    // 81 İli doğrudan sabitten alıyoruz (Anında yüklenir, sıfır gecikme)
+    setCities(CITIES_DATA);
 
-    loadDistricts();
+    async function loadAddresses() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('saved_addresses')
+          .select('*')
+          .eq('user_id', user.id);
+        if (data) setSavedAddresses(data);
+      }
+    }
+    loadAddresses();
   }, []);
+
+  // 🌸 İl Seçildiğinde O İlin İlçelerini Getir (Bu Kalıyor!)
+  const handleCityChange = async (cityIdStr: string) => {
+    const cityId = Number(cityIdStr);
+    setSelectedCityId(cityId);
+    update('city', '');
+
+    if (cityId) {
+      const districtList = await fetchDistrictsByCity(cityId);
+      setDistricts(districtList);
+    } else {
+      setDistricts([]);
+    }
+  };
 
   const update = (field: keyof FormState, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
     setErrors((e) => ({ ...e, [field]: undefined }));
+  };
+
+  // 🌸 Kayıtlı adresi seçince form alanlarını doldur
+  const handleSelectSavedAddress = (addressId: string) => {
+    if (!addressId) return;
+    const selected = savedAddresses.find((a) => a.id === addressId);
+    if (selected) {
+      setForm((f) => ({
+        ...f,
+        recipientName: selected.recipient_name,
+        recipientPhone: selected.recipient_phone,
+        address: selected.address,
+        city: selected.district || f.city,
+      }));
+    }
   };
 
   const validate = (): boolean => {
@@ -91,6 +134,18 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
     }
     setSubmitting(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && saveForNextTime && addressTitle.trim()) {
+        await supabase.from('saved_addresses').insert({
+          user_id: user.id,
+          title: addressTitle.trim(),
+          recipient_name: form.recipientName,
+          recipient_phone: form.recipientPhone,
+          address: form.address,
+          district: form.city,
+        });
+      }
+
       const orderId = await onPlaceOrder({
         items,
         total,
@@ -156,6 +211,27 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
               <h2 className="font-display text-xl font-bold text-sand-900">Teslimat Bilgileri</h2>
             </div>
 
+            {/* 🌸 Kayıtlı Adres Seçimi */}
+            {savedAddresses.length > 0 && (
+              <div className="mb-6 p-4 bg-brand-50/60 rounded-2xl border border-brand-200">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-brand-800 uppercase tracking-wider mb-2">
+                  <BookmarkCheck className="w-4 h-4 text-brand-600" />
+                  Hızlı Seçim: Kayıtlı Alıcılarınız
+                </label>
+                <select
+                  onChange={(e) => handleSelectSavedAddress(e.target.value)}
+                  className="input bg-white text-sm cursor-pointer"
+                >
+                  <option value="">-- Kayıtlı Adres Seçin (Örn: Annem) --</option>
+                  {savedAddresses.map((addr) => (
+                    <option key={addr.id} value={addr.id}>
+                      {addr.title} - {addr.recipient_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="grid sm:grid-cols-2 gap-4">
               <div data-error={!!errors.recipientName}>
                 <label className="label">Alıcı Adı Soyadı *</label>
@@ -189,22 +265,44 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
                 />
                 {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
               </div>
+
+              {/* 🌸 Teslimat İli (81 İl) */}
+              <div>
+                <label className="label">Teslimat İli *</label>
+                <select
+                  onChange={(e) => handleCityChange(e.target.value)}
+                  className="input"
+                >
+                  <option value="">İl seçin (81 İl)</option>
+                  {cities.map((city) => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 🌸 Teslimat İlçesi */}
               <div data-error={!!errors.city}>
                 <label className="label">Teslimat İlçesi *</label>
                 <select
                   value={form.city}
                   onChange={(e) => update('city', e.target.value)}
                   className="input"
+                  disabled={!selectedCityId}
                 >
-                  <option value="">İlçe seçin</option>
+                  <option value="">
+                    {selectedCityId ? 'İlçe seçin' : 'Önce il seçiniz'}
+                  </option>
                   {districts.map((district) => (
-                    <option key={district.id} value={district.id.toString()}>
-                      {district.name} (₺{district.deliveryFee})
+                    <option key={district.id} value={district.name}>
+                      {district.name}
                     </option>
                   ))}
                 </select>
                 {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
               </div>
+
               <div data-error={!!errors.deliveryDate}>
                 <label className="label">Teslimat Tarihi *</label>
                 <input
@@ -225,6 +323,29 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
                   placeholder="Çiçek kartına yazılacak mesaj veya teslimat notu..."
                 />
               </div>
+            </div>
+
+            {/* 🌸 Alıcı Defterine Kaydetme Kutusu */}
+            <div className="mt-6 p-4 bg-sand-50 rounded-2xl border border-sand-200 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-sand-700">
+                <input
+                  type="checkbox"
+                  checked={saveForNextTime}
+                  onChange={(e) => setSaveForNextTime(e.target.checked)}
+                  className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500"
+                />
+                Bu teslimat bilgilerini alıcı defterime kaydet
+              </label>
+
+              {saveForNextTime && (
+                <input
+                  type="text"
+                  placeholder="Kayıt Adı (Örn: Annem, Hilal, İş Yeri)"
+                  value={addressTitle}
+                  onChange={(e) => setAddressTitle(e.target.value)}
+                  className="input bg-white text-sm"
+                />
+              )}
             </div>
           </section>
 
