@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from './router';
 import { useCart } from './useCart';
+import { supabase } from './supabaseClient'; // Yol proje yapına göre './supabaseClient' veya '../supabaseClient' olabilir.
 import {
   fetchProducts,
   fetchCategories,
@@ -17,6 +18,7 @@ import Footer from './components/Footer';
 import Toast from './components/Toast';
 import HomePage from './pages/HomePage';
 import ShopPage from './pages/ShopPage';
+import { OrdersPage } from './pages/OrdersPage';
 import ProductPage from './pages/ProductPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -75,58 +77,155 @@ function App() {
 
   const handlePlaceOrder = useCallback(
     async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
-      try {
-        // Transform cart items to API format
-        const items = orderData.items.map(item => ({
-          productId: parseInt(item.product.id),
+      // 🌸 1. Oturum açmış kullanıcıyı al
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 🌸 2. Supabase 'orders' tablosuna kayıt
+      const { data: insertedOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user?.id || null,
+          recipient_name: orderData.recipientName || 'Alıcı Adı Belirtilmedi',
+          recipient_phone: orderData.recipientPhone || '',
+          shipping_address: orderData.address || 'Adres Belirtilmedi',
+          city: orderData.city || '',
+          delivery_date: orderData.deliveryDate || '',
+          note: orderData.note || '',
+          total_amount: orderData.total,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (orderError) {
+        alert(`❌ ORDERS HATASI:\n${orderError.message}`);
+        throw orderError;
+      }
+
+      const orderId = insertedOrder.id.toString();
+
+      // 🌸 3. 'order_items' tablosuna ürünleri ekle
+      if (orderData.items && orderData.items.length > 0) {
+        const itemsToInsert = orderData.items.map((item) => ({
+          order_id: orderId,
+          product_id: String(item.product.id),
           quantity: item.quantity,
+          unit_price: item.product.price || 0, // 🎯 Eklenen alan
         }));
 
-        // Create order via API
-        const response = await apiService.createOrder({
-          customerName: orderData.recipientName,
-          customerPhone: orderData.recipientPhone,
-          address: orderData.address,
-          districtId: parseInt(orderData.city), // Assuming city contains district ID
-          items,
-        });
+        console.log('order_items tablosuna gönderilen veri:', itemsToInsert);
 
-        // Create local order info for display
-        const id = response.orderId.toString();
-        const order: OrderInfo = {
-          id,
-          items: orderData.items,
-          total: response.grandTotal,
-          recipientName: response.customerName,
-          recipientPhone: orderData.recipientPhone,
-          address: orderData.address,
-          city: response.districtName,
-          deliveryDate: orderData.deliveryDate,
-          note: orderData.note,
-          createdAt: response.orderDate,
-          status: response.orderStatus as 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi',
-        };
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(itemsToInsert);
 
-        setOrders((prev) => ({ ...prev, [id]: order }));
-        cart.clearCart();
-        return id;
-      } catch (error) {
-        console.error('Error creating order:', error);
-        // Fallback to local order creation if API fails
-        const id = `CC${Date.now().toString().slice(-8)}`;
-        const order: OrderInfo = {
-          ...orderData,
-          id,
-          createdAt: new Date().toISOString(),
-          status: 'Hazırlanıyor',
-        };
-        setOrders((prev) => ({ ...prev, [id]: order }));
-        cart.clearCart();
-        return id;
+        if (itemsError) {
+          alert(`❌ ORDER_ITEMS HATASI:\n${itemsError.message}`);
+          console.error('ORDER_ITEMS HATASI:', itemsError);
+        } else {
+          alert('✅ Sipariş ve Ürün Detayları Başarıyla Veritabanına Yazıldı!');
+        }
       }
+
+      const order: OrderInfo = {
+        ...orderData,
+        id: orderId,
+        createdAt: insertedOrder.created_at || new Date().toISOString(),
+        status: 'Hazırlanıyor',
+      };
+
+      setOrders((prev) => ({ ...prev, [orderId]: order }));
+      cart.clearCart();
+
+      return orderId;
     },
     [cart],
   );
+
+  // 🌸 Giriş yapan kullanıcının geçmiş siparişlerini Supabase'den çekme
+  const fetchUserOrders = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      // 🌸 1. .select() içine delivery_date alanını ekledik
+      const { data: fetchedOrders, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          created_at,
+          delivery_date,
+          status,
+          total_amount,
+          shipping_address,
+          city,
+          recipient_name,
+          recipient_phone,
+          note,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            unit_price
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Siparişler çekilirken hata oluştu:', error);
+        return;
+      }
+
+      if (fetchedOrders) {
+        const ordersMap: Record<string, OrderInfo> = {};
+
+        fetchedOrders.forEach((ord: any) => { // 🌸 (ord: any) yaparak TypeScript'i rahatlattık
+          ordersMap[ord.id] = {
+            id: ord.id.toString(),
+            createdAt: ord.created_at,
+            deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
+            status: ord.status || 'Hazırlanıyor',
+            total: ord.total_amount,
+            address: ord.shipping_address,
+            city: ord.city,
+            recipientName: ord.recipient_name,
+            recipientPhone: ord.recipient_phone,
+            note: ord.note,
+            items: ord.order_items ? ord.order_items.map((item: any) => {
+              const foundProduct = products.find((p) => String(p.id) === String(item.product_id));
+              const fallbackProduct = {
+                id: item.product_id,
+                name: 'Ürün Detayı',
+                price: item.unit_price || 0,
+                image: '',
+                slug: 'urun',
+                categoryId: '',
+                description: '',
+              };
+
+              return {
+                product: (foundProduct || fallbackProduct) as any,
+                quantity: item.quantity,
+                price: item.unit_price,
+              };
+            }) : [],
+          };
+        });
+
+        setOrders(ordersMap);
+      }
+    } catch (err) {
+      console.error('Sipariş çekme hatası:', err);
+    }
+  }, [products]);
+  
+  // 🌸 Uygulama yüklendiğinde veya kullanıcı oturumu değiştiğinde siparişleri çek
+  useEffect(() => {
+    fetchUserOrders();
+  }, [fetchUserOrders]);
+
 
   const renderPage = () => {
     if (loading) {
@@ -200,31 +299,43 @@ function App() {
         const order = orders[route.orderId];
         return <OrderSuccessPage order={order} navigate={navigate} />;
       }
+
+      /* 🌸 🌸 🌸 EKSİK OLAN KISIM BURAYDI: SİPARİŞLERİM SAYFASI 🌸 🌸 🌸 */
+      case 'orders':
+        return (
+          <OrdersPage
+            orders={orders}
+            onNavigateToShop={() => navigate({ name: 'shop' })}
+          />
+        );
+
       case 'about':
         return <AboutPage navigate={navigate} />;
       case 'contact':
         return <ContactPage navigate={navigate} />;
-      case 'faq':
-        return <FaqPage navigate={navigate} />;
-      default:
-        return <HomePage
-          categories={categories}
-          featured={getFeaturedProducts(products)}
-          discounted={getDiscountedProducts(products)}
-          navigate={navigate}
-          onAddToCart={handleAddToCart}
-        />;
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col bg-sand-50">
-      <Header cartCount={cart.totalItems} navigate={navigate} currentRoute={route} />
-      <main className="flex-1">{renderPage()}</main>
-      <Footer navigate={navigate} />
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
-
-export default App;
+        case 'faq':
+          return <FaqPage navigate={navigate} />;
+        default:
+          return (
+            <HomePage
+              categories={categories}
+              featured={getFeaturedProducts(products)}
+              discounted={getDiscountedProducts(products)}
+              navigate={navigate}
+              onAddToCart={handleAddToCart}
+            />
+          );
+      }
+    };
+  
+    return (
+      <div className="min-h-screen flex flex-col bg-sand-50">
+        <Header cartCount={cart.totalItems} navigate={navigate} currentRoute={route} />
+        <main className="flex-1">{renderPage()}</main>
+        <Footer />
+        {toast && <Toast message={String(toast)} onClose={() => setToast(null)} />}
+      </div>
+    );
+  }
+  
+  export default App;

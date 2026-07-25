@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Flower2, ShoppingBag, Menu, X, Search, Phone } from 'lucide-react';
+import { Flower2, ShoppingBag, Menu, X, Search, Phone, User, LogOut, History } from 'lucide-react';
 import type { Route } from '../types';
 import { routeToHash } from '../router';
+import { AuthModal } from './AuthModal';
+import { supabase } from '../supabaseClient';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 type Props = {
   cartCount: number;
@@ -12,12 +15,32 @@ type Props = {
 export default function Header({ cartCount, navigate, currentRoute }: Props) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // 🌸 Supabase Oturum Dinleyicisi
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   const navLinks: { label: string; route: Route }[] = [
     { label: 'Anasayfa', route: { name: 'home' } },
@@ -103,6 +126,46 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                 )}
               </button>
 
+              {/* 🌸 Giriş Yapılmışsa "Sipariş Geçmişi", "Kullanıcı Adı" ve "Çıkış Yap" Butonu */}
+              {user ? (
+                <div className="flex items-center gap-1.5 ml-1">
+                  {/* 🕒 Geçmiş Siparişlerim İkonu */}
+                  <button
+                    onClick={() => {
+                      window.location.hash = '#/siparislerim';
+                      if (typeof navigate === 'function') {
+                        navigate({ name: 'orders' as any });
+                      }
+                    }}
+                    title="Geçmiş Siparişlerim"
+                    className="p-2 text-sand-600 hover:text-brand-700 hover:bg-brand-50 rounded-full transition-all cursor-pointer"
+                  >
+                    <History className="w-5 h-5" />
+                  </button>
+
+                  <span className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200">
+                    {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                  </span>
+
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-red-500 text-red-600 hover:bg-red-50 text-sm font-semibold transition-all ml-1"
+                    title="Çıkış Yap"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden sm:inline">Çıkış</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAuthOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-semibold transition-all ml-1"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="hidden sm:inline">Giriş Yap</span>
+                </button>
+              )}
+
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="lg:hidden btn-ghost"
@@ -131,10 +194,49 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                   {link.label}
                 </a>
               ))}
+              {user ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setMobileOpen(false);
+                      window.location.hash = '#/siparislerim';
+                      if (typeof navigate === 'function') {
+                        navigate({ name: 'orders' as any });
+                      }
+                    }}
+                    className="mt-2 w-full py-3 rounded-xl bg-brand-50 text-brand-700 font-semibold flex items-center justify-center gap-2 border border-brand-200"
+                  >
+                    <History className="w-5 h-5" />
+                    Geçmiş Siparişlerim
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMobileOpen(false);
+                      handleSignOut();
+                    }}
+                    className="mt-1 w-full py-3 rounded-xl bg-red-600 text-white font-semibold text-center"
+                  >
+                    Çıkış Yap ({user.email})
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setIsAuthOpen(true);
+                  }}
+                  className="mt-2 w-full py-3 rounded-xl bg-brand-600 text-white font-semibold text-center"
+                >
+                  Giriş Yap / Kayıt Ol
+                </button>
+              )}
             </nav>
           </div>
         )}
       </header>
+
+      {/* 🌸 Giriş & Kayıt Modal Penceresi */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </>
   );
 }
