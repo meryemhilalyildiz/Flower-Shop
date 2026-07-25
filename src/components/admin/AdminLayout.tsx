@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, RefreshCw, X, LogOut, Flower2 } from 'lucide-react';
+import { Menu, RefreshCw, X, LogOut, Flower2, Store } from 'lucide-react';
 import { useAdminAuth } from '../../hooks/useAdminAuth';
 import AdminSidebar from './AdminSidebar';
 import { supabase } from '../../supabaseClient';
@@ -33,6 +33,10 @@ export default function AdminLayout({ children, currentPage, navigate }: Props) 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate({ name: 'home' });
+  };
+
+  const handleGoToStore = () => {
+    navigate({ name: 'shop' });
   };
 
   if (loading) {
@@ -97,6 +101,12 @@ export default function AdminLayout({ children, currentPage, navigate }: Props) 
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleGoToStore}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm"
+              >
+                <Store className="h-4 w-4" /> Mağaza
+              </button>
               <button
                 onClick={() => window.location.reload()}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm"

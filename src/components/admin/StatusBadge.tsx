@@ -29,8 +29,9 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function StatusBadge({ status }: Props) {
-  const style = statusStyles[status] || statusStyles.pending;
-  const label = statusLabels[status] || status;
+  const normalized = (status || '').toLowerCase();
+  const style = statusStyles[status] || statusStyles[normalized] || statusStyles.pending;
+  const label = statusLabels[status] || statusLabels[normalized] || status;
 
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${style}`}>

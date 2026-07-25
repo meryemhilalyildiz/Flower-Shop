@@ -183,8 +183,35 @@ export async function fetchAllOrders() {
 
 // Sipariş durumu güncelle
 export async function updateOrderStatus(id: string, status: string) {
-  const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-  if (error) throw error;
+  const normalizedStatus = normalizeOrderStatus(status);
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status: normalizedStatus })
+    .eq('id', id)
+    .select('id, status')
+    .limit(1);
+
+  if (error) {
+    const message = error.message || 'Sipariş durumu güncellenemedi.';
+    if (error.code === '42501' || /permission|policy/i.test(message)) {
+      throw new Error(`Sipariş durumu güncellenemedi. Supabase RLS politikalarını kontrol edin. ${message}`);
+    }
+    throw new Error(message);
+  }
+
+  return Array.isArray(data) ? data[0] ?? null : data ?? null;
+}
+
+export function normalizeOrderStatus(status: string): string {
+  const value = (status || '').toLowerCase();
+
+  if (['pending', 'beklemede', 'bekliyor'].includes(value)) return 'pending';
+  if (['processing', 'işleniyor', 'hazırlanıyor'].includes(value)) return 'processing';
+  if (['shipped', 'kargoda', 'yolda'].includes(value)) return 'shipped';
+  if (['delivered', 'teslim', 'teslim edildi'].includes(value)) return 'delivered';
+  if (['cancelled', 'iptal', 'iptal edildi'].includes(value)) return 'cancelled';
+
+  return 'pending';
 }
 
 // Slugify fonksiyonu

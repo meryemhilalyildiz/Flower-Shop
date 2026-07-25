@@ -54,6 +54,18 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setIsAdmin(false);
+  };
+
+  const handleAccountClick = () => {
+    if (isAdmin) {
+      window.location.hash = '#/admin/dashboard';
+      navigate({ name: 'admin-dashboard' as any });
+      return;
+    }
+
+    window.location.hash = '#/siparislerim';
+    navigate({ name: 'orders' as any });
   };
 
   const navLinks: { label: string; route: Route }[] = isAdmin
@@ -163,9 +175,12 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                     <History className="w-5 h-5" />
                   </button>
 
-                  <span className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200">
+                  <button
+                    onClick={handleAccountClick}
+                    className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200 hover:bg-brand-100 transition-all"
+                  >
                     {user.user_metadata?.full_name || user.email?.split('@')[0]}
-                  </span>
+                  </button>
 
                   <button
                     onClick={handleSignOut}

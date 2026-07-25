@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Package, Clock, CheckCircle2, Truck, XCircle, RefreshCw, Search, Filter } from 'lucide-react';
-import { fetchAllOrders, updateOrderStatus } from '../services/adminApi';
+import { fetchAllOrders, normalizeOrderStatus, updateOrderStatus } from '../services/adminApi';
 import StatusBadge from '../components/admin/StatusBadge';
 
 export default function AdminOrdersPageNew() {
@@ -14,8 +14,12 @@ export default function AdminOrdersPageNew() {
     setLoading(true);
     try {
       const data = await fetchAllOrders();
-      console.log('Siparişler:', data);
-      setOrders(data || []);
+      const normalizedOrders = (data || []).map((order: any) => ({
+        ...order,
+        status: normalizeOrderStatus(order.status),
+      }));
+      console.log('Siparişler:', normalizedOrders);
+      setOrders(normalizedOrders);
     } catch (err) {
       console.error('Siparişler yüklenirken hata:', err);
       alert('Siparişler yüklenirken bir hata oluştu.');
@@ -31,12 +35,15 @@ export default function AdminOrdersPageNew() {
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setUpdatingId(orderId);
     try {
-      await updateOrderStatus(orderId, newStatus);
+      const normalizedStatus = normalizeOrderStatus(newStatus);
+      await updateOrderStatus(orderId, normalizedStatus);
       setOrders((prevOrders) =>
-        prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+        prevOrders.map((o) => (o.id === orderId ? { ...o, status: normalizedStatus } : o))
       );
+      await loadOrders();
     } catch (err) {
-      alert('Durum güncellenirken hata oluştu.');
+      console.error('Durum güncellenirken hata:', err);
+      alert(err instanceof Error ? err.message : 'Durum güncellenirken hata oluştu.');
     } finally {
       setUpdatingId(null);
     }
