@@ -157,6 +157,19 @@ export function AdminDashboard() {
         });
         alert('Ürün başarıyla güncellendi!');
       } else {
+        if (!newProduct.category_id) {
+          alert('Lütfen bir kategori seçin.');
+          return;
+        }
+        if (!newProduct.price || parseFloat(newProduct.price) < 0.01) {
+          alert('Lütfen geçerli bir fiyat girin.');
+          return;
+        }
+        if (!newProduct.stock_quantity || parseInt(newProduct.stock_quantity) < 0) {
+          alert('Lütfen geçerli bir stok miktarı girin.');
+          return;
+        }
+
         await addProduct({
           name: newProduct.name,
           price: parseFloat(newProduct.price),
@@ -175,7 +188,12 @@ export function AdminDashboard() {
       resetProductForm();
       loadProducts();
     } catch (err) {
-      alert(isEditingMode ? 'Güncelleme sırasında hata oluştu.' : 'Ekleme sırasında hata oluştu.');
+      console.error('Ürün ekleme/güncelleme hatası:', err);
+      alert(
+        isEditingMode
+          ? `Güncelleme hatası: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}`
+          : `Ekleme hatası: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}`
+      );
     }
   };
 
@@ -340,36 +358,56 @@ export function AdminDashboard() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-sand-700">Fiyat (₺)</label>
+                  <label className="text-xs font-semibold text-sand-700">Fiyat (₺) *</label>
                   <input
                     type="number"
                     required
+                    min="0.01"
+                    step="0.01"
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
                     placeholder="350"
-                    className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none"
+                    className={`w-full px-3 py-2 border rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none ${
+                      newProduct.price && parseFloat(newProduct.price) >= 0.01
+                        ? 'border-sand-300'
+                        : 'border-red-500 bg-red-50'
+                    }`}
                   />
+                  {newProduct.price && parseFloat(newProduct.price) < 0.01 && (
+                    <p className="text-xs text-red-600 mt-1">Fiyat 0'dan büyük olmalı</p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-sand-700">Stok Adedi</label>
+                  <label className="text-xs font-semibold text-sand-700">Stok Adedi *</label>
                   <input
                     type="number"
                     required
+                    min="0"
+                    step="1"
                     value={newProduct.stock_quantity}
                     onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value })}
                     placeholder="25"
-                    className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none"
+                    className={`w-full px-3 py-2 border rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none ${
+                      newProduct.stock_quantity && parseInt(newProduct.stock_quantity) >= 0
+                        ? 'border-sand-300'
+                        : 'border-red-500 bg-red-50'
+                    }`}
                   />
+                  {newProduct.stock_quantity && parseInt(newProduct.stock_quantity) < 0 && (
+                    <p className="text-xs text-red-600 mt-1">Stok negatif olamaz</p>
+                  )}
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-sand-700">Kategori</label>
+                <label className="text-xs font-semibold text-sand-700">Kategori *</label>
                 <select
                   required
                   value={newProduct.category_id}
                   onChange={(e) => setNewProduct({ ...newProduct, category_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none"
+                  className={`w-full px-3 py-2 border rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none ${
+                    newProduct.category_id ? 'border-sand-300' : 'border-red-500 bg-red-50'
+                  }`}
                 >
                   <option value="">Kategori Seçin</option>
                   {categories.map((cat) => (
@@ -378,6 +416,9 @@ export function AdminDashboard() {
                     </option>
                   ))}
                 </select>
+                {!newProduct.category_id && (
+                  <p className="text-xs text-red-600 mt-1">Kategori seçimi zorunludur</p>
+                )}
               </div>
 
               <div>

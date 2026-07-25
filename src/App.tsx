@@ -77,6 +77,19 @@ function App() {
     }
 
     loadData();
+
+    // Refresh products every 10 seconds to pick up newly added items
+    const interval = setInterval(() => {
+      fetchProductsFromSupabase()
+        .then((newProducts) => {
+          if (newProducts.length > 0) {
+            setProducts(newProducts);
+          }
+        })
+        .catch((error) => console.error('Ürünler yenilenirken hata:', error));
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -296,6 +309,7 @@ function App() {
             subtotal={cart.subtotal}
             deliveryFee={cart.deliveryFee}
             total={cart.total}
+            timeRemaining={cart.timeRemaining}
             navigate={navigate}
             onUpdateQuantity={cart.updateQuantity}
             onRemove={cart.removeItem}
