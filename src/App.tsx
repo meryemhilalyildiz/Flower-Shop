@@ -322,16 +322,16 @@ function App() {
           />
         );
     }
-  
-    return (
-      <div className="min-h-screen flex flex-col bg-sand-50">
-        <Header cartCount={cart.totalItems} navigate={navigate} currentRoute={route} />
-        <main className="flex-1">{renderPage()}</main>
-        <Footer />
-        {toast && <Toast message={String(toast)} onClose={() => setToast(null)} />}
-      </div>
-    );
-};
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-sand-50">
+      <Header cartCount={cart.totalItems} navigate={navigate} currentRoute={route} />
+      <main className="flex-1">{renderPage()}</main>
+      <Footer />
+      {toast && <Toast message={String(toast)} onClose={() => setToast(null)} />}
+    </div>
+  );
 }
 
-  export default App;
+export default App;

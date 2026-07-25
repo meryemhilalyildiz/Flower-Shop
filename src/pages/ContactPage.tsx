@@ -3,7 +3,11 @@ import { MapPin, Phone, Mail, Clock, Send, Check } from 'lucide-react';
 import type { Route } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 
-export default function ContactPage() {
+type Props = {
+  navigate: (r: Route) => void;
+};
+
+export default function ContactPage({ navigate }: Props) {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [sent, setSent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
