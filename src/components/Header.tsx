@@ -5,6 +5,7 @@ import { routeToHash } from '../router';
 import { AuthModal } from './AuthModal';
 import { supabase } from '../supabaseClient';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { checkAdminAccess } from '../services/adminApi';
 
 type Props = {
   cartCount: number;
@@ -17,6 +18,7 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -26,12 +28,24 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
 
   // 🌸 Supabase Oturum Dinleyicisi
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUser(user);
+      if (user) {
+        const adminCheck = await checkAdminAccess(user.id);
+        setIsAdmin(adminCheck);
+      } else {
+        setIsAdmin(false);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        const adminCheck = await checkAdminAccess(session.user.id);
+        setIsAdmin(adminCheck);
+      } else {
+        setIsAdmin(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -40,15 +54,33 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setIsAdmin(false);
   };
 
-  const navLinks: { label: string; route: Route }[] = [
-    { label: 'Anasayfa', route: { name: 'home' } },
-    { label: 'Mağaza', route: { name: 'shop' } },
-    { label: 'Hakkımızda', route: { name: 'about' } },
-    { label: 'İletişim', route: { name: 'contact' } },
-    { label: 'S.S.S.', route: { name: 'faq' } },
-  ];
+  const handleAccountClick = () => {
+    if (isAdmin) {
+      window.location.hash = '#/admin/dashboard';
+      navigate({ name: 'admin-dashboard' as any });
+      return;
+    }
+
+    window.location.hash = '#/siparislerim';
+    navigate({ name: 'orders' as any });
+  };
+
+  const navLinks: { label: string; route: Route }[] = isAdmin
+    ? [
+        { label: 'Anasayfa', route: { name: 'home' } },
+        { label: 'Hakkımızda', route: { name: 'about' } },
+        { label: 'İletişim', route: { name: 'contact' } },
+      ]
+    : [
+        { label: 'Anasayfa', route: { name: 'home' } },
+        { label: 'Mağaza', route: { name: 'shop' } },
+        { label: 'Hakkımızda', route: { name: 'about' } },
+        { label: 'İletişim', route: { name: 'contact' } },
+        { label: 'S.S.S.', route: { name: 'faq' } },
+      ];
 
   const isActive = (route: Route) => {
     if (route.name === 'home' && currentRoute.name === 'home') return true;
@@ -143,9 +175,12 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                     <History className="w-5 h-5" />
                   </button>
 
-                  <span className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200">
+                  <button
+                    onClick={handleAccountClick}
+                    className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200 hover:bg-brand-100 transition-all"
+                  >
                     {user.user_metadata?.full_name || user.email?.split('@')[0]}
-                  </span>
+                  </button>
 
                   <button
                     onClick={handleSignOut}
@@ -157,13 +192,15 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setIsAuthOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-semibold transition-all ml-1"
-                >
-                  <User className="w-4 h-4" />
-                  <span className="hidden sm:inline">Giriş Yap</span>
-                </button>
+                <div className="flex items-center gap-2 ml-1">
+                  <button
+                    onClick={() => setIsAuthOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-semibold transition-all"
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="hidden sm:inline">Giriş Yap</span>
+                  </button>
+                </div>
               )}
 
               <button

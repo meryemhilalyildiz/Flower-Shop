@@ -74,7 +74,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
       .from('products')
       .select('*')
       .eq('is_active', true)
-      .order('name');
+      .order('created_at', { ascending: false }); // Show newest first
 
     if (error) throw error;
 

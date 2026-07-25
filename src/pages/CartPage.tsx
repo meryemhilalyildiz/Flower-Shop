@@ -1,4 +1,4 @@
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Clock } from 'lucide-react';
 import type { CartItem, Route } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 
@@ -7,16 +7,24 @@ type Props = {
   subtotal: number;
   deliveryFee: number;
   total: number;
+  timeRemaining: number | null;
   navigate: (r: Route) => void;
   onUpdateQuantity: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
 };
 
-export default function CartPage({ items, subtotal, deliveryFee, total, navigate, onUpdateQuantity, onRemove }: Props) {
+export default function CartPage({ items, subtotal, deliveryFee, total, timeRemaining, navigate, onUpdateQuantity, onRemove }: Props) {
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },
     { label: 'Sepet' },
   ];
+
+  const formatTimeRemaining = (ms: number | null) => {
+    if (ms === null) return null;
+    const seconds = Math.floor((ms / 1000) % 60);
+    const minutes = Math.floor((ms / (1000 * 60)) % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   if (items.length === 0) {
     return (
@@ -35,6 +43,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, navigate
   }
 
   const remainingForFree = 500 - subtotal;
+  const isTimeRunningLow = timeRemaining !== null && timeRemaining < 60000; // Less than 1 minute
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
@@ -45,6 +54,19 @@ export default function CartPage({ items, subtotal, deliveryFee, total, navigate
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Items */}
         <div className="lg:col-span-2 space-y-4">
+          {timeRemaining !== null && (
+            <div className={`rounded-2xl p-4 flex items-center gap-3 border ${
+              isTimeRunningLow 
+                ? 'bg-red-50 border-red-200' 
+                : 'bg-amber-50 border-amber-200'
+            }`}>
+              <Clock className={`w-5 h-5 flex-shrink-0 ${isTimeRunningLow ? 'text-red-600' : 'text-amber-600'}`} />
+              <p className={`text-sm font-semibold ${isTimeRunningLow ? 'text-red-700' : 'text-amber-700'}`}>
+                Sipariş verme süresi: <span className="font-bold">{formatTimeRemaining(timeRemaining)}</span> | Sepete eklediğiniz ürünler 5 dakika sonra silinecek
+              </p>
+            </div>
+          )}
+
           {deliveryFee > 0 && (
             <div className="bg-brand-50 border border-brand-100 rounded-2xl p-4 flex items-center gap-3">
               <Truck className="w-5 h-5 text-brand-600 flex-shrink-0" />

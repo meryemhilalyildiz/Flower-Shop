@@ -18,9 +18,16 @@ function parseHash(): Route {
   if (parts[0] === 'hakkimizda') return { name: 'about' };
   if (parts[0] === 'iletisim') return { name: 'contact' };
   if (parts[0] === 'sss') return { name: 'faq' };
-  if (parts[0] === 'admin' && parts[1] === 'siparisler') return { name: 'admin-orders' };
-  if (parts[0] === 'admin' && parts[1] === 'kargo') return { name: 'admin-shipping' };
-  if (parts[0] === 'admin' && (parts[1] === 'dashboard' || parts.length === 1)) return { name: 'admin-dashboard' };
+  if (parts[0] === 'admin') {
+    if (parts[1] === 'login') return { name: 'admin-login' };
+    if (parts[1] === 'dashboard' || parts.length === 1) return { name: 'admin-dashboard' };
+    if (parts[1] === 'urunler') return { name: 'admin-products' };
+    if (parts[1] === 'kategoriler') return { name: 'admin-categories' };
+    if (parts[1] === 'siparisler') return { name: 'admin-orders' };
+    if (parts[1] === 'kargo') return { name: 'admin-shipping' };
+    if (parts[1] === 'ilceler') return { name: 'admin-districts' };
+    if (parts[1] === 'wiki') return { name: 'admin-wiki' };
+  }
   return { name: 'home' };
 }
 
@@ -46,10 +53,22 @@ export function routeToHash(route: Route): string {
       return '#/iletisim';
     case 'faq':
       return '#/sss';
+    case 'admin-login':
+      return '#/admin/login';
+    case 'admin-dashboard':
+      return '#/admin/dashboard';
+    case 'admin-products':
+      return '#/admin/urunler';
+    case 'admin-categories':
+      return '#/admin/kategoriler';
     case 'admin-orders':
       return '#/admin/siparisler';
     case 'admin-shipping':
       return '#/admin/kargo';
+    case 'admin-districts':
+      return '#/admin/ilceler';
+    case 'admin-wiki':
+      return '#/admin/wiki';
     default:
       return '#/';
   }

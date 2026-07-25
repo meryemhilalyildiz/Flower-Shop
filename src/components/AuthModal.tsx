@@ -20,6 +20,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null
 
+  const handleGoToAdminLogin = () => {
+    onClose()
+    window.location.hash = '#/admin/login'
+  }
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage('')
@@ -75,11 +80,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         return
       }
 
+      if (profile?.role === 'admin') {
+        setMessage('✅ Yönetici girişi başarılı!')
+        setTimeout(() => {
+          onClose()
+          window.location.hash = '#/admin/dashboard'
+        }, 500)
+        return
+      }
+
       setMessage('✅ Giriş başarılı!')
       setTimeout(() => {
         onClose()
-        window.location.reload()
-      }, 1000)
+        window.location.hash = '#/magaza'
+      }, 500)
     }
   }
 
@@ -130,6 +144,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <p onClick={() => { setIsSignUp(!isSignUp); setMessage('') }} style={{ marginTop: '1rem', fontSize: '0.875rem', color: '#2563eb', cursor: 'pointer', textAlign: 'center' }}>
           {isSignUp ? 'Zaten hesabınız var mı? Giriş Yap' : 'Hesabınız yok mu? Kayıt Ol'}
         </p>
+
+        <button
+          type="button"
+          onClick={handleGoToAdminLogin}
+          style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#111827', cursor: 'pointer', textAlign: 'center', textDecoration: 'underline' }}
+        >
+          Yönetici girişi için buraya tıklayın
+        </button>
         
         <button onClick={onClose} style={{ marginTop: '0.5rem', width: '100%', padding: '0.4rem', border: 'none', background: '#e5e7eb', borderRadius: '6px', cursor: 'pointer' }}>Kapat</button>
       </div>

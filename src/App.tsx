@@ -25,10 +25,16 @@ import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
 import AdminOrdersPage from './pages/AdminOrdersPage';
-import { AdminCompaniesPage } from './pages/AdminCompaniesPage';
-import { CompanyDashboard } from './pages/CompanyDashboard';
+import AdminOrdersPageNew from './pages/AdminOrdersPageNew';
 import { AdminDashboard } from './pages/AdminDashboardPage'; // 👈 Sadece tek bir tane kalsın!
 import { AdminShippingPage } from './pages/AdminShippingPage';
+import AdminLoginPage from './pages/AdminLoginPage';
+import AdminDashboardNew from './pages/AdminDashboardNew';
+import AdminCategoriesPage from './pages/AdminCategoriesPage';
+import AdminDistrictsPage from './pages/AdminDistrictsPage';
+import AdminWikiPage from './pages/AdminWikiPage';
+import { useAdminAuth } from './hooks/useAdminAuth';
+import AdminLayout from './components/admin/AdminLayout';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -39,6 +45,7 @@ function App() {
   const [categories, setCategories] = useState(mockCategories);
   const [loading, setLoading] = useState(true);
   const [useApi, setUseApi] = useState(true);
+  const { loading: adminLoading, isAdmin } = useAdminAuth();
 
   // Load data from Supabase or fallback to mock data
   useEffect(() => {
@@ -71,6 +78,19 @@ function App() {
     }
 
     loadData();
+
+    // Refresh products every 10 seconds to pick up newly added items
+    const interval = setInterval(() => {
+      fetchProductsFromSupabase()
+        .then((newProducts) => {
+          if (newProducts.length > 0) {
+            setProducts(newProducts);
+          }
+        })
+        .catch((error) => console.error('Ürünler yenilenirken hata:', error));
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -290,6 +310,7 @@ function App() {
             subtotal={cart.subtotal}
             deliveryFee={cart.deliveryFee}
             total={cart.total}
+            timeRemaining={cart.timeRemaining}
             navigate={navigate}
             onUpdateQuantity={cart.updateQuantity}
             onRemove={cart.removeItem}
@@ -326,17 +347,47 @@ function App() {
       case 'faq':
         return <FaqPage navigate={navigate} />;
 
-      /* ⚙️ ADMİN VE B2B ŞİRKET ROTALARI 🏢 */
+      /* ⚙️ ADMİN ROTALARI 🏢 */
+      case 'admin-login':
+        return <AdminLoginPage onLoginSuccess={() => navigate({ name: 'admin-dashboard' })} />;
       case 'admin-dashboard':
-        return <AdminDashboard />;
+        return (
+          <AdminLayout currentPage="admin-dashboard" navigate={navigate}>
+            <AdminDashboardNew navigate={navigate} />
+          </AdminLayout>
+        );
+      case 'admin-products':
+        return (
+          <AdminLayout currentPage="admin-products" navigate={navigate}>
+            <AdminDashboard />
+          </AdminLayout>
+        );
+      case 'admin-categories':
+        return (
+          <AdminLayout currentPage="admin-categories" navigate={navigate}>
+            <AdminCategoriesPage />
+          </AdminLayout>
+        );
       case 'admin-orders':
-        return <AdminOrdersPage />;
-      case 'admin-companies':
-        return <AdminCompaniesPage />;
+        return (
+          <AdminLayout currentPage="admin-orders" navigate={navigate}>
+            <AdminOrdersPageNew />
+          </AdminLayout>
+        );
+      case 'admin-districts':
+        return (
+          <AdminLayout currentPage="admin-districts" navigate={navigate}>
+            <AdminDistrictsPage />
+          </AdminLayout>
+        );
       case 'admin-shipping':
         return <AdminShippingPage />;
-      case 'company-dashboard':
-        return <CompanyDashboard />;
+      case 'admin-wiki':
+        return (
+          <AdminLayout currentPage="admin-wiki" navigate={navigate}>
+            <AdminWikiPage />
+          </AdminLayout>
+        );
 
       default:
         return (

@@ -170,7 +170,11 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
     const newErrors: Partial<Record<keyof FormState, string>> = {};
     if (!form.recipientName.trim()) newErrors.recipientName = 'Alıcı adı gerekli';
     if (!form.recipientPhone.trim()) newErrors.recipientPhone = 'Telefon gerekli';
-    else if (form.recipientPhone.replace(/\D/g, '').length < 10) newErrors.recipientPhone = 'Geçerli bir telefon girin';
+    else {
+      const phoneDigits = form.recipientPhone.replace(/\D/g, '');
+      if (phoneDigits.length !== 10) newErrors.recipientPhone = 'Telefon 10 haneli olmalı (örn: 5XXXXXXXXX)';
+      else if (!phoneDigits.startsWith('5')) newErrors.recipientPhone = 'Geçerli bir Türkiye cep telefonu girin';
+    }
     if (!form.address.trim()) newErrors.address = 'Adres gerekli';
     if (!form.city.trim()) newErrors.city = 'İlçe seçimi gerekli';
     if (!form.deliveryDate) newErrors.deliveryDate = 'Teslimat tarihi gerekli';

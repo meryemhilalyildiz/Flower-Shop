@@ -56,11 +56,16 @@ export type Route =
   | { name: 'contact' }
   | { name: 'faq' }
   | { name: 'orders' }
+  | { name: 'admin-dashboard' }
+  | { name: 'admin-products' }
+  | { name: 'admin-categories' }
   | { name: 'admin-orders' }
   | { name: 'admin-companies' }
   | { name: 'company-dashboard' }
-  | { name: 'admin-dashboard' }
-  | { name: 'admin-shipping' };; // 🌸 Tek Route tanımı burada bitti.
+  | { name: 'admin-shipping' }
+  | { name: 'admin-districts' }
+  | { name: 'admin-wiki' }
+  | { name: 'admin-login' }; // 🌸 Tek Route tanımı burada bitti.
 
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri
