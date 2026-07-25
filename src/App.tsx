@@ -1,17 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from './router';
 import { useCart } from './useCart';
-import { supabase } from './supabaseClient'; // Yol proje yapına göre './supabaseClient' veya '../supabaseClient' olabilir.
+import { supabase } from './supabaseClient';
 import {
-  fetchProducts,
-  fetchCategories,
   getFeaturedProducts,
   getDiscountedProducts,
   getProductBySlug,
   mockProducts,
   mockCategories,
 } from './data';
-import { apiService } from './services/api';
+import { fetchCategoriesFromSupabase, fetchProductsFromSupabase } from './services/supabaseData';
 import type { Product, OrderInfo } from './types';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -41,11 +39,37 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [useApi, setUseApi] = useState(true);
 
-  // Load data from API or fallback to mock data
+  // Load data from Supabase or fallback to mock data
   useEffect(() => {
-    setProducts(mockProducts);
-    setCategories(mockCategories);
-    setLoading(false);
+    async function loadData() {
+      try {
+        const [supabaseProducts, supabaseCategories] = await Promise.all([
+          fetchProductsFromSupabase(),
+          fetchCategoriesFromSupabase(),
+        ]);
+
+        if (supabaseProducts.length > 0) {
+          setProducts(supabaseProducts);
+        } else {
+          setProducts(mockProducts);
+        }
+
+        if (supabaseCategories.length > 0) {
+          setCategories(supabaseCategories);
+        } else {
+          setCategories(mockCategories);
+        }
+      } catch (error) {
+        console.error('Veri yüklenirken hata:', error);
+        // Fallback to mock data
+        setProducts(mockProducts);
+        setCategories(mockCategories);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -256,7 +280,7 @@ function App() {
             </div>
           );
         }
-        return <ProductPage product={product} navigate={navigate} onAddToCart={handleAddToCart} />;
+        return <ProductPage product={product} categories={categories} navigate={navigate} onAddToCart={handleAddToCart} />;
       }
       case 'cart':
         return (

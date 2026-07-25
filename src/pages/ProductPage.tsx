@@ -1,22 +1,23 @@
 import { useState } from 'react';
 import { Star, Minus, Plus, ShoppingBag, Truck, ShieldCheck, RefreshCw, ChevronLeft, Check } from 'lucide-react';
-import type { Product, Route } from '../types';
+import type { Product, Route, Category } from '../types';
 import { getCategoryById, products as allProducts } from '../data';
 import Breadcrumbs from '../components/Breadcrumbs';
 import ProductCard from '../components/ProductCard';
 
 type Props = {
   product: Product;
+  categories: Category[];
   navigate: (r: Route) => void;
   onAddToCart: (p: Product, qty: number) => void;
 };
 
-export default function ProductPage({ product, navigate, onAddToCart }: Props) {
+export default function ProductPage({ product, categories, navigate, onAddToCart }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
 
-  const category = getCategoryById(product.categoryId);
+  const category = getCategoryById(product.categoryId, categories);
   const related = allProducts
     .filter((p) => p.categoryId === product.categoryId && p.id !== product.id)
     .slice(0, 4);
