@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, Edit3, ShoppingBag, Building2, RefreshCw, Save, X } from 'lucide-react';
+import { Package, Plus, Trash2, Edit3, ShoppingBag, Building2, RefreshCw, Save, X, Truck } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { addProduct, updateProduct, deleteProduct } from '../services/api';
 
@@ -115,6 +115,12 @@ export function AdminDashboard() {
             className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer"
           >
             <Building2 className="w-4 h-4" /> B2B Onayları
+          </button>
+          <button
+            onClick={() => (window.location.hash = '#/admin/kargo')}
+            className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <Truck className="w-4 h-4" /> Kargo Yönetimi
           </button>
           <button
             onClick={() => setShowAddModal(true)}

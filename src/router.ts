@@ -19,6 +19,8 @@ function parseHash(): Route {
   if (parts[0] === 'iletisim') return { name: 'contact' };
   if (parts[0] === 'sss') return { name: 'faq' };
   if (parts[0] === 'admin' && parts[1] === 'siparisler') return { name: 'admin-orders' };
+  if (parts[0] === 'admin' && parts[1] === 'kargo') return { name: 'admin-shipping' };
+  if (parts[0] === 'admin' && (parts[1] === 'dashboard' || parts.length === 1)) return { name: 'admin-dashboard' };
   return { name: 'home' };
 }
 
@@ -46,6 +48,8 @@ export function routeToHash(route: Route): string {
       return '#/sss';
     case 'admin-orders':
       return '#/admin/siparisler';
+    case 'admin-shipping':
+      return '#/admin/kargo';
     default:
       return '#/';
   }

@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck } from 'lucide-react';
+import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck, Calendar, Clock, Info, RefreshCw, Truck } from 'lucide-react';
 import type { CartItem, Route, OrderInfo } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { CITIES_DATA, fetchDistrictsByCity } from '../services/dataFetching';
 import type { City, District } from '../services/dataFetching';
 import { supabase } from '../supabaseClient';
+import {
+  calculateShippingCached,
+  generateDeliveryDateOptions,
+  formatDateTurkish,
+} from '../services/shipping';
+import type { ShippingCalculation } from '../types';
 
 type Props = {
   items: CartItem[];
@@ -29,7 +35,16 @@ type FormState = {
   cardCvv: string;
 };
 
-export default function CheckoutPage({ items, subtotal, deliveryFee, total, navigate, onPlaceOrder }: Props) {
+type SavedAddress = {
+  id: string;
+  title: string;
+  recipient_name: string;
+  recipient_phone: string;
+  address: string;
+  district: string;
+};
+
+export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }: Props) {
   const [form, setForm] = useState<FormState>({
     recipientName: '',
     recipientPhone: '',
@@ -45,7 +60,7 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
   });
 
   // 🌸 Kayıtlı Adres / Alıcı State'leri
-  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [saveForNextTime, setSaveForNextTime] = useState(false);
   const [addressTitle, setAddressTitle] = useState('');
 
@@ -53,6 +68,11 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
   const [cities, setCities] = useState<City[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+
+  // 🌸 Dinamik Kargo Hesaplama State'leri
+  const [shippingInfo, setShippingInfo] = useState<ShippingCalculation | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [deliveryDateOptions, setDeliveryDateOptions] = useState<string[]>([]);
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -75,17 +95,50 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
     loadAddresses();
   }, []);
 
-  // 🌸 İl Seçildiğinde O İlin İlçelerini Getir (Bu Kalıyor!)
+  // 🌸 İl Seçildiğinde O İlin İlçelerini Getir ve Kargo Hesapla
   const handleCityChange = async (cityIdStr: string) => {
     const cityId = Number(cityIdStr);
     setSelectedCityId(cityId);
     update('city', '');
+    setForm((f) => ({ ...f, deliveryDate: '' }));
+    setShippingInfo(null);
+    setDeliveryDateOptions([]);
 
     if (cityId) {
+      const cityObj = CITIES_DATA.find((c) => c.id === cityId);
+      const cityName = cityObj ? cityObj.name : '';
+
       const districtList = await fetchDistrictsByCity(cityId);
       setDistricts(districtList);
+
+      // 🌸 Kargo hesabını tetikle
+      await calculateShippingForCity(cityName);
     } else {
       setDistricts([]);
+    }
+  };
+
+  // 🌸 Kargo Hesaplama Fonksiyonu
+  const calculateShippingForCity = async (cityName: string) => {
+    if (!cityName) return;
+
+    setShippingLoading(true);
+    try {
+      const result = await calculateShippingCached(cityName, '');
+      setShippingInfo(result);
+
+      // 🌸 Teslimat tarihi seçeneklerini oluştur
+      const options = generateDeliveryDateOptions(result.earliestDeliveryDate, 7);
+      setDeliveryDateOptions(options);
+
+      // 🌸 İlk teslimat tarihini otomatik seç
+      if (options.length > 0) {
+        update('deliveryDate', options[0]);
+      }
+    } catch (err) {
+      console.error('Kargo hesaplama hatası:', err);
+    } finally {
+      setShippingLoading(false);
     }
   };
 
@@ -108,6 +161,10 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
       }));
     }
   };
+
+  // 🌸 Dinamik toplam hesaplama
+  const dynamicDeliveryFee = shippingInfo ? shippingInfo.shippingFee : 0;
+  const dynamicTotal = subtotal + dynamicDeliveryFee;
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof FormState, string>> = {};
@@ -148,7 +205,7 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
 
       const orderId = await onPlaceOrder({
         items,
-        total,
+        total: dynamicTotal,
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
         address: form.address,
@@ -303,17 +360,106 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
                 {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
               </div>
 
-              <div data-error={!!errors.deliveryDate}>
-                <label className="label">Teslimat Tarihi *</label>
-                <input
-                  type="date"
-                  value={form.deliveryDate}
-                  onChange={(e) => update('deliveryDate', e.target.value)}
-                  className="input"
-                  min={new Date().toISOString().split('T')[0]}
-                />
+              {/* 🌸 Dinamik Kargo Bilgisi Kartı */}
+              {shippingInfo && (
+                <div className="sm:col-span-2 bg-brand-50/60 border border-brand-200 rounded-2xl p-4 mb-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
+                      <Truck className="w-4 h-4 text-brand-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-sand-900 mb-1">Kargo Bilgileri</h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                        <div>
+                          <span className="text-xs text-sand-500">Mesafe</span>
+                          <p className="font-bold text-brand-700">{shippingInfo.distance} km</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-sand-500">Kargo Ücreti</span>
+                          <p className="font-bold text-rose-700">{shippingInfo.shippingFee} TL</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-sand-500">Teslimat Süresi</span>
+                          <p className="font-bold text-sand-800">{shippingInfo.deliveryDays} gün</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-sand-500">Mağaza</span>
+                          <p className="font-bold text-sand-800 text-xs">{shippingInfo.storeCity} / {shippingInfo.storeDistrict}</p>
+                        </div>
+                      </div>
+                      {shippingInfo.rule && (
+                        <p className="text-xs text-sand-600 mt-2">
+                          {shippingInfo.rule.min_km} - {shippingInfo.rule.max_km} km arası → {shippingInfo.rule.price} TL / {shippingInfo.rule.delivery_days} gün
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 🌸 Teslimat Tarihi - Dinamik Takvim */}
+              <div data-error={!!errors.deliveryDate} className="sm:col-span-2">
+                <label className="label flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-brand-600" />
+                  Teslimat Tarihi *
+                </label>
+
+                {shippingLoading && (
+                  <div className="flex items-center gap-2 text-sm text-sand-600 mb-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Kargo bilgileri hesaplanıyor...
+                  </div>
+                )}
+
+                {!shippingInfo && !shippingLoading && selectedCityId && (
+                  <div className="flex items-center gap-2 text-sm text-sand-600 mb-2">
+                    <Info className="w-4 h-4" />
+                    İl seçtiğinizde kargo ücreti ve teslimat tarihi otomatik hesaplanacak.
+                  </div>
+                )}
+
+                {deliveryDateOptions.length > 0 ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {deliveryDateOptions.map((date) => (
+                      <button
+                        key={date}
+                        type="button"
+                        onClick={() => update('deliveryDate', date)}
+                        className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                          form.deliveryDate === date
+                            ? 'border-brand-600 bg-brand-50 text-brand-700 font-bold'
+                            : 'border-sand-200 hover:border-brand-300 hover:bg-brand-50/30'
+                        }`}
+                      >
+                        <div className="text-xs text-sand-500 mb-1">
+                          {new Date(date).toLocaleDateString('tr-TR', { weekday: 'short' })}
+                        </div>
+                        <div className="text-lg font-bold">{new Date(date).getDate()}</div>
+                        <div className="text-xs text-sand-500">
+                          {new Date(date).toLocaleDateString('tr-TR', { month: 'short' })}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="date"
+                    value={form.deliveryDate}
+                    onChange={(e) => update('deliveryDate', e.target.value)}
+                    className="input"
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                )}
+
+                {form.deliveryDate && (
+                  <p className="text-xs text-sand-600 mt-2 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    Seçilen tarih: {formatDateTurkish(form.deliveryDate)}
+                  </p>
+                )}
                 {errors.deliveryDate && <p className="text-xs text-red-500 mt-1">{errors.deliveryDate}</p>}
               </div>
+
               <div className="sm:col-span-2">
                 <label className="label">Not (opsiyonel)</label>
                 <textarea
@@ -444,11 +590,17 @@ export default function CheckoutPage({ items, subtotal, deliveryFee, total, navi
               </div>
               <div className="flex justify-between text-sand-600">
                 <span>Kargo</span>
-                <span>{deliveryFee === 0 ? <span className="text-leaf-600">Ücretsiz</span> : `${deliveryFee} TL`}</span>
+                <span>
+                  {shippingInfo ? (
+                    <span className="font-medium text-sand-800">{shippingInfo.shippingFee} TL</span>
+                  ) : (
+                    <span className="text-sand-400">İl seçin</span>
+                  )}
+                </span>
               </div>
               <div className="border-t border-sand-100 pt-2 flex justify-between items-baseline">
                 <span className="font-semibold text-sand-800">Toplam</span>
-                <span className="text-2xl font-bold text-brand-700">{total} TL</span>
+                <span className="text-2xl font-bold text-brand-700">{dynamicTotal} TL</span>
               </div>
             </div>
 

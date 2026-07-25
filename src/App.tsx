@@ -28,6 +28,7 @@ import AdminOrdersPage from './pages/AdminOrdersPage';
 import { AdminCompaniesPage } from './pages/AdminCompaniesPage';
 import { CompanyDashboard } from './pages/CompanyDashboard';
 import { AdminDashboard } from './pages/AdminDashboardPage'; // 👈 Sadece tek bir tane kalsın!
+import { AdminShippingPage } from './pages/AdminShippingPage';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -332,6 +333,8 @@ function App() {
         return <AdminOrdersPage />;
       case 'admin-companies':
         return <AdminCompaniesPage />;
+      case 'admin-shipping':
+        return <AdminShippingPage />;
       case 'company-dashboard':
         return <CompanyDashboard />;
 
