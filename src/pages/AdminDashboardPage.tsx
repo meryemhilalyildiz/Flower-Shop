@@ -1,30 +1,33 @@
 import { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, Edit3, ShoppingBag, Building2, RefreshCw, Save, X } from 'lucide-react';
+import { Package, Plus, Trash2, Edit3, ShoppingBag, Building2, RefreshCw, Save, X, Upload } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { addProduct, updateProduct, deleteProduct } from '../services/api';
+import { addProduct, updateProduct, deleteProduct, fetchAllProducts, fetchAllCategories } from '../services/adminApi';
 
 export function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Yeni Ürün Form State'i
   const [newProduct, setNewProduct] = useState({
     name: '',
     price: '',
-    stock: '',
+    stock_quantity: '',
     image_url: '',
-    category: 'Cicekler',
-    description: ''
+    category_id: '',
+    description: '',
+    freshness_score: 10,
+    vase_life_days: 7
   });
 
   // Ürünleri Çek
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
+      const data = await fetchAllProducts();
       setProducts(data || []);
     } catch (err) {
       alert('Ürünler yüklenirken hata oluştu.');
@@ -33,9 +36,50 @@ export function AdminDashboard() {
     }
   };
 
+  // Kategorileri Çek
+  const loadCategories = async () => {
+    try {
+      const data = await fetchAllCategories();
+      setCategories(data || []);
+    } catch (err) {
+      console.error('Kategoriler yüklenirken hata:', err);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
+
+  // Resim Yükleme
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+
+      setNewProduct({ ...newProduct, image_url: publicUrl });
+    } catch (error) {
+      alert('Resim yüklenirken hata oluştu');
+      console.error(error);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   // Yeni Ürün Ekle
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -44,14 +88,25 @@ export function AdminDashboard() {
       await addProduct({
         name: newProduct.name,
         price: parseFloat(newProduct.price),
-        stock: parseInt(newProduct.stock),
+        stock_quantity: parseInt(newProduct.stock_quantity),
         image_url: newProduct.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
-        category: newProduct.category,
-        description: newProduct.description
+        category_id: newProduct.category_id,
+        description: newProduct.description,
+        freshness_score: newProduct.freshness_score,
+        vase_life_days: newProduct.vase_life_days
       });
       alert('Yeni çiçek başarıyla eklendi!');
       setShowAddModal(false);
-      setNewProduct({ name: '', price: '', stock: '', image_url: '', category: 'Cicekler', description: '' });
+      setNewProduct({
+        name: '',
+        price: '',
+        stock_quantity: '',
+        image_url: '',
+        category_id: '',
+        description: '',
+        freshness_score: 10,
+        vase_life_days: 7
+      });
       loadProducts();
     } catch (err) {
       alert('Ekleme sırasında hata oluştu.');
@@ -177,13 +232,13 @@ export function AdminDashboard() {
                     {editingProduct?.id === p.id ? (
                       <input
                         type="number"
-                        defaultValue={p.stock || 0}
+                        defaultValue={p.stock_quantity || 0}
                         id={`stock-${p.id}`}
                         className="w-20 px-2 py-1 border border-sand-300 rounded-lg text-sm"
                       />
                     ) : (
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.stock > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                        {p.stock || 0} Adet Stok
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.stock_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                        {p.stock_quantity || 0} Adet Stok
                       </span>
                     )}
                   </td>
@@ -195,7 +250,7 @@ export function AdminDashboard() {
                         onClick={() => {
                           const newPrice = (document.getElementById(`price-${p.id}`) as HTMLInputElement).value;
                           const newStock = (document.getElementById(`stock-${p.id}`) as HTMLInputElement).value;
-                          handleUpdateProduct(p.id, { price: parseFloat(newPrice), stock: parseInt(newStock) });
+                          handleUpdateProduct(p.id, { price: parseFloat(newPrice), stock_quantity: parseInt(newStock) });
                         }}
                         className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all cursor-pointer"
                         title="Kaydet"
@@ -266,8 +321,8 @@ export function AdminDashboard() {
                   <input
                     type="number"
                     required
-                    value={newProduct.stock}
-                    onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
+                    value={newProduct.stock_quantity}
+                    onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value })}
                     placeholder="25"
                     className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none"
                   />
@@ -275,14 +330,72 @@ export function AdminDashboard() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-sand-700">Görsel URL</label>
-                <input
-                  type="url"
-                  value={newProduct.image_url}
-                  onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
+                <label className="text-xs font-semibold text-sand-700">Kategori</label>
+                <select
+                  required
+                  value={newProduct.category_id}
+                  onChange={(e) => setNewProduct({ ...newProduct, category_id: e.target.value })}
                   className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none"
-                />
+                >
+                  <option value="">Kategori Seçin</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-sand-700">Görsel</label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="url"
+                    value={newProduct.image_url}
+                    onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
+                    placeholder="https://images.unsplash.com/..."
+                    className="flex-1 px-3 py-2 border border-sand-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 outline-none"
+                  />
+                  <label className="flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-700 rounded-xl cursor-pointer hover:bg-brand-100 transition-all">
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Yükle</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {uploadingImage && (
+                  <p className="text-xs text-sand-500 mt-1">Resim yükleniyor...</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-sand-700">Tazelik Skoru (1-10)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    value={newProduct.freshness_score}
+                    onChange={(e) => setNewProduct({ ...newProduct, freshness_score: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-sand-700">Vazo Ömrü (Gün)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newProduct.vase_life_days}
+                    onChange={(e) => setNewProduct({ ...newProduct, vase_life_days: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none"
+                  />
+                </div>
               </div>
 
               <div>

@@ -56,7 +56,10 @@ export type Route =
   | { name: 'contact' }
   | { name: 'faq' }
   | { name: 'orders' }
+  | { name: 'admin-login' }
+  | { name: 'admin-dashboard' }
+  | { name: 'admin-products' }
+  | { name: 'admin-categories' }
   | { name: 'admin-orders' }
-  | { name: 'admin-companies' }
-  | { name: 'company-dashboard' }
-  | { name: 'admin-dashboard' };; // 🌸 Tek Route tanımı burada bitti.
+  | { name: 'admin-districts' }
+  | { name: 'admin-wiki' }; // 🌸 Tek Route tanımı burada bitti.

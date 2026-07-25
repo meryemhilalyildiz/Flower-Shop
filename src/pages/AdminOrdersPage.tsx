@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Package, Clock, CheckCircle2, Truck, XCircle, RefreshCw } from 'lucide-react';
-import { fetchAllOrders, updateOrderStatus } from '../services/api';
+import { fetchAllOrders, updateOrderStatus } from '../services/adminApi';
 
 export function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);

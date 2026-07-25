@@ -5,6 +5,7 @@ import { routeToHash } from '../router';
 import { AuthModal } from './AuthModal';
 import { supabase } from '../supabaseClient';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { checkAdminAccess } from '../services/adminApi';
 
 type Props = {
   cartCount: number;
@@ -17,6 +18,7 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -26,12 +28,22 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
 
   // 🌸 Supabase Oturum Dinleyicisi
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUser(user);
+      if (user) {
+        const adminCheck = await checkAdminAccess(user.id);
+        setIsAdmin(adminCheck);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        const adminCheck = await checkAdminAccess(session.user.id);
+        setIsAdmin(adminCheck);
+      } else {
+        setIsAdmin(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -42,13 +54,19 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
     setUser(null);
   };
 
-  const navLinks: { label: string; route: Route }[] = [
-    { label: 'Anasayfa', route: { name: 'home' } },
-    { label: 'Mağaza', route: { name: 'shop' } },
-    { label: 'Hakkımızda', route: { name: 'about' } },
-    { label: 'İletişim', route: { name: 'contact' } },
-    { label: 'S.S.S.', route: { name: 'faq' } },
-  ];
+  const navLinks: { label: string; route: Route }[] = isAdmin
+    ? [
+        { label: 'Anasayfa', route: { name: 'home' } },
+        { label: 'Hakkımızda', route: { name: 'about' } },
+        { label: 'İletişim', route: { name: 'contact' } },
+      ]
+    : [
+        { label: 'Anasayfa', route: { name: 'home' } },
+        { label: 'Mağaza', route: { name: 'shop' } },
+        { label: 'Hakkımızda', route: { name: 'about' } },
+        { label: 'İletişim', route: { name: 'contact' } },
+        { label: 'S.S.S.', route: { name: 'faq' } },
+      ];
 
   const isActive = (route: Route) => {
     if (route.name === 'home' && currentRoute.name === 'home') return true;
@@ -157,13 +175,27 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setIsAuthOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-semibold transition-all ml-1"
-                >
-                  <User className="w-4 h-4" />
-                  <span className="hidden sm:inline">Giriş Yap</span>
-                </button>
+                <div className="flex items-center gap-2 ml-1">
+                  <button
+                    onClick={() => setIsAuthOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-semibold transition-all"
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="hidden sm:inline">Giriş Yap</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      window.location.hash = '#/admin/login';
+                      if (typeof navigate === 'function') {
+                        navigate({ name: 'admin-login' as any });
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-900 text-white hover:bg-gray-800 text-sm font-semibold transition-all"
+                    title="Admin Girişi"
+                  >
+                    <span className="hidden sm:inline">Admin</span>
+                  </button>
+                </div>
               )}
 
               <button

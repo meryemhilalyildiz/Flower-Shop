@@ -25,9 +25,15 @@ import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
 import AdminOrdersPage from './pages/AdminOrdersPage';
-import { AdminCompaniesPage } from './pages/AdminCompaniesPage';
-import { CompanyDashboard } from './pages/CompanyDashboard';
+import AdminOrdersPageNew from './pages/AdminOrdersPageNew';
 import { AdminDashboard } from './pages/AdminDashboardPage'; // 👈 Sadece tek bir tane kalsın!
+import AdminLoginPage from './pages/AdminLoginPage';
+import AdminDashboardNew from './pages/AdminDashboardNew';
+import AdminCategoriesPage from './pages/AdminCategoriesPage';
+import AdminDistrictsPage from './pages/AdminDistrictsPage';
+import AdminWikiPage from './pages/AdminWikiPage';
+import { useAdminAuth } from './hooks/useAdminAuth';
+import AdminLayout from './components/admin/AdminLayout';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -38,6 +44,7 @@ function App() {
   const [categories, setCategories] = useState(mockCategories);
   const [loading, setLoading] = useState(true);
   const [useApi, setUseApi] = useState(true);
+  const { loading: adminLoading, isAdmin } = useAdminAuth();
 
   // Load data from Supabase or fallback to mock data
   useEffect(() => {
@@ -325,15 +332,45 @@ function App() {
       case 'faq':
         return <FaqPage navigate={navigate} />;
 
-      /* ⚙️ ADMİN VE B2B ŞİRKET ROTALARI 🏢 */
+      /* ⚙️ ADMİN ROTALARI 🏢 */
+      case 'admin-login':
+        return <AdminLoginPage onLoginSuccess={() => navigate({ name: 'admin-dashboard' })} />;
       case 'admin-dashboard':
-        return <AdminDashboard />;
+        return (
+          <AdminLayout currentPage="admin-dashboard" navigate={navigate}>
+            <AdminDashboardNew navigate={navigate} />
+          </AdminLayout>
+        );
+      case 'admin-products':
+        return (
+          <AdminLayout currentPage="admin-products" navigate={navigate}>
+            <AdminDashboard />
+          </AdminLayout>
+        );
+      case 'admin-categories':
+        return (
+          <AdminLayout currentPage="admin-categories" navigate={navigate}>
+            <AdminCategoriesPage />
+          </AdminLayout>
+        );
       case 'admin-orders':
-        return <AdminOrdersPage />;
-      case 'admin-companies':
-        return <AdminCompaniesPage />;
-      case 'company-dashboard':
-        return <CompanyDashboard />;
+        return (
+          <AdminLayout currentPage="admin-orders" navigate={navigate}>
+            <AdminOrdersPageNew />
+          </AdminLayout>
+        );
+      case 'admin-districts':
+        return (
+          <AdminLayout currentPage="admin-districts" navigate={navigate}>
+            <AdminDistrictsPage />
+          </AdminLayout>
+        );
+      case 'admin-wiki':
+        return (
+          <AdminLayout currentPage="admin-wiki" navigate={navigate}>
+            <AdminWikiPage />
+          </AdminLayout>
+        );
 
       default:
         return (
