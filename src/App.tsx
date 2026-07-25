@@ -26,6 +26,10 @@ import OrderSuccessPage from './pages/OrderSuccessPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
+import AdminOrdersPage from './pages/AdminOrdersPage';
+import { AdminCompaniesPage } from './pages/AdminCompaniesPage';
+import { CompanyDashboard } from './pages/CompanyDashboard';
+import { AdminDashboard } from './pages/AdminDashboardPage'; // 👈 Sadece tek bir tane kalsın!
 
 function App() {
   const { route, navigate } = useRouter();
@@ -39,27 +43,9 @@ function App() {
 
   // Load data from API or fallback to mock data
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [fetchedProducts, fetchedCategories] = await Promise.all([
-          fetchProducts(),
-          fetchCategories(),
-        ]);
-        setProducts(fetchedProducts);
-        setCategories(fetchedCategories);
-        setUseApi(true);
-      } catch (error) {
-        console.warn('API not available, using mock data:', error);
-        setProducts(mockProducts);
-        setCategories(mockCategories);
-        setUseApi(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+    setProducts(mockProducts);
+    setCategories(mockCategories);
+    setLoading(false);
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -300,7 +286,6 @@ function App() {
         return <OrderSuccessPage order={order} navigate={navigate} />;
       }
 
-      /* 🌸 🌸 🌸 EKSİK OLAN KISIM BURAYDI: SİPARİŞLERİM SAYFASI 🌸 🌸 🌸 */
       case 'orders':
         return (
           <OrdersPage
@@ -313,20 +298,30 @@ function App() {
         return <AboutPage navigate={navigate} />;
       case 'contact':
         return <ContactPage navigate={navigate} />;
-        case 'faq':
-          return <FaqPage navigate={navigate} />;
-        default:
-          return (
-            <HomePage
-              categories={categories}
-              featured={getFeaturedProducts(products)}
-              discounted={getDiscountedProducts(products)}
-              navigate={navigate}
-              onAddToCart={handleAddToCart}
-            />
-          );
-      }
-    };
+      case 'faq':
+        return <FaqPage navigate={navigate} />;
+
+      /* ⚙️ ADMİN VE B2B ŞİRKET ROTALARI 🏢 */
+      case 'admin-dashboard':
+        return <AdminDashboard />;
+      case 'admin-orders':
+        return <AdminOrdersPage />;
+      case 'admin-companies':
+        return <AdminCompaniesPage />;
+      case 'company-dashboard':
+        return <CompanyDashboard />;
+
+      default:
+        return (
+          <HomePage
+            categories={categories}
+            featured={getFeaturedProducts(products)}
+            discounted={getDiscountedProducts(products)}
+            navigate={navigate}
+            onAddToCart={handleAddToCart}
+          />
+        );
+    }
   
     return (
       <div className="min-h-screen flex flex-col bg-sand-50">
@@ -336,6 +331,7 @@ function App() {
         {toast && <Toast message={String(toast)} onClose={() => setToast(null)} />}
       </div>
     );
-  }
-  
+};
+}
+
   export default App;
