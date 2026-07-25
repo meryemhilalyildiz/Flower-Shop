@@ -185,18 +185,6 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                     <User className="w-4 h-4" />
                     <span className="hidden sm:inline">Giriş Yap</span>
                   </button>
-                  <button
-                    onClick={() => {
-                      window.location.hash = '#/admin/login';
-                      if (typeof navigate === 'function') {
-                        navigate({ name: 'admin-login' as any });
-                      }
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-900 text-white hover:bg-gray-800 text-sm font-semibold transition-all"
-                    title="Admin Girişi"
-                  >
-                    <span className="hidden sm:inline">Admin</span>
-                  </button>
                 </div>
               )}
 
