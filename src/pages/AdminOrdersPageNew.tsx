@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Search, Truck, Save, Check } from 'lucide-react';
+import { RefreshCw, Search, Truck, Save, Check, AlertTriangle } from 'lucide-react';
 import { fetchAllOrders, normalizeOrderStatus, updateOrderStatus } from '../services/adminApi';
 import StatusBadge from '../components/admin/StatusBadge';
 
@@ -9,7 +9,7 @@ export default function AdminOrdersPageNew() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  
+
   // 📦 Takip Numarası State'leri
   const [trackingInputs, setTrackingInputs] = useState<{ [key: string]: string }>({});
   const [savedTracking, setSavedTracking] = useState<{ [key: string]: boolean }>({});
@@ -45,17 +45,17 @@ export default function AdminOrdersPageNew() {
     loadOrders();
   }, []);
 
-  // Durum ve Takip No Güncelleme
+  // Durum ve Takip No Güncelleme (Geliştirilmiş)
   const handleStatusChange = async (orderId: string, newStatus: string, trackingNum?: string) => {
     setUpdatingId(orderId);
     try {
       const normalizedStatus = normalizeOrderStatus(newStatus);
       await updateOrderStatus(orderId, normalizedStatus, trackingNum);
-      
+
       setOrders((prevOrders) =>
-        prevOrders.map((o) => 
-          o.id === orderId 
-            ? { ...o, status: normalizedStatus, tracking_number: trackingNum ?? o.tracking_number } 
+        prevOrders.map((o) =>
+          o.id === orderId
+            ? { ...o, status: normalizedStatus, tracking_number: trackingNum ?? o.tracking_number }
             : o
         )
       );
@@ -74,14 +74,19 @@ export default function AdminOrdersPageNew() {
     }
   };
 
+  // 🌸 İptal Talebi Onay/Reddediş Handler Fonksiyonu
+  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
+    await handleStatusChange(orderId, newStatus);
+  };
+
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch = 
+    const matchesSearch =
       order.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.shipping_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.id?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -91,7 +96,8 @@ export default function AdminOrdersPageNew() {
     processing: orders.filter((o) => o.status === 'processing').length,
     shipped: orders.filter((o) => o.status === 'shipped').length,
     delivered: orders.filter((o) => o.status === 'delivered').length,
-    cancelled: orders.filter((o) => o.status === 'cancelled').length,
+    cancel_requested: orders.filter((o) => o.status === 'İptal Talebi Alındı').length,
+    cancelled: orders.filter((o) => o.status === 'cancelled' || o.status === 'İptal Edildi').length,
   };
 
   if (loading) {
@@ -139,6 +145,7 @@ export default function AdminOrdersPageNew() {
               processing: 'İşleniyor',
               shipped: 'Kargoda',
               delivered: 'Teslim Edildi',
+              'İptal Talebi Alındı': 'İptal Talepleri',
               cancelled: 'İptal',
             }).map(([key, label]) => (
               <button
@@ -150,7 +157,7 @@ export default function AdminOrdersPageNew() {
                     : 'bg-sand-100 text-sand-700 hover:bg-sand-200'
                 }`}
               >
-                {label} ({statusCounts[key as keyof typeof statusCounts]})
+                {label} ({statusCounts[key as keyof typeof statusCounts] || 0})
               </button>
             ))}
           </div>
@@ -159,7 +166,7 @@ export default function AdminOrdersPageNew() {
 
       {filteredOrders.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 text-center text-sand-600 shadow-sm border border-sand-200">
-          {searchTerm || statusFilter !== 'all' 
+          {searchTerm || statusFilter !== 'all'
             ? 'Arama kriterlerine uygun sipariş bulunmuyor.'
             : 'Henüz hiç sipariş bulunmuyor.'}
         </div>
@@ -209,6 +216,32 @@ export default function AdminOrdersPageNew() {
                     )}
                   </div>
 
+                  {/* 🚨 İPTAL TALEBİ UYARI VE YÖNETİM KUTUSU */}
+                  {order.status === 'İptal Talebi Alındı' && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
+                      <p className="text-xs text-red-700 font-medium flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <strong>İptal Nedeni:</strong> {order.cancel_reason || 'Belirtilmedi'}
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => handleUpdateStatus(order.id, 'İptal Edildi')}
+                          disabled={updatingId === order.id}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+                        >
+                          İptali Onayla
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus(order.id, 'Hazırlanıyor')}
+                          disabled={updatingId === order.id}
+                          className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                        >
+                          Talebi Reddet
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {order.order_items && order.order_items.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-sand-100">
                       <p className="text-xs font-semibold text-sand-700 mb-2">Sipariş Detayları:</p>
@@ -229,55 +262,56 @@ export default function AdminOrdersPageNew() {
                 </div>
 
                 {/* 🚚 Durum Değiştirme & Kargo Takip Kutusu */}
-<div className="lg:min-w-[240px] space-y-3">
-  <div>
-    <label className="text-xs font-semibold text-sand-600 block mb-1">
-      Durum Değiştir:
-    </label>
-    <select
-      value={order.status || 'pending'}
-      disabled={updatingId === order.id}
-      onChange={(e) => handleStatusChange(order.id, e.target.value, trackingInputs[order.id])}
-      className="w-full px-3 py-2 bg-sand-50 border border-sand-300 rounded-xl text-sm font-semibold text-sand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all disabled:opacity-50 cursor-pointer"
-    >
-      <option value="pending">⏳ Beklemede</option>
-      <option value="processing">⚙️ İşleniyor</option>
-      <option value="shipped">🚚 Kargoda</option>
-      <option value="delivered">✅ Teslim Edildi</option>
-      <option value="cancelled">❌ İptal Edildi</option>
-    </select>
-  </div>
+                <div className="lg:min-w-[240px] space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-sand-600 block mb-1">
+                      Durum Değiştir:
+                    </label>
+                    <select
+                      value={order.status || 'pending'}
+                      disabled={updatingId === order.id}
+                      onChange={(e) => handleStatusChange(order.id, e.target.value, trackingInputs[order.id])}
+                      className="w-full px-3 py-2 bg-sand-50 border border-sand-300 rounded-xl text-sm font-semibold text-sand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      <option value="pending">⏳ Beklemede</option>
+                      <option value="processing">⚙️ İşleniyor</option>
+                      <option value="shipped">🚚 Kargoda</option>
+                      <option value="delivered">✅ Teslim Edildi</option>
+                      <option value="İptal Talebi Alındı">⚠️ İptal Talebi Var</option>
+                      <option value="cancelled">❌ İptal Edildi</option>
+                    </select>
+                  </div>
 
                   {/* 🚚 KARGO TAKİP NO GİRİŞ ALANI */}
-  {(order.status === 'shipped' || order.status === 'Kargoda' || order.status === 'shipping' || order.status === 'Yolda') && (
-    <div className="mt-3 p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
-      <label className="text-xs font-semibold text-blue-900 flex items-center gap-1">
-        <Truck className="w-3.5 h-3.5 text-blue-600" /> Kargo Takip No:
-      </label>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Takip no giriniz..."
-          value={trackingInputs[order.id] !== undefined ? trackingInputs[order.id] : (order.tracking_number || '')}
-          onChange={(e) => setTrackingInputs({ ...trackingInputs, [order.id]: e.target.value })}
-          className="w-full px-2.5 py-1.5 text-xs bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-        />
-        <button
-          onClick={() => handleStatusChange(order.id, order.status, trackingInputs[order.id])}
-          disabled={updatingId === order.id}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
-        >
-          {savedTracking[order.id] ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />} Kaydet
-        </button>
-      </div>
-      {order.tracking_number && (
-        <p className="text-[11px] text-blue-700 font-mono">
-          Mevcut Kod: <strong>{order.tracking_number}</strong>
-        </p>
-      )}
-    </div>
-  )}
-</div>
+                  {(order.status === 'shipped' || order.status === 'Kargoda' || order.status === 'shipping' || order.status === 'Yolda') && (
+                    <div className="mt-3 p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
+                      <label className="text-xs font-semibold text-blue-900 flex items-center gap-1">
+                        <Truck className="w-3.5 h-3.5 text-blue-600" /> Kargo Takip No:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Takip no giriniz..."
+                          value={trackingInputs[order.id] !== undefined ? trackingInputs[order.id] : (order.tracking_number || '')}
+                          onChange={(e) => setTrackingInputs({ ...trackingInputs, [order.id]: e.target.value })}
+                          className="w-full px-2.5 py-1.5 text-xs bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <button
+                          onClick={() => handleStatusChange(order.id, order.status, trackingInputs[order.id])}
+                          disabled={updatingId === order.id}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          {savedTracking[order.id] ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />} Kaydet
+                        </button>
+                      </div>
+                      {order.tracking_number && (
+                        <p className="text-[11px] text-blue-700 font-mono">
+                          Mevcut Kod: <strong>{order.tracking_number}</strong>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}

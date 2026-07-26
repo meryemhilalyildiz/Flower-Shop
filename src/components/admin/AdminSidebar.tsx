@@ -1,4 +1,4 @@
-import { Home, Package, ShoppingBag, FolderTree, X, LogOut, Flower2, Truck, BookOpen, Star } from 'lucide-react';
+import { Home, Package, ShoppingBag, FolderTree, LogOut, Flower2, Truck, BookOpen, Star, Ticket } from 'lucide-react';
 
 interface Props {
   currentPage: string;
@@ -15,6 +15,7 @@ const menuItems = [
   { id: 'admin-shipping', label: 'Kargo Yönetimi', icon: Truck },
   { id: 'admin-wiki', label: 'Botanik Wiki', icon: BookOpen },
   { id: 'admin-reviews', label: 'Yorumlar', icon: Star },
+  { id: 'admin-coupons', label: 'Kupon Yönetimi', icon: Ticket },
 ];
 
 export default function AdminSidebar({ currentPage, navigate, onSignOut, onClose }: Props) {
@@ -43,10 +44,14 @@ export default function AdminSidebar({ currentPage, navigate, onSignOut, onClose
             <button
               key={item.id}
               onClick={() => {
-                navigate({ name: item.id as any });
+                if (item.id === 'admin-coupons') {
+                  window.location.hash = '#/admin/kuponlar';
+                } else {
+                  navigate({ name: item.id as any });
+                }
                 onClose?.();
               }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                 isActive
                   ? 'bg-brand-50 text-brand-700 border border-brand-200'
                   : 'text-sand-600 hover:bg-sand-50 hover:text-sand-900'
@@ -66,7 +71,7 @@ export default function AdminSidebar({ currentPage, navigate, onSignOut, onClose
             onSignOut();
             onClose?.();
           }}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 transition-all cursor-pointer"
         >
           <LogOut className="h-5 w-5" />
           Çıkış Yap

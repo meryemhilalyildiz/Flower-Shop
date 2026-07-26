@@ -26,9 +26,8 @@ import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
 import FavoritesPage from './pages/FavoritesPage';
-import AdminOrdersPage from './pages/AdminOrdersPage';
 import AdminOrdersPageNew from './pages/AdminOrdersPageNew';
-import { AdminDashboard } from './pages/AdminDashboardPage'; // 👈 Sadece tek bir tane kalsın!
+import { AdminDashboard } from './pages/AdminDashboardPage';
 import { AdminShippingPage } from './pages/AdminShippingPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboardNew from './pages/AdminDashboardNew';
@@ -38,7 +37,7 @@ import AdminReviewsPage from './pages/AdminReviewsPage';
 import { useAdminAuth } from './hooks/useAdminAuth';
 import { normalizeOrderStatusToTurkish } from './services/adminApi';
 import AdminLayout from './components/admin/AdminLayout';
-import { transformApiOrders } from './services/dataAdapter'; // dataAdapter dosya yoluna göre ayarla
+import AdminCouponsPage from './pages/AdminCouponsPage';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -49,10 +48,7 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState(mockCategories);
   const [loading, setLoading] = useState(true);
-  const [useApi, setUseApi] = useState(true);
-  const { loading: adminLoading, isAdmin } = useAdminAuth();
 
-  // Load data from Supabase or fallback to mock data
   useEffect(() => {
     async function loadData() {
       try {
@@ -74,7 +70,6 @@ function App() {
         }
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
-        // Fallback to mock data
         setProducts(mockProducts);
         setCategories(mockCategories);
       } finally {
@@ -84,7 +79,6 @@ function App() {
 
     loadData();
 
-    // Refresh products every 10 seconds to pick up newly added items
     const interval = setInterval(() => {
       fetchProductsFromSupabase()
         .then((newProducts) => {
@@ -93,7 +87,7 @@ function App() {
           }
         })
         .catch((error) => console.error('Ürünler yenilenirken hata:', error));
-    }, 10000); // 10 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
@@ -113,10 +107,8 @@ function App() {
 
   const handlePlaceOrder = useCallback(
     async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
-      // 🌸 1. Oturum açmış kullanıcıyı al
       const { data: { user } } = await supabase.auth.getUser();
 
-      // 🌸 2. Supabase 'orders' tablosuna kayıt
       const { data: insertedOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -140,26 +132,20 @@ function App() {
 
       const orderId = insertedOrder.id.toString();
 
-      // 🌸 3. 'order_items' tablosuna ürünleri ekle
       if (orderData.items && orderData.items.length > 0) {
         const itemsToInsert = orderData.items.map((item) => ({
           order_id: orderId,
           product_id: String(item.product.id),
           quantity: item.quantity,
-          unit_price: item.product.price || 0, // 🎯 Eklenen alan
+          unit_price: item.product.price || 0,
         }));
-
-        console.log('order_items tablosuna gönderilen veri:', itemsToInsert);
 
         const { error: itemsError } = await supabase
           .from('order_items')
           .insert(itemsToInsert);
 
         if (itemsError) {
-          alert(`❌ ORDER_ITEMS HATASI:\n${itemsError.message}`);
           console.error('ORDER_ITEMS HATASI:', itemsError);
-        } else {
-          alert('✅ Sipariş ve Ürün Detayları Başarıyla Veritabanına Yazıldı!');
         }
       }
 
@@ -178,13 +164,11 @@ function App() {
     [cart],
   );
 
-  // 🌸 Giriş yapan kullanıcının geçmiş siparişlerini Supabase'den çekme
   const fetchUserOrders = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) return;
-      // 🌸 1. .select() içine tracking_number alanını ekledik!
       const { data: fetchedOrders, error } = await supabase
         .from('orders')
         .select(`
@@ -221,7 +205,11 @@ function App() {
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
+<<<<<<< HEAD
+            deliveryDate: ord.delivery_date || '',
+=======
             deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
+>>>>>>> origin/main
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
             total: ord.total_amount,
             address: ord.shipping_address,
@@ -229,7 +217,6 @@ function App() {
             recipientName: ord.recipient_name,
             recipientPhone: ord.recipient_phone,
             note: ord.note,
-            // 🚚 2. Kargo takip numarasını buraya aktardık!
             tracking_number: ord.tracking_number || undefined,
             items: ord.order_items ? ord.order_items.map((item: any) => {
               const foundProduct = products.find((p) => String(p.id) === String(item.product_id));
@@ -258,11 +245,10 @@ function App() {
       console.error('Sipariş çekme hatası:', err);
     }
   }, [products]);
-  // 🌸 Uygulama yüklendiğinde veya kullanıcı oturumu değiştiğinde siparişleri çek
+
   useEffect(() => {
     fetchUserOrders();
   }, [fetchUserOrders]);
-
 
   const renderPage = () => {
     if (loading) {
@@ -379,7 +365,7 @@ function App() {
       case 'faq':
         return <FaqPage navigate={navigate} />;
 
-      /* ⚙️ ADMİN ROTALARI 🏢 */
+      /* ⚙️ ADMİN ROTALARI */
       case 'admin-login':
         return <AdminLoginPage onLoginSuccess={() => navigate({ name: 'admin-dashboard' })} />;
       case 'admin-dashboard':
@@ -388,12 +374,12 @@ function App() {
             <AdminDashboardNew navigate={navigate} />
           </AdminLayout>
         );
-      case 'admin-products':
-        return (
-          <AdminLayout currentPage="admin-products" navigate={navigate}>
-            <AdminDashboard />
-          </AdminLayout>
-        );
+        case 'admin-products':
+          return (
+            <AdminLayout currentPage="admin-products" navigate={navigate}>
+              <AdminDashboard />
+            </AdminLayout>
+          );
       case 'admin-categories':
         return (
           <AdminLayout currentPage="admin-categories" navigate={navigate}>
@@ -425,6 +411,14 @@ function App() {
           </AdminLayout>
         );
 
+      /* 🎟️ KUPON YÖNETİMİ SAYFASI ROTASI */
+      case 'admin-coupons':
+        return (
+          <AdminLayout currentPage="admin-coupons" navigate={navigate}>
+            <AdminCouponsPage />
+          </AdminLayout>
+        );
+
       default:
         return (
           <HomePage
@@ -439,6 +433,17 @@ function App() {
         );
     }
   };
+
+  const isAdminRoute = route.name.startsWith('admin');
+
+  if (isAdminRoute) {
+    return (
+      <div className="min-h-screen bg-sand-50">
+        {renderPage()}
+        {toast && <Toast message={String(toast)} onClose={() => setToast(null)} />}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-sand-50">
