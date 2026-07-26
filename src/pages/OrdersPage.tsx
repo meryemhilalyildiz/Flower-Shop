@@ -1,6 +1,6 @@
 import React from 'react';
 import { OrderInfo, Route } from '../types';
-import { Star, Download } from 'lucide-react';
+import { Star, Download, MapPin } from 'lucide-react';
 import { supabase } from "../supabaseClient";
 import { generateInvoicePDF } from "../services/pdfService";
 
@@ -145,10 +145,23 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
               {/* Sipariş İçindeki Ürünler */}
               <div className="p-6">
                 <div className="divide-y divide-gray-100">
-                  {order.items.map((item, index) => {
-                    const imageUrl = Array.isArray(item.product.images)
+                  {order.items.map((item: any, index) => {
+                    const imageUrl = Array.isArray(item.product?.images)
                       ? item.product.images[0]
-                      : (item.product.images as unknown as string);
+                      : (item.product?.images as unknown as string) || item.image || item.image_url;
+
+                    // 🌸 Varyantlı Ürün İsmi Ayrıştırma (örn: "Çiçek (Boyut: Büyük Boy | Vazo: Cam Vazo)")
+                    const fullName = item.product?.name || item.product_name || item.name || item.title || 'Çiçek Ürünü';
+                    let baseName = fullName;
+                    let variantSubtext = '';
+
+                    if (fullName.includes('(') && fullName.includes(')')) {
+                      const parts = fullName.split('(');
+                      baseName = parts[0].trim();
+                      variantSubtext = parts[1].replace(')', '').trim();
+                    }
+
+                    const itemUnitPrice = item.product?.price || item.unit_price || item.price || 0;
 
                     return (
                       <div key={index} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
@@ -156,7 +169,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                           {imageUrl ? (
                             <img
                               src={imageUrl}
-                              alt={item.product.name}
+                              alt={baseName}
                               className="w-14 h-14 object-cover rounded-lg border border-gray-100"
                             />
                           ) : (
@@ -166,8 +179,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                           )}
                           <div>
                             <h4 className="font-semibold text-gray-800 text-sm">
-                              {item.product.name || 'Çiçek Ürünü'}
+                              {baseName}
                             </h4>
+                            {variantSubtext ? (
+                              <p className="text-xs text-pink-600 font-medium mt-0.5">
+                                ✨ {variantSubtext}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-gray-400 mt-0.5">Standart Boyut</p>
+                            )}
                             <p className="text-xs text-gray-500">
                               Adet: <span className="font-medium text-gray-700">{item.quantity}</span>
                             </p>
@@ -176,9 +196,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
 
                         <div className="text-right flex flex-col items-end gap-2">
                           <p className="text-sm font-semibold text-gray-800">
-                            ₺{((item.product.price || 0) * item.quantity).toFixed(2)}
+                            ₺{(itemUnitPrice * item.quantity).toFixed(2)}
                           </p>
-                          {isDelivered && item.product.slug && (
+                          {isDelivered && item.product?.slug && (
                             <button
                               onClick={() => navigate({ name: 'product', slug: item.product.slug })}
                               className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
@@ -191,6 +211,34 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                       </div>
                     );
                   })}
+                </div>
+
+                {/* 🧾 Sipariş Tutar Detayları */}
+                <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
+                  <div className="flex justify-between gap-4 text-sm text-gray-600 mb-1">
+                    <span>Ürünler Toplamı:</span>
+                    <span className="font-semibold text-gray-800">
+                      ₺{((order.subtotal || order.items.reduce((sum: number, item: any) => {
+                        const price = item.product?.price || item.unit_price || item.price || 0;
+                        const qty = item.quantity || 1;
+                        return sum + (price * qty);
+                      }, 0)) || 0).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {(order.deliveryFee || order.delivery_fee || 0) > 0 && (
+                    <div className="flex justify-between gap-4 text-sm text-gray-600 mb-1">
+                      <span>🚚 Kargo / Teslimat:</span>
+                      <span className="font-semibold text-gray-800">
+                        ₺{(order.deliveryFee || order.delivery_fee || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between gap-4 pt-1.5 border-t border-gray-200 text-sm font-bold text-pink-600">
+                    <span>Genel Toplam:</span>
+                    <span>₺{order.total.toFixed(2)}</span>
+                  </div>
                 </div>
 
                 {/* Adres, Not ve Kargo Takip Bilgisi */}

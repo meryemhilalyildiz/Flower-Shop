@@ -88,6 +88,16 @@ export const mockProducts: Product[] = [
     badge: 'Çok Satan',
     inStock: true,
     deliveryInfo: 'Aynı gün teslimat',
+    sizes: [
+      { id: 's1', name: 'Standart (12 Gül)', priceDifference: 0 },
+      { id: 's2', name: 'Orta Boy (18 Gül)', priceDifference: 200 },
+      { id: 's3', name: 'Deluxe Boy (24 Gül)', priceDifference: 400 },
+    ],
+    vases: [
+      { id: 'v1', name: 'Vazosuz (Buket Sargılı)', priceDifference: 0 },
+      { id: 'v2', name: 'Şeffaf Cam Vazo İle', priceDifference: 120 },
+      { id: 'v3', name: 'Şık Seramik Vazo İle', priceDifference: 250 },
+    ],
   },
   {
     id: 'p2',
@@ -108,6 +118,11 @@ export const mockProducts: Product[] = [
     badge: 'Çok Satan',
     inStock: true,
     deliveryInfo: 'Aynı gün teslimat',
+    sizes: [
+      { id: 's1', name: 'Standart (25 Gül)', priceDifference: 0 },
+      { id: 's2', name: 'Lüks Boy (50 Gül)', priceDifference: 350 },
+      { id: 's3', name: 'Kraliyet Boy (100 Gül)', priceDifference: 850 },
+    ],
   },
   {
     id: 'p3',
@@ -129,6 +144,15 @@ export const mockProducts: Product[] = [
     badge: 'İndirim',
     inStock: true,
     deliveryInfo: '1-2 iş günü teslimat',
+    sizes: [
+      { id: 's1', name: 'Tek Dal Orkide', priceDifference: 0 },
+      { id: 's2', name: 'Çift Dal Orkide', priceDifference: 180 },
+    ],
+    vases: [
+      { id: 'v1', name: 'Standart Plastik Saksı', priceDifference: 0 },
+      { id: 'v2', name: 'Beyaz Seramik Saksı', priceDifference: 90 },
+      { id: 'v3', name: 'Mermer Desen Saksı', priceDifference: 160 },
+    ],
   },
   {
     id: 'p4',
@@ -168,6 +192,10 @@ export const mockProducts: Product[] = [
     reviewCount: 31,
     inStock: true,
     deliveryInfo: 'Aynı gün teslimat',
+    sizes: [
+      { id: 's1', name: 'Standart (5 Dal Lilyum)', priceDifference: 0 },
+      { id: 's2', name: 'Büyük Boy (9 Dal Lilyum)', priceDifference: 220 },
+    ],
   },
   {
     id: 'p6',

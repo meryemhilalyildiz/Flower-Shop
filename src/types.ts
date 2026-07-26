@@ -7,6 +7,12 @@ export type Category = {
   icon: string;
 };
 
+export type ProductVariant = {
+  id: string;
+  name: string; // Örn: 'Orta Boy', 'Cam Vazo İle'
+  priceDifference: number; // Örn: 250 veya 0
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -22,8 +28,11 @@ export type Product = {
   reviewCount: number;
   badge?: 'Yeni' | 'Çok Satan' | 'İndirim' | 'Mevsimlik';
   inStock: boolean;
-  deliveryInfo: string;stock?: number;          
-  stock_quantity?: number; 
+  deliveryInfo: string;
+  stock?: number;
+  stock_quantity?: number;
+  sizes?: ProductVariant[]; // 🌸 Boyut Seçenekleri
+  vases?: ProductVariant[]; // 🌸 Vazo Seçenekleri
 };
 
 export type CartItem = {
@@ -38,7 +47,7 @@ export type Favorite = {
   created_at: string;
 };
 
-export type OrderInfo = {
+export interface OrderInfo {
   id: string;
   createdAt: string;
   recipientName: string;
@@ -48,7 +57,13 @@ export type OrderInfo = {
   city: string;
   deliveryDate?: string;
   note?: string;
-  total: number;
+
+  // 🌸 Hesaplama & Kargo Alanları
+  subtotal?: number;       // Ürünlerin ham/varyantlı toplamı
+  deliveryFee?: number;    // Şehre/Mesafeye göre hesaplanan kargo ücreti
+  delivery_fee?: number;   // Supabase sütun uyumluluğu için
+  total: number;           // Genel Toplam
+
   status?: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | string;
   tracking_number?: string; // Kargo takip numarası
   cancel_reason?: string;
@@ -57,13 +72,9 @@ export type OrderInfo = {
   items: Array<{
     product: Product;
     quantity: number;
+    selectedSize?: string;  // Örn: "Büyük Boy"
+    selectedVase?: string;  // Örn: "Cam Vazo"
   }> | CartItem[];
-<<<<<<< HEAD
-  subtotal?: number;
-  deliveryFee?: number;
-  delivery_fee?: number;
-=======
->>>>>>> origin/main
 };
 
 export type Route =

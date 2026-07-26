@@ -247,12 +247,41 @@ const handleApplyCoupon = async () => {
     setSubmitting(true);
     
     try {
+      // 1. Sepet Toplamı ve Kargo Ücreti Hesabı
+      const subtotalAmount = items.reduce((sum, item) => {
+        const price = item.product?.price || 0;
+        const qty = item.quantity || 1;
+        return sum + (price * qty);
+      }, 0);
+
+      const calculatedDeliveryFee = dynamicTotal > subtotalAmount ? dynamicTotal - subtotalAmount : 0;
+
       // Kupon indirimli son toplam hesabı
       const finalTotal = Math.max(0, dynamicTotal - discountAmount);
-  
-      // 2. Siparişi veritabanına ekliyoruz (Kupon bilgileri dahil)
+
+      // 🌸 2. Siparişi veritabanına/state'e gönderirken Varyantlı İsimleri Koruma
+      const orderItems = items.map((item) => {
+        const fullProductName = item.product.name || 'Çiçek Ürünü';
+
+        return {
+          ...item,
+          product: {
+            ...item.product,
+            name: fullProductName,
+          },
+          product_name: fullProductName,
+          title: fullProductName,
+          quantity: item.quantity,
+          price: item.product.price,
+        };
+      });
+
+      // 3. Sipariş oluşturma (Kupon bilgileri dahil)
       const orderId = await onPlaceOrder({
-        items,
+        items: orderItems,
+        subtotal: subtotalAmount,
+        deliveryFee: calculatedDeliveryFee,
+        delivery_fee: calculatedDeliveryFee,
         total: finalTotal,
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
@@ -263,38 +292,36 @@ const handleApplyCoupon = async () => {
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         discountAmount: discountAmount,
       });
-  
-      // 🎟️ 3. KUPON KULLANIM SAYISINI ARTIRMA (Varsa kullanılan kuponun used_count'ını +1 yapıyoruz)
+
+      // 🎟️ 4. KUPON KULLANIM SAYISINI ARTIRMA (Varsa kullanılan kuponun used_count'ını +1 yapıyoruz)
       if (appliedCoupon) {
         const { error: couponErr } = await supabase
           .from('coupons')
           .update({ used_count: (appliedCoupon.used_count || 0) + 1 })
           .eq('id', appliedCoupon.id);
-  
+
         if (couponErr) {
           console.error('KUPON SAYACI GÜNCELLENEMEDİ:', couponErr);
         } else {
           console.log(`Kupon kullanımı güncellendi: ${appliedCoupon.code} -> ${appliedCoupon.used_count + 1}`);
         }
       }
-  
-      // 🌸 4. ANINDA STOK DÜŞME (Admin onayını beklemeden)
+
+      // 🌸 5. Anında Stok Düşme İşlemi
       for (const item of items) {
         const targetId = item.product.id;
-  
+
         if (targetId) {
-          // a. Güncel stok miktarını çek
           const { data: prod } = await supabase
             .from('products')
             .select('stock_quantity')
             .eq('id', targetId)
             .single();
-  
+
           if (prod) {
             const currentStock = prod.stock_quantity ?? 0;
             const newStock = Math.max(0, currentStock - item.quantity);
-  
-            // b. Supabase'deki 'stock_quantity'yi düş ve kaydet
+
             const { error: updateErr } = await supabase
               .from('products')
               .update({ 
@@ -302,7 +329,7 @@ const handleApplyCoupon = async () => {
                 is_active: newStock > 0 
               })
               .eq('id', targetId);
-  
+
             if (updateErr) {
               console.error('Stok düşme RLS/DB Hatası:', updateErr);
             } else {
@@ -311,8 +338,8 @@ const handleApplyCoupon = async () => {
           }
         }
       }
-  
-      // 5. Başarılı sayfasına yönlendir
+
+      // 6. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);

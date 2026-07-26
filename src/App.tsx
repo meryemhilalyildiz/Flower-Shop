@@ -109,6 +109,7 @@ function App() {
     async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // 1. orders tablosuna kargo ve ara toplam ile kayıt
       const { data: insertedOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -119,6 +120,8 @@ function App() {
           city: orderData.city || '',
           delivery_date: orderData.deliveryDate || '',
           note: orderData.note || '',
+          subtotal: orderData.subtotal || orderData.total,
+          delivery_fee: orderData.deliveryFee || 0,
           total_amount: orderData.total,
           status: 'pending',
         })
@@ -132,10 +135,12 @@ function App() {
 
       const orderId = insertedOrder.id.toString();
 
+      // 2. order_items tablosuna tam varyantlı ismi yazıyoruz! ✨
       if (orderData.items && orderData.items.length > 0) {
         const itemsToInsert = orderData.items.map((item) => ({
           order_id: orderId,
           product_id: String(item.product.id),
+          product_name: item.product.name, // 👈 Sepetteki tam isim buraya gidiyor
           quantity: item.quantity,
           unit_price: item.product.price || 0,
         }));
@@ -169,6 +174,8 @@ function App() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) return;
+
+      // 🌸 Supabase sorgusuna product_name, subtotal ve delivery_fee eklendi!
       const { data: fetchedOrders, error } = await supabase
         .from('orders')
         .select(`
@@ -176,6 +183,8 @@ function App() {
           created_at,
           delivery_date,
           status,
+          subtotal,
+          delivery_fee,
           total_amount,
           shipping_address,
           city,
@@ -186,6 +195,7 @@ function App() {
           order_items (
             id,
             product_id,
+            product_name,
             quantity,
             unit_price
           )
@@ -207,6 +217,8 @@ function App() {
             createdAt: ord.created_at,
             deliveryDate: ord.delivery_date || '',
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
+            subtotal: ord.subtotal || undefined,
+            deliveryFee: ord.delivery_fee || undefined,
             total: ord.total_amount,
             address: ord.shipping_address,
             city: ord.city,
