@@ -22,7 +22,8 @@ export type Product = {
   reviewCount: number;
   badge?: 'Yeni' | 'Çok Satan' | 'İndirim' | 'Mevsimlik';
   inStock: boolean;
-  deliveryInfo: string;
+  deliveryInfo: string;stock?: number;          
+  stock_quantity?: number; 
 };
 
 export type CartItem = {

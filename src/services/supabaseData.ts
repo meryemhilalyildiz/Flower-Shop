@@ -39,20 +39,22 @@ const mapCategory = (cat: SupabaseCategory): Category => ({
 const mapProduct = (prod: SupabaseProduct): Product => ({
   id: prod.id,
   name: prod.name,
-  slug: prod.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''), // name'den slug oluştur
+  slug: prod.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
   categoryId: prod.category_id,
   price: prod.price,
-  oldPrice: undefined, // Supabase'de yok
+  oldPrice: undefined,
   images: prod.image_url ? [prod.image_url] : ['https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=800'],
   description: prod.description || '',
   longDescription: prod.description || '',
-  ingredients: [], // Supabase'de yok
-  rating: 4.5, // Varsayılan
-  reviewCount: 0, // Varsayılan
+  ingredients: [],
+  rating: 4.5,
+  reviewCount: 0,
   badge: undefined,
-  inStock: prod.stock_quantity > 0,
+  inStock: prod.stock_quantity > 0, // 🌸 Stok 0 ise inStock false olur, ProductCard "TÜKENDİ" basar!
   deliveryInfo: prod.stock_quantity > 0 ? 'Aynı gün teslimat' : 'Stokta yok',
-});
+  stock: prod.stock_quantity,
+  stock_quantity: prod.stock_quantity,
+} as Product);
 
 // Supabase'den kategorileri çek
 export async function fetchCategoriesFromSupabase(): Promise<Category[]> {
@@ -71,14 +73,13 @@ export async function fetchCategoriesFromSupabase(): Promise<Category[]> {
   }
 }
 
-// Supabase'den ürünleri çek
+// 🌸 Supabase'den ürünleri çek (is_active filtresi kaldırıldı, tüm ürünler çekiliyor)
 export async function fetchProductsFromSupabase(): Promise<Product[]> {
   try {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false }); // Show newest first
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
@@ -89,13 +90,12 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
   }
 }
 
-// Kategoriye göre ürünleri çek
+// 🌸 Kategoriye göre ürünleri çek (is_active filtresi kaldırıldı)
 export async function fetchProductsByCategoryFromSupabase(categoryId: string): Promise<Product[]> {
   try {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('is_active', true)
       .eq('category_id', categoryId)
       .order('name');
 
@@ -105,5 +105,29 @@ export async function fetchProductsByCategoryFromSupabase(categoryId: string): P
   } catch (error) {
     console.error('Kategori ürünleri çekilirken hata:', error);
     return [];
+  }
+}
+
+export async function decreaseProductStock(productId: string, quantity: number) {
+  const { data: product, error: fetchError } = await supabase
+    .from('products')
+    .select('stock_quantity')
+    .eq('id', productId)
+    .single();
+
+  if (fetchError || !product) {
+    console.error('Stok bilgisi alınamadı:', fetchError);
+    return;
+  }
+
+  const newStock = Math.max(0, product.stock_quantity - quantity);
+
+  const { error: updateError } = await supabase
+    .from('products')
+    .update({ stock_quantity: newStock })
+    .eq('id', productId);
+
+  if (updateError) {
+    console.error('Stok güncellenirken hata oluştu:', updateError);
   }
 }
