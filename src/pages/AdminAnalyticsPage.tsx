@@ -50,6 +50,11 @@ export default function AdminAnalyticsPage({ navigate }: Props) {
       setCouponData(coupons);
     } catch (error) {
       console.error('Analitik verileri yüklenirken hata:', error);
+      // If analytics fail, set empty arrays to show "no data" instead of crashing
+      setSalesData([]);
+      setTopProducts([]);
+      setTopCategories([]);
+      setCouponData([]);
     } finally {
       setLoading(false);
     }

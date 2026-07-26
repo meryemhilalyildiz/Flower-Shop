@@ -47,7 +47,7 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState(mockCategories);
   const [bundles, setBundles] = useState<Bundle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [useApi, setUseApi] = useState(true);
   const { loading: adminLoading, isAdmin } = useAdminAuth();
 

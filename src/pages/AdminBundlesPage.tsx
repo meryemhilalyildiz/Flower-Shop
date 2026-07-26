@@ -420,10 +420,10 @@ export default function AdminBundlesPage({ navigate }: Props) {
 
               {/* Price Summary */}
               {selectedProducts.length > 0 && (
-                <div className="bg-brand-50 border border-brand-200 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sand-600">Orijinal Toplam:</span>
-                    <span className="font-semibold text-sand-900">{originalPrice.toFixed(2)} TL</span>
+                <div className="bg-brand-50 border border-brand-200 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sand-600 font-medium">Orijinal Toplam:</span>
+                    <span className="font-bold text-sand-900 text-lg">{originalPrice.toFixed(2)} TL</span>
                   </div>
                   <div>
                     <label className="label">İndirim Yüzdesi (%)</label>
@@ -435,15 +435,24 @@ export default function AdminBundlesPage({ navigate }: Props) {
                       placeholder="0"
                       min="0"
                       max="100"
+                      step="1"
                     />
                   </div>
-                  <div className="flex justify-between text-lg">
-                    <span className="font-semibold text-brand-700">Paket Fiyatı:</span>
-                    <span className="font-bold text-brand-700">{bundlePrice.toFixed(2)} TL</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-green-600">İndirim:</span>
-                    <span className="font-semibold text-green-600">{(originalPrice - bundlePrice).toFixed(2)} TL</span>
+                  <div className="border-t border-brand-200 pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-brand-700 text-lg">Paket Fiyatı:</span>
+                      <span className="font-bold text-brand-700 text-2xl">{bundlePrice.toFixed(2)} TL</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-green-600 font-medium">İndirim Tutarı:</span>
+                      <span className="font-bold text-green-600">{(originalPrice - bundlePrice).toFixed(2)} TL</span>
+                    </div>
+                    {discountPercentage > 0 && (
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-rose-600 font-medium">İndirim Oranı:</span>
+                        <span className="font-bold text-rose-600">%{discountPercentage.toFixed(0)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

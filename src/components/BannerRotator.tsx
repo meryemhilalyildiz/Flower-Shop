@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
-import type { Banner } from '../types';
+import { ChevronLeft, ChevronRight, ArrowRight, Tag } from 'lucide-react';
+import type { Banner, Bundle } from '../types';
 import { supabase } from '../supabaseClient';
 
 type Props = {
   navigate: (route: any) => void;
+  bundles?: Bundle[];
 };
 
-export default function BannerRotator({ navigate }: Props) {
+export default function BannerRotator({ navigate, bundles = [] }: Props) {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -74,6 +75,7 @@ export default function BannerRotator({ navigate }: Props) {
   }
 
   const banner = banners[currentIndex];
+  const linkedBundle = banner.bundle_id ? bundles.find(b => b.id === banner.bundle_id) : null;
 
   return (
     <section className="max-w-7xl mx-auto px-4 py-12">
@@ -94,6 +96,14 @@ export default function BannerRotator({ navigate }: Props) {
           <div className="absolute inset-0 bg-black/30" />
         </div>
 
+        {/* Bundle Badge */}
+        {linkedBundle && (
+          <div className="absolute top-4 right-4 bg-rose-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-lg">
+            <Tag className="w-4 h-4" />
+            <span>%{Math.round(linkedBundle.discount_percentage || 0)} İndirim</span>
+          </div>
+        )}
+
         {/* Content */}
         <div className="relative px-8 py-12 lg:px-16 lg:py-20 flex flex-col lg:flex-row items-center justify-between gap-8">
           <div className="text-white max-w-lg">
@@ -103,6 +113,17 @@ export default function BannerRotator({ navigate }: Props) {
             </h2>
             {banner.subtitle && (
               <p className="text-white/80 mt-3 text-lg">{banner.subtitle}</p>
+            )}
+            {linkedBundle && (
+              <div className="mt-4 bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                <p className="font-semibold text-white">{linkedBundle.name}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-2xl font-bold text-white">{linkedBundle.bundle_price} TL</span>
+                  {linkedBundle.original_price > linkedBundle.bundle_price && (
+                    <span className="text-white/70 line-through">{linkedBundle.original_price} TL</span>
+                  )}
+                </div>
+              </div>
             )}
             {banner.link_url && (
               <button

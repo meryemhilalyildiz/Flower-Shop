@@ -1,10 +1,11 @@
-import { Star, Plus, Heart } from 'lucide-react';
-import type { Product } from '../types';
+import { Star, Plus, Heart, Tag } from 'lucide-react';
+import type { Product, Bundle } from '../types';
 import { routeToHash } from '../router';
 
 type Props = {
   product: Product;
   onAddToCart: (product: Product) => void;
+  bundleDiscount?: { bundlePrice: number; originalPrice: number; discountPercent: number };
 };
 
 const badgeStyles: Record<string, string> = {
@@ -14,10 +15,14 @@ const badgeStyles: Record<string, string> = {
   'Mevsimlik': 'bg-sky-100 text-sky-700',
 };
 
-export default function ProductCard({ product, onAddToCart }: Props) {
+export default function ProductCard({ product, onAddToCart, bundleDiscount }: Props) {
   const discount = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
     : 0;
+
+  const displayPrice = bundleDiscount ? bundleDiscount.bundlePrice : product.price;
+  const displayOldPrice = bundleDiscount ? bundleDiscount.originalPrice : product.oldPrice;
+  const displayDiscountPercent = bundleDiscount ? bundleDiscount.discountPercent : discount;
 
   return (
     <div className="card group hover:shadow-soft hover:-translate-y-1 transition-all duration-300">
@@ -37,8 +42,11 @@ export default function ProductCard({ product, onAddToCart }: Props) {
               {product.badge}
             </span>
           )}
-          {discount > 0 && (
-            <span className="chip text-xs bg-red-500 text-white">%{discount} indirim</span>
+          {displayDiscountPercent > 0 && (
+            <span className="chip text-xs bg-red-500 text-white flex items-center gap-1">
+              <Tag className="w-3 h-3" />
+              %{displayDiscountPercent} indirim
+            </span>
           )}
         </div>
 
@@ -69,10 +77,13 @@ export default function ProductCard({ product, onAddToCart }: Props) {
 
         <div className="flex items-end justify-between mt-3">
           <div className="flex flex-col">
-            {product.oldPrice && (
-              <span className="text-xs text-sand-400 line-through">{product.oldPrice} TL</span>
+            {displayOldPrice && displayOldPrice > displayPrice && (
+              <span className="text-xs text-sand-400 line-through">{displayOldPrice} TL</span>
             )}
-            <span className="text-lg font-bold text-brand-700">{product.price} TL</span>
+            <span className="text-lg font-bold text-brand-700">{displayPrice} TL</span>
+            {bundleDiscount && (
+              <span className="text-xs text-rose-600 font-medium">Paket Fiyatı</span>
+            )}
           </div>
           <button
             onClick={() => onAddToCart(product)}

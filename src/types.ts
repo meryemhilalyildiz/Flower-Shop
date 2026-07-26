@@ -167,6 +167,7 @@ export type Banner = {
   text_color: string;
   link_url: string | null;
   link_text: string;
+  bundle_id: string | null;
   start_date: string;
   end_date: string | null;
   is_active: boolean;

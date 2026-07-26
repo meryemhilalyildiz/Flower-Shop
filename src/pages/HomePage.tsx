@@ -189,7 +189,7 @@ export default function HomePage({ categories, featured, discounted, bundles, na
       </section>
 
       {/* Campaign Banner */}
-      <BannerRotator navigate={navigate} />
+      <BannerRotator navigate={navigate} bundles={bundles} />
 
       {/* Bundles */}
       {bundles.length > 0 && (

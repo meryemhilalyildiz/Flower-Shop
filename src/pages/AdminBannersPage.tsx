@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Image as ImageIcon, Calendar, Link as LinkIcon, Check, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, Calendar, Link as LinkIcon, Check, X, Package } from 'lucide-react';
 import type { Route } from '../types';
 import { supabase } from '../supabaseClient';
-import type { Banner } from '../types';
+import type { Banner, Bundle } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
 
 export default function AdminBannersPage({ navigate }: Props) {
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [bundles, setBundles] = useState<Bundle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
@@ -22,6 +23,7 @@ export default function AdminBannersPage({ navigate }: Props) {
     text_color: '#000000',
     link_url: '',
     link_text: 'Şimdi Keşfet',
+    bundle_id: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: '',
     is_active: true,
@@ -30,7 +32,22 @@ export default function AdminBannersPage({ navigate }: Props) {
 
   useEffect(() => {
     loadBanners();
+    loadBundles();
   }, []);
+
+  const loadBundles = async () => {
+    const { data, error } = await supabase
+      .from('bundles')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Paketler yüklenirken hata:', error);
+    } else {
+      setBundles(data || []);
+    }
+  };
 
   const loadBanners = async () => {
     setLoading(true);
@@ -57,6 +74,7 @@ export default function AdminBannersPage({ navigate }: Props) {
         text_color: formData.text_color,
         link_url: formData.link_url || null,
         link_text: formData.link_text,
+        bundle_id: formData.bundle_id || null,
         start_date: formData.start_date,
         end_date: formData.end_date || null,
         is_active: formData.is_active,
@@ -106,6 +124,7 @@ export default function AdminBannersPage({ navigate }: Props) {
       text_color: banner.text_color,
       link_url: banner.link_url || '',
       link_text: banner.link_text,
+      bundle_id: banner.bundle_id || '',
       start_date: banner.start_date.split('T')[0],
       end_date: banner.end_date?.split('T')[0] || '',
       is_active: banner.is_active,
@@ -123,6 +142,7 @@ export default function AdminBannersPage({ navigate }: Props) {
       text_color: '#000000',
       link_url: '',
       link_text: 'Şimdi Keşfet',
+      bundle_id: '',
       start_date: new Date().toISOString().split('T')[0],
       end_date: '',
       is_active: true,
@@ -310,6 +330,22 @@ export default function AdminBannersPage({ navigate }: Props) {
                   className="input"
                   placeholder="Şimdi Keşfet"
                 />
+              </div>
+              <div>
+                <label className="label">Kampanya Paketi</label>
+                <select
+                  value={formData.bundle_id}
+                  onChange={(e) => setFormData({ ...formData, bundle_id: e.target.value })}
+                  className="input"
+                >
+                  <option value="">Paket seçin (opsiyonel)</option>
+                  {bundles.map(bundle => (
+                    <option key={bundle.id} value={bundle.id}>
+                      {bundle.name} - {bundle.bundle_price} TL
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-sand-500 mt-1">Banner'ı bir kampanya paketine bağlayın</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
