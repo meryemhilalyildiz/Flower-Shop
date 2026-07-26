@@ -1,6 +1,7 @@
 import React from 'react';
 import { OrderInfo, Route } from '../types';
 import { Star } from 'lucide-react';
+import { generateInvoicePDF } from '../services/pdfService';
 
 interface OrdersPageProps {
   orders: Record<string, OrderInfo>;
@@ -79,7 +80,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                   <p className="text-sm font-bold text-pink-600">₺{order.total.toFixed(2)}</p>
                 </div>
 
-                <div>
+                {/* Status ve Fatura Butonu Alanı */}
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
                     isDelivered
                       ? 'bg-emerald-100 text-emerald-800'
@@ -89,6 +91,16 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                   }`}>
                     {order.status || 'Hazırlanıyor'}
                   </span>
+
+                  {/* 📄 FATURA İNDİR BUTONU */}
+                  <button
+                    type="button"
+                    onClick={() => generateInvoicePDF(order)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 text-xs font-medium rounded-full transition-all cursor-pointer shadow-2xs"
+                    title="Faturayı PDF olarak indir"
+                  >
+                    📄 Fatura İndir
+                  </button>
                 </div>
               </div>
 
