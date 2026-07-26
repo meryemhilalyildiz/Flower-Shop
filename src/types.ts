@@ -74,7 +74,11 @@ export type Route =
   | { name: 'admin-companies' }
   | { name: 'company-dashboard' }
   | { name: 'admin-shipping' }
-  | { name: 'admin-reviews' }; // 🌸 Tek Route tanımı burada bitti.
+  | { name: 'admin-reviews' }
+  | { name: 'admin-coupons' }
+  | { name: 'admin-bundles' }
+  | { name: 'admin-analytics' }
+  | { name: 'admin-banners' }; // 🌸 Tek Route tanımı burada bitti.
 
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri

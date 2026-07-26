@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import type { Coupon } from '../types';
 
 // Admin erişim kontrolü
 export async function checkAdminAccess(userId: string): Promise<boolean> {
@@ -457,3 +458,79 @@ export async function uploadReviewPhoto(file: File): Promise<string> {
   return publicUrl;
 }
 
+// =====================================================================
+// 🌸 KUPON YÖNETİMİ
+// =====================================================================
+
+// Tüm kuponları getir
+export async function fetchAllCoupons(): Promise<Coupon[]> {
+  const { data, error } = await supabase
+    .from('coupons')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    if (error.code === 'PGRST205') {
+      console.log('Coupons tablosu henüz oluşturulmadı');
+      return [];
+    }
+    throw error;
+  }
+  return data ?? [];
+}
+
+// Kupon ekle
+export async function addCoupon(coupon: {
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  min_order_amount?: number;
+  max_discount_amount?: number | null;
+  usage_limit?: number | null;
+  valid_from?: string;
+  valid_until?: string | null;
+  is_active?: boolean;
+  description?: string | null;
+}): Promise<Coupon> {
+  const { data, error } = await supabase
+    .from('coupons')
+    .insert({
+      code: coupon.code,
+      discount_type: coupon.discount_type,
+      discount_value: coupon.discount_value,
+      min_order_amount: coupon.min_order_amount ?? 0,
+      max_discount_amount: coupon.max_discount_amount ?? null,
+      usage_limit: coupon.usage_limit ?? null,
+      valid_from: coupon.valid_from ?? new Date().toISOString(),
+      valid_until: coupon.valid_until ?? null,
+      is_active: coupon.is_active ?? true,
+      description: coupon.description ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+// Kupon güncelle
+export async function updateCoupon(id: string, updates: Partial<Coupon>): Promise<Coupon> {
+  const { data, error } = await supabase
+    .from('coupons')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+// Kupon sil
+export async function deleteCoupon(id: string): Promise<void> {
+  const { error } = await supabase.from('coupons').delete().eq('id', id);
+  if (error) throw error;
+}

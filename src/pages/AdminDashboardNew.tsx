@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, Clock, Package, AlertTriangle, Plus, ArrowRight, RefreshCw } from 'lucide-react';
+import { ShoppingBag, Clock, Package, AlertTriangle, Plus, ArrowRight, RefreshCw, Tag, BarChart3 } from 'lucide-react';
 import { fetchDashboardStats, fetchRecentOrders, fetchRecentProducts } from '../services/adminApi';
 import StatCard from '../components/admin/StatCard';
 import StatusBadge from '../components/admin/StatusBadge';
@@ -76,6 +76,41 @@ export default function AdminDashboard({ navigate }: Props) {
           <div className="flex items-center gap-3">
             <Package className="h-5 w-5 text-brand-600" />
             <span className="font-medium">Kategoriler</span>
+          </div>
+          <ArrowRight className="h-4 w-4 text-sand-400" />
+        </button>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-3">
+        <button
+          onClick={() => navigate({ name: 'admin-coupons' })}
+          className="bg-white p-4 rounded-2xl border border-sand-200 flex items-center justify-between hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center gap-3">
+            <Tag className="h-5 w-5 text-brand-600" />
+            <span className="font-medium">Kupon Yönetimi</span>
+          </div>
+          <ArrowRight className="h-4 w-4 text-sand-400" />
+        </button>
+
+        <button
+          onClick={() => navigate({ name: 'admin-bundles' })}
+          className="bg-white p-4 rounded-2xl border border-sand-200 flex items-center justify-between hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center gap-3">
+            <Package className="h-5 w-5 text-brand-600" />
+            <span className="font-medium">Kampanya Paketleri</span>
+          </div>
+          <ArrowRight className="h-4 w-4 text-sand-400" />
+        </button>
+
+        <button
+          onClick={() => navigate({ name: 'admin-analytics' })}
+          className="bg-white p-4 rounded-2xl border border-sand-200 flex items-center justify-between hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center gap-3">
+            <BarChart3 className="h-5 w-5 text-brand-600" />
+            <span className="font-medium">Satış Analitikleri</span>
           </div>
           <ArrowRight className="h-4 w-4 text-sand-400" />
         </button>

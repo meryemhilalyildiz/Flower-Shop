@@ -210,3 +210,105 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+
+// =====================================================================
+// 🌸 SATIŞ ANALİTİK & RAPORLAR
+// =====================================================================
+
+import type { SalesAnalytics, ProductSalesAnalytics, CategorySalesAnalytics, CouponAnalytics } from '../types';
+
+// Satış analitik verilerini getir (tarih aralığı)
+export async function getSalesAnalytics(startDate: string, endDate: string): Promise<SalesAnalytics[]> {
+  const { data, error } = await supabase
+    .from('sales_analytics')
+    .select('*')
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: true });
+
+  if (error) {
+    if (error.code === 'PGRST205') return [];
+    console.error('Satış analitiği çekilirken hata:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+// Ürün satış analitikleri
+export async function getProductSalesAnalytics(): Promise<ProductSalesAnalytics[]> {
+  const { data, error } = await supabase
+    .from('product_sales_analytics')
+    .select('*')
+    .order('revenue', { ascending: false });
+
+  if (error) {
+    if (error.code === 'PGRST205') return [];
+    console.error('Ürün satış analitiği çekilirken hata:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+// Kategori satış analitikleri
+export async function getCategorySalesAnalytics(): Promise<CategorySalesAnalytics[]> {
+  const { data, error } = await supabase
+    .from('category_sales_analytics')
+    .select('*')
+    .order('total_revenue', { ascending: false });
+
+  if (error) {
+    if (error.code === 'PGRST205') return [];
+    console.error('Kategori satış analitiği çekilirken hata:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+// Kupon analitik verilerini getir
+export async function getCouponAnalytics(startDate: string, endDate: string): Promise<CouponAnalytics[]> {
+  const { data, error } = await supabase
+    .from('coupon_analytics')
+    .select('*')
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('discount_total', { ascending: false });
+
+  if (error) {
+    if (error.code === 'PGRST205') return [];
+    console.error('Kupon analitiği çekilirken hata:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+// En çok satan ürünler (limit)
+export async function getTopSellingProducts(limit = 5): Promise<ProductSalesAnalytics[]> {
+  const { data, error } = await supabase
+    .from('product_sales_analytics')
+    .select('*')
+    .order('quantity_sold', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (error.code === 'PGRST205') return [];
+    console.error('En çok satan ürünler çekilirken hata:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+// En çok satan kategoriler (limit)
+export async function getTopSellingCategories(limit = 5): Promise<CategorySalesAnalytics[]> {
+  const { data, error } = await supabase
+    .from('category_sales_analytics')
+    .select('*')
+    .order('total_revenue', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (error.code === 'PGRST205') return [];
+    console.error('En çok satan kategoriler çekilirken hata:', error);
+    return [];
+  }
+  return data ?? [];
+}

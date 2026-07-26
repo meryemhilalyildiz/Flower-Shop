@@ -220,7 +220,7 @@ export default function AdminBundlesPage({ navigate }: Props) {
     ));
   };
 
-  const { originalPrice, bundlePrice } = calculatePrices();
+  const { originalPrice, bundlePrice, discountPercentage } = calculatePrices();
 
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },

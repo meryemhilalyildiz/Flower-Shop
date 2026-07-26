@@ -35,6 +35,10 @@ import AdminDashboardNew from './pages/AdminDashboardNew';
 import AdminCategoriesPage from './pages/AdminCategoriesPage';
 import AdminWikiPage from './pages/AdminWikiPage';
 import AdminReviewsPage from './pages/AdminReviewsPage';
+import AdminCouponsPage from './pages/AdminCouponsPage';
+import AdminBundlesPage from './pages/AdminBundlesPage';
+import AdminBannersPage from './pages/AdminBannersPage';
+import AdminAnalyticsPage from './pages/AdminAnalyticsPage';
 import { useAdminAuth } from './hooks/useAdminAuth';
 import { normalizeOrderStatusToTurkish } from './services/adminApi';
 import AdminLayout from './components/admin/AdminLayout';
@@ -420,6 +424,30 @@ function App() {
         return (
           <AdminLayout currentPage="admin-reviews" navigate={navigate}>
             <AdminReviewsPage />
+          </AdminLayout>
+        );
+      case 'admin-coupons':
+        return (
+          <AdminLayout currentPage="admin-coupons" navigate={navigate}>
+            <AdminCouponsPage navigate={navigate} />
+          </AdminLayout>
+        );
+      case 'admin-bundles':
+        return (
+          <AdminLayout currentPage="admin-bundles" navigate={navigate}>
+            <AdminBundlesPage navigate={navigate} />
+          </AdminLayout>
+        );
+      case 'admin-banners':
+        return (
+          <AdminLayout currentPage="admin-banners" navigate={navigate}>
+            <AdminBannersPage navigate={navigate} />
+          </AdminLayout>
+        );
+      case 'admin-analytics':
+        return (
+          <AdminLayout currentPage="admin-analytics" navigate={navigate}>
+            <AdminAnalyticsPage navigate={navigate} />
           </AdminLayout>
         );
 
