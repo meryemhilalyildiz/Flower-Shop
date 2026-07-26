@@ -1,6 +1,7 @@
-import { CheckCircle2, Package, Truck, Home, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Package, Truck, Home, ArrowRight, MessageCircle } from 'lucide-react';
 import type { Route, OrderInfo } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
+import { openWhatsApp } from '../services/whatsappService';
 
 type Props = {
   order: OrderInfo | undefined;
@@ -109,12 +110,22 @@ export default function OrderSuccessPage({ order, navigate }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <button onClick={() => navigate({ name: 'home' })} className="btn-primary">
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+        <button
+          onClick={() => openWhatsApp(order)}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all shadow-lg hover:shadow-emerald-200"
+        >
+          <MessageCircle className="w-5 h-5" />
+          Siparişi WhatsApp ile İlet
+        </button>
+
+        <button onClick={() => navigate({ name: 'home' })} className="btn-primary w-full sm:w-auto">
           <Home className="w-5 h-5" />
           Anasayfaya Dön
         </button>
-        <button onClick={() => navigate({ name: 'shop' })} className="btn-secondary">
+        
+        <button onClick={() => navigate({ name: 'shop' })} className="btn-secondary w-full sm:w-auto">
           Alışverişe Devam Et
           <ArrowRight className="w-5 h-5" />
         </button>

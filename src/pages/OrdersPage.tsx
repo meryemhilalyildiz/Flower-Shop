@@ -1,9 +1,9 @@
 import React from 'react';
 import { OrderInfo, Route } from '../types';
-import { Star, Download, MapPin } from 'lucide-react';
+import { Star, Download, MessageCircle } from 'lucide-react';
 import { supabase } from "../supabaseClient";
 import { generateInvoicePDF } from "../services/pdfService";
-
+import { openWhatsApp } from "../services/whatsappService";
 
 interface OrdersPageProps {
   orders: Record<string, OrderInfo>;
@@ -107,7 +107,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                   <p className="text-sm font-bold text-pink-600">₺{order.total.toFixed(2)}</p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
                       isDelivered
@@ -120,6 +120,16 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                     {order.status || 'Hazırlanıyor'}
                   </span>
 
+                  {/* 💬 WhatsApp Destek Butonu */}
+                  <button
+                    onClick={() => openWhatsApp(order)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-emerald-200"
+                    title="WhatsApp Destek"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    WhatsApp Destek
+                  </button>
+
                   {/* 📄 Fatura İndir Butonu */}
                   <button
                     onClick={() => generateInvoicePDF(order)}
@@ -130,7 +140,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                     Fatura
                   </button>
 
-                  {/* 🚫 Sipariş İptal Et Butonu (Sadece Henüz Kargolanmamış / Onay Aşamasında Olanlar İçin) */}
+                  {/* 🚫 Sipariş İptal Et Butonu */}
                   {canCancel && (
                     <button
                       onClick={() => handleCancelOrder(order.id)}
@@ -256,7 +266,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                     )}
                   </div>
 
-                  {/* 🚚 KARGO TAKİP NUMARASI (Varsa Ekranın Sağ Tarafında Mavi Kutuda Görünür) */}
+                  {/* 🚚 KARGO TAKİP NUMARASI */}
                   {order.tracking_number && (
                     <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
                       <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>

@@ -107,17 +107,38 @@ export async function fetchCategoriesFromSupabase(): Promise<Category[]> {
 
 // 🌸 Supabase'den ürünleri çek (is_active filtresi kaldırıldı, tüm ürünler çekiliyor)
 export async function fetchProductsFromSupabase(): Promise<Product[]> {
-  try {
-    return await fetchActiveProducts(() =>
-      supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false }),
-    );
-  } catch (error) {
-    console.error('Ürünler çekilirken hata:', error);
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, description, price, original_price, rating, reviews_count, category_id, stock, in_stock, image, is_best_seller, is_featured')
+
+  if (error) {
+    console.error('Supabase ürün çekme hatası:', error);
     return [];
   }
+
+  return (data || []).map((item: any) => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    price: Number(item.price),
+    oldPrice: item.original_price ? Number(item.original_price) : undefined,
+    rating: item.rating ? Number(item.rating) : 5,
+    reviewCount: item.reviews_count || 0,
+    categoryId: item.category_id,
+
+    // 🌸 STOK ALANLARI (Tükendi sorununu çözen yer)
+    stock: item.stock !== undefined && item.stock !== null ? Number(item.stock) : 10,
+    inStock: item.stock !== undefined && item.stock !== null ? Number(item.stock) > 0 : true,
+
+    // 🎯 TYPESCRIPT EKSİK OLAN ALANLAR (Hatanı çözen yer)
+    longDescription: item.description || '',
+    ingredients: [],
+    deliveryInfo: 'Aynı gün teslimat seçeneği ile kapınızda.',
+
+    images: [item.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=800&q=80'],
+    slug: item.id.toString(),
+    badge: item.is_best_seller ? 'Çok Satan' : undefined,
+  }));
 }
 
 // 🌸 Kategoriye göre ürünleri çek (is_active filtresi kaldırıldı)

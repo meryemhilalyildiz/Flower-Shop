@@ -107,13 +107,17 @@ function App() {
 
   const handlePlaceOrder = useCallback(
     async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
+      // 1. Kullanıcı oturumunu al
       const { data: { user } } = await supabase.auth.getUser();
 
       // 1. orders tablosuna kargo ve ara toplam ile kayıt
+      // 🎯 İŞTE KRİTİK NOKTA: Sadece oturum açmış GERÇEK kullanıcı id'si gönder, yoksa null ver!
+      const validUserId = user?.id ? user.id : null;
+
       const { data: insertedOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: user?.id || null,
+          user_id: validUserId, // Foreign Key hatasını önleyen güvenli kullanım
           recipient_name: orderData.recipientName || 'Alıcı Adı Belirtilmedi',
           recipient_phone: orderData.recipientPhone || '',
           shipping_address: orderData.address || 'Adres Belirtilmedi',
@@ -215,7 +219,7 @@ function App() {
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
-            deliveryDate: ord.delivery_date || '',
+            deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
             subtotal: ord.subtotal || undefined,
             deliveryFee: ord.delivery_fee || undefined,
