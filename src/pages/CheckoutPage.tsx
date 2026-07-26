@@ -11,6 +11,7 @@ import {
   formatDateTurkish,
 } from '../services/shipping';
 import type { ShippingCalculation } from '../types';
+import { Coupon } from '../types';
 
 type Props = {
   items: CartItem[];
@@ -76,6 +77,53 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  const [couponInput, setCouponInput] = useState('');
+const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+const [discountAmount, setDiscountAmount] = useState(0);
+
+const handleApplyCoupon = async () => {
+  if (!couponInput.trim()) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('code', couponInput.toUpperCase().trim())
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) {
+      alert('Geçersiz veya aktif olmayan kupon kodu.');
+      return;
+    }
+
+    // 🛑 Kullanım Limiti Kontrolü
+    if (data.used_count >= data.max_uses) {
+      alert('Bu kuponun kullanım limiti dolmuştur.');
+      return;
+    }
+
+    // 🛑 Minimum Sepet Tutarı Kontrolü
+    if (subtotal < data.min_order_amount) {
+      alert(`Bu kupon en az ₺${data.min_order_amount} tutarındaki sepetlerde geçerlidir.`);
+      return;
+    }
+
+    let calculatedDiscount = 0;
+    if (data.discount_type === 'percentage') {
+      calculatedDiscount = (subtotal * data.discount_value) / 100;
+    } else {
+      calculatedDiscount = data.discount_value;
+    }
+
+    setAppliedCoupon(data);
+    setDiscountAmount(calculatedDiscount);
+    alert(`🎉 Kupon başarıyla uygulandı! İndirim: ₺${calculatedDiscount.toFixed(2)}`);
+  } catch (err: any) {
+    alert('Kupon uygulanırken hata oluştu: ' + err.message);
+  }
+};
 
   // 🌸 81 İli Sabitten Alıyoruz ve Kayıtlı Adresleri Yüklüyoruz
   useEffect(() => {
@@ -188,28 +236,52 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 1. Form Doğrulama (Validation)
     if (!validate()) {
       const firstError = document.querySelector('[data-error="true"]');
       firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    
     setSubmitting(true);
+    
     try {
-      // 1. Önce siparişi veritabanına ekliyoruz
+      // Kupon indirimli son toplam hesabı
+      const finalTotal = Math.max(0, dynamicTotal - discountAmount);
+  
+      // 2. Siparişi veritabanına ekliyoruz (Kupon bilgileri dahil)
       const orderId = await onPlaceOrder({
         items,
-        total: dynamicTotal,
+        total: finalTotal,
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
         address: form.address,
         city: form.city,
         deliveryDate: form.deliveryDate,
         note: form.note,
-      });// 🌸 2. ANINDA STOK DÜŞME (Admin onayını beklemeden)
+        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        discountAmount: discountAmount,
+      });
+  
+      // 🎟️ 3. KUPON KULLANIM SAYISINI ARTIRMA (Varsa kullanılan kuponun used_count'ını +1 yapıyoruz)
+      if (appliedCoupon) {
+        const { error: couponErr } = await supabase
+          .from('coupons')
+          .update({ used_count: (appliedCoupon.used_count || 0) + 1 })
+          .eq('id', appliedCoupon.id);
+  
+        if (couponErr) {
+          console.error('KUPON SAYACI GÜNCELLENEMEDİ:', couponErr);
+        } else {
+          console.log(`Kupon kullanımı güncellendi: ${appliedCoupon.code} -> ${appliedCoupon.used_count + 1}`);
+        }
+      }
+  
+      // 🌸 4. ANINDA STOK DÜŞME (Admin onayını beklemeden)
       for (const item of items) {
-        // item.product.id veya item.product._id kontrolü
         const targetId = item.product.id;
-
+  
         if (targetId) {
           // a. Güncel stok miktarını çek
           const { data: prod } = await supabase
@@ -217,11 +289,11 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
             .select('stock_quantity')
             .eq('id', targetId)
             .single();
-
+  
           if (prod) {
             const currentStock = prod.stock_quantity ?? 0;
             const newStock = Math.max(0, currentStock - item.quantity);
-
+  
             // b. Supabase'deki 'stock_quantity'yi düş ve kaydet
             const { error: updateErr } = await supabase
               .from('products')
@@ -230,7 +302,7 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
                 is_active: newStock > 0 
               })
               .eq('id', targetId);
-
+  
             if (updateErr) {
               console.error('Stok düşme RLS/DB Hatası:', updateErr);
             } else {
@@ -239,11 +311,13 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
           }
         }
       }
-
-      // 3. Başarılı sayfasına yönlendir
+  
+      // 5. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);
+      alert('Sipariş verilirken bir hata oluştu.');
+    } finally {
       setSubmitting(false);
     }
   };
@@ -594,61 +668,104 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
         </div>
 
         {/* Summary */}
-        <div>
-          <div className="card p-6 sticky top-24">
-            <h2 className="font-display text-xl font-bold text-sand-900 mb-4">Sipariş Özeti</h2>
+<div>
+  <div className="card p-6 sticky top-24">
+    <h2 className="font-display text-xl font-bold text-sand-900 mb-4">Sipariş Özeti</h2>
 
-            <div className="space-y-3 max-h-48 overflow-y-auto mb-4">
-              {items.map((item) => (
-                <div key={item.product.id} className="flex gap-3 text-sm">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-sand-100 flex-shrink-0">
-                    <img src={item.product.images[0]} alt="" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sand-800 line-clamp-1">{item.product.name}</p>
-                    <p className="text-xs text-sand-500">{item.quantity} adet · {item.product.price} TL</p>
-                  </div>
-                  <span className="font-semibold text-sand-800 text-sm">{item.product.price * item.quantity} TL</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t border-sand-100 pt-4 space-y-2 text-sm">
-              <div className="flex justify-between text-sand-600">
-                <span>Ara toplam</span>
-                <span>{subtotal} TL</span>
-              </div>
-              <div className="flex justify-between text-sand-600">
-                <span>Kargo</span>
-                <span>
-                  {shippingInfo ? (
-                    <span className="font-medium text-sand-800">{shippingInfo.shippingFee} TL</span>
-                  ) : (
-                    <span className="text-sand-400">İl seçin</span>
-                  )}
-                </span>
-              </div>
-              <div className="border-t border-sand-100 pt-2 flex justify-between items-baseline">
-                <span className="font-semibold text-sand-800">Toplam</span>
-                <span className="text-2xl font-bold text-brand-700">{dynamicTotal} TL</span>
-              </div>
-            </div>
-
-            <button type="submit" disabled={submitting} className="btn-primary w-full mt-6">
-              {submitting ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  İşleniyor...
-                </>
-              ) : (
-                <>
-                  <Check className="w-5 h-5" />
-                  Siparişi Tamamla
-                </>
-              )}
-            </button>
+    {/* Ürün Listesi */}
+    <div className="space-y-3 max-h-48 overflow-y-auto mb-4">
+      {items.map((item) => (
+        <div key={item.product.id} className="flex gap-3 text-sm">
+          <div className="w-12 h-12 rounded-lg overflow-hidden bg-sand-100 flex-shrink-0">
+            <img src={item.product.images[0]} alt="" className="w-full h-full object-cover" />
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sand-800 line-clamp-1">{item.product.name}</p>
+            <p className="text-xs text-sand-500">{item.quantity} adet · {item.product.price} TL</p>
+          </div>
+          <span className="font-semibold text-sand-800 text-sm">{item.product.price * item.quantity} TL</span>
         </div>
+      ))}
+    </div>
+
+    {/* 🎟️ KUPON KODU GİRİŞ ALANI */}
+    <div className="bg-sand-50 p-3.5 rounded-xl border border-sand-200 mb-4">
+      <label className="text-xs font-semibold text-sand-700 block mb-1.5">
+        Kupon Kodu
+      </label>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Örn: INDIRIM10"
+          value={couponInput}
+          onChange={(e) => setCouponInput(e.target.value)}
+          className="flex-1 px-3 py-1.5 text-xs bg-white border border-sand-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none uppercase font-semibold text-sand-800"
+        />
+        <button
+          type="button"
+          onClick={handleApplyCoupon}
+          className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-lg transition-all cursor-pointer shadow-xs"
+        >
+          Uygula
+        </button>
+      </div>
+
+      {appliedCoupon && (
+        <div className="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
+          🎉 '{appliedCoupon.code}' kuponu uygulandı (-{discountAmount} TL)
+        </div>
+      )}
+    </div>
+
+    {/* Hesaplama Bilgileri */}
+    <div className="border-t border-sand-100 pt-4 space-y-2 text-sm">
+      <div className="flex justify-between text-sand-600">
+        <span>Ara toplam</span>
+        <span>{subtotal} TL</span>
+      </div>
+
+      {/* 🟢 VARSA KUPON İNDİRİMİ SATIRI */}
+      {discountAmount > 0 && (
+        <div className="flex justify-between text-emerald-600 font-semibold">
+          <span>Kupon İndirimi</span>
+          <span>-{discountAmount} TL</span>
+        </div>
+      )}
+
+      <div className="flex justify-between text-sand-600">
+        <span>Kargo</span>
+        <span>
+          {shippingInfo ? (
+            <span className="font-medium text-sand-800">{shippingInfo.shippingFee} TL</span>
+          ) : (
+            <span className="text-sand-400">İl seçin</span>
+          )}
+        </span>
+      </div>
+
+      <div className="border-t border-sand-100 pt-2 flex justify-between items-baseline">
+        <span className="font-semibold text-sand-800">Toplam</span>
+        <span className="text-2xl font-bold text-brand-700">
+          {Math.max(0, dynamicTotal - discountAmount)} TL
+        </span>
+      </div>
+    </div>
+
+    <button type="submit" disabled={submitting} className="btn-primary w-full mt-6">
+      {submitting ? (
+        <>
+          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          İşleniyor...
+        </>
+      ) : (
+        <>
+          <Check className="w-5 h-5" />
+          Siparişi Tamamla
+        </>
+      )}
+    </button>
+  </div>
+</div>
       </form>
     </div>
   );

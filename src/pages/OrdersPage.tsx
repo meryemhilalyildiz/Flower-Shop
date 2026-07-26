@@ -1,6 +1,9 @@
 import React from 'react';
 import { OrderInfo, Route } from '../types';
-import { Star } from 'lucide-react';
+import { Star, Download } from 'lucide-react';
+import { supabase } from "../supabaseClient";
+import { generateInvoicePDF } from "../services/pdfService";
+
 
 interface OrdersPageProps {
   orders: Record<string, OrderInfo>;
@@ -12,6 +15,29 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
   const orderList = Object.values(orders).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+
+  // 🌸 Sipariş İptal Talebi Fonksiyonu (Madde 24)
+  const handleCancelOrder = async (orderId: string) => {
+    const reason = prompt('Siparişi iptal etme nedeninizi kısaca belirtin:');
+    if (reason === null) return; // Kullanıcı iptal butonuna bastıysa vazgeç
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'İptal Talebi Alındı',
+          cancel_reason: reason || 'Müşteri tarafından iptal talebi oluşturuldu.',
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      alert('İptal talebiniz admin onayına gönderildi.');
+      window.location.reload();
+    } catch (err: any) {
+      alert('İptal talebi oluşturulurken hata: ' + err.message);
+    }
+  };
 
   if (orderList.length === 0) {
     return (
@@ -46,7 +72,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
       <div className="space-y-6">
         {orderList.map((order) => {
           const isDelivered = order.status === 'Teslim Edildi';
-          const isCancelled = order.status === 'İptal Edildi';
+          const isCancelled = order.status === 'İptal Edildi' || order.status === 'İptal Talebi Alındı';
+          const canCancel = order.status === 'pending' || order.status === 'Hazırlanıyor';
+
           return (
             <div
               key={order.id}
@@ -79,16 +107,38 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                   <p className="text-sm font-bold text-pink-600">₺{order.total.toFixed(2)}</p>
                 </div>
 
-                <div>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                    isDelivered
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : isCancelled
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                      isDelivered
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : isCancelled
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
                     {order.status || 'Hazırlanıyor'}
                   </span>
+
+                  {/* 📄 Fatura İndir Butonu */}
+                  <button
+                    onClick={() => generateInvoicePDF(order)}
+                    className="flex items-center gap-1 px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-full text-xs font-semibold transition-all cursor-pointer border border-pink-200"
+                    title="Fatura İndir"
+                  >
+                    <Download className="w-3 h-3" />
+                    Fatura
+                  </button>
+
+                  {/* 🚫 Sipariş İptal Et Butonu (Sadece Henüz Kargolanmamış / Onay Aşamasında Olanlar İçin) */}
+                  {canCancel && (
+                    <button
+                      onClick={() => handleCancelOrder(order.id)}
+                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-full text-xs font-semibold transition-colors cursor-pointer border border-red-200"
+                    >
+                      🚫 İptal Et
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -131,7 +181,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                           {isDelivered && item.product.slug && (
                             <button
                               onClick={() => navigate({ name: 'product', slug: item.product.slug })}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all"
+                              className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
                             >
                               <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                               Yorum Yap
@@ -158,7 +208,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                     )}
                   </div>
 
-                  {/* 🚚 KARGO TAKİP NUMARASI (Varsa Ekranın Sağ Tarafında Mavi Kutuda Görünür) */}
+                  {/* 🚚 KARGO TAKİP NUMARASI */}
                   {order.tracking_number && (
                     <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
                       <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>

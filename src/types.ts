@@ -51,35 +51,39 @@ export type OrderInfo = {
   total: number;
   status?: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | string;
   tracking_number?: string; // Kargo takip numarası
+  cancel_reason?: string;
+  couponCode?: string;
+  discountAmount?: number;
   items: Array<{
     product: Product;
     quantity: number;
   }> | CartItem[];
+  subtotal?: number;
+  deliveryFee?: number;
+  delivery_fee?: number;
 };
 
 export type Route =
   | { name: 'home' }
+  | { name: 'admin-dashboard' }
+  | { name: 'admin-products' }
+  | { name: 'admin-categories' }
+  | { name: 'admin-orders' }
+  | { name: 'admin-shipping' }
+  | { name: 'admin-wiki' }
+  | { name: 'admin-reviews' }
+  | { name: 'admin-coupons' } // 👈 Bu satırın olduğundan emin ol
   | { name: 'shop'; categorySlug?: string }
   | { name: 'product'; slug: string }
   | { name: 'cart' }
   | { name: 'checkout' }
   | { name: 'order-success'; orderId: string }
+  | { name: 'orders' }
+  | { name: 'favorites' }
   | { name: 'about' }
   | { name: 'contact' }
   | { name: 'faq' }
-  | { name: 'orders' }
-  | { name: 'favorites' }
-  | { name: 'admin-login' }
-  | { name: 'admin-dashboard' }
-  | { name: 'admin-products' }
-  | { name: 'admin-categories' }
-  | { name: 'admin-orders' }
-  | { name: 'admin-districts' }
-  | { name: 'admin-wiki' }
-  | { name: 'admin-companies' }
-  | { name: 'company-dashboard' }
-  | { name: 'admin-shipping' }
-  | { name: 'admin-reviews' }; // 🌸 Tek Route tanımı burada bitti.
+  | { name: 'admin-login' };
 
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri
