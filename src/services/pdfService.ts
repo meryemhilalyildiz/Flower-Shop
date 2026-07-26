@@ -23,31 +23,62 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     paymentMethodText = paymentMethodRaw;
   }
 
-  // 2. Kupon ve İndirim Hesaplama
+  // 2. Kupon ve İndirim
   const couponCode = (order as any).couponCode || (order as any).coupon_code || null;
   const discountAmount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
-  const deliveryFee = Number((order as any).deliveryFee || (order as any).delivery_fee || 0);
 
-  // Ürünlerin ham ara toplamı
-  const subtotal = order.items.reduce((sum, item) => {
-    const price = item.product?.price || 0;
+  // 3. Ara Toplam (Sepetteki ürünlerin toplam fiyatı)
+  const subtotal = order.subtotal || order.items.reduce((sum, item: any) => {
+    const price = item.product?.price || item.unit_price || item.price || 0;
     const qty = item.quantity || 1;
     return sum + (price * qty);
   }, 0);
+  
+  // 4. Kargo Ücreti
+  let deliveryFee = Number(order.deliveryFee || order.delivery_fee || 0);
+  if (deliveryFee === 0 && order.total > subtotal) {
+    deliveryFee = order.total - subtotal;
+  }
 
+  // 5. Ürün Satırları (Olası Tüm İsim Kaynaklarını Tarama + Varyant Ayrıştırması)
   const itemsHtml = order.items
-    .map((item) => {
-      const productName = item.product?.name || 'Çiçek Ürünü';
+    .map((item: any) => {
+      // 🎯 Birleştirilen Kısım: Tüm olası alan isimlerinden güvenli arama
+      const fullName = 
+        item.product?.name || 
+        item.product_name || 
+        item.name || 
+        item.title || 
+        'Çiçek Ürünü';
+
       const qty = item.quantity || 1;
-      const price = item.product?.price || 0;
+      const price = item.product?.price || item.unit_price || item.price || 0;
       const total = price * qty;
+
+      let baseName = fullName;
+      let variantSubtext = '';
+
+      if (fullName.includes('(') && fullName.includes(')')) {
+        const parts = fullName.split('(');
+        baseName = parts[0].trim();
+        variantSubtext = parts[1].replace(')', '').trim();
+      }
 
       return `
         <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #eee;">${productName}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${qty}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">₺${price.toFixed(2)}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">₺${total.toFixed(2)}</td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
+            <div style="font-weight: bold; color: #333; font-size: 14px;">${baseName}</div>
+            ${
+              variantSubtext
+                ? `<div style="font-size: 11px; color: #db2777; margin-top: 4px; font-weight: 600; display: inline-block;">
+                    ✨ Ek Özellik / Varyant: ${variantSubtext}
+                   </div>`
+                : '<div style="font-size: 11px; color: #888; margin-top: 2px;">Standart Boyut</div>'
+            }
+          </td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center;">${qty} Adet</td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${price.toFixed(2)}</td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">₺${total.toFixed(2)}</td>
         </tr>
       `;
     })
@@ -67,10 +98,10 @@ export const generateInvoicePDF = (order: OrderInfo) => {
           table { width: 100%; border-collapse: collapse; margin-top: 25px; font-size: 13px; }
           th { background-color: #f9fafb; padding: 10px; text-align: left; border-bottom: 2px solid #eee; }
           
-          .summary-table { margin-left: auto; width: 280px; margin-top: 20px; font-size: 13px; line-height: 1.8; }
-          .summary-table td { padding: 3px 0; }
-          .grand-total { font-size: 16px; font-weight: bold; color: #db2777; border-top: 2px solid #db2777; padding-top: 6px; }
-          .coupon-badge { background-color: #fdf2f8; color: #db2777; padding: 2px 6px; rounded: 4px; font-weight: bold; font-size: 11px; }
+          .summary-table { margin-left: auto; width: 320px; margin-top: 20px; font-size: 13px; line-height: 1.8; }
+          .summary-table td { padding: 4px 0; }
+          .grand-total { font-size: 16px; font-weight: bold; color: #db2777; border-top: 2px solid #db2777; padding-top: 8px; }
+          .coupon-badge { background-color: #fdf2f8; color: #db2777; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
 
           .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 15px; }
           @media print { body { padding: 0; } }
@@ -109,8 +140,8 @@ export const generateInvoicePDF = (order: OrderInfo) => {
         <table>
           <thead>
             <tr>
-              <th>Ürün Adı</th>
-              <th style="text-align: center;">Adet</th>
+              <th>Ürün Detayı / Varyant</th>
+              <th style="text-align: center;">Miktar</th>
               <th style="text-align: right;">Birim Fiyat</th>
               <th style="text-align: right;">Toplam</th>
             </tr>
@@ -123,19 +154,19 @@ export const generateInvoicePDF = (order: OrderInfo) => {
         <!-- Hesap Döküm Tablosu -->
         <table class="summary-table">
           <tr>
-            <td>Ara Toplam:</td>
-            <td style="text-align: right;">₺${subtotal.toFixed(2)}</td>
+            <td>Ürünler Toplamı:</td>
+            <td style="text-align: right; font-weight: 500;">₺${subtotal.toFixed(2)}</td>
           </tr>
           ${deliveryFee > 0 ? `
           <tr>
-            <td>Teslimat / Kargo Ücreti:</td>
-            <td style="text-align: right;">₺${deliveryFee.toFixed(2)}</td>
+            <td>🚚 Teslimat / Kargo Ücreti:</td>
+            <td style="text-align: right; font-weight: 500;">₺${deliveryFee.toFixed(2)}</td>
           </tr>
           ` : ''}
           ${discountAmount > 0 ? `
           <tr style="color: #db2777;">
-            <td>Kupon İndirimi (${couponCode || 'Kampanya'}):</td>
-            <td style="text-align: right;">-₺${discountAmount.toFixed(2)}</td>
+            <td>🏷️ Kupon İndirimi (${couponCode || 'Kampanya'}):</td>
+            <td style="text-align: right; font-weight: 500;">-₺${discountAmount.toFixed(2)}</td>
           </tr>
           ` : ''}
           <tr class="grand-total">

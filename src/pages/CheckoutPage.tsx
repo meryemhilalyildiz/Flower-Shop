@@ -193,11 +193,38 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
       firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    setSubmitting(true);
     try {
-      // 1. Önce siparişi veritabanına ekliyoruz
+      // 1. Sepet Toplamı ve Kargo Ücreti Hesabı
+      const subtotalAmount = items.reduce((sum, item) => {
+        const price = item.product?.price || 0;
+        const qty = item.quantity || 1;
+        return sum + (price * qty);
+      }, 0);
+
+      const calculatedDeliveryFee = dynamicTotal > subtotalAmount ? dynamicTotal - subtotalAmount : 0;
+      // 🌸 2. Siparişi veritabanına/state'e gönderirken Varyantlı İsimleri Koruma
+      const orderItems = items.map((item) => {
+        const fullProductName = item.product.name || 'Çiçek Ürünü';
+
+        return {
+          ...item,
+          product: {
+            ...item.product,
+            name: fullProductName,
+          },
+          product_name: fullProductName,
+          title: fullProductName,
+          quantity: item.quantity,
+          price: item.product.price,
+        };
+      });
+
+      // 🌸 3. Sipariş oluşturma
       const orderId = await onPlaceOrder({
-        items,
+        items: orderItems,
+        subtotal: subtotalAmount,
+        deliveryFee: calculatedDeliveryFee,
+        delivery_fee: calculatedDeliveryFee,
         total: dynamicTotal,
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
@@ -205,13 +232,12 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
         city: form.city,
         deliveryDate: form.deliveryDate,
         note: form.note,
-      });// 🌸 2. ANINDA STOK DÜŞME (Admin onayını beklemeden)
-      for (const item of items) {
-        // item.product.id veya item.product._id kontrolü
-        const targetId = item.product.id;
+      });
 
+      // 🌸 4. Anında Stok Düşme İşlemi
+      for (const item of items) {
+        const targetId = item.product.id;
         if (targetId) {
-          // a. Güncel stok miktarını çek
           const { data: prod } = await supabase
             .from('products')
             .select('stock_quantity')
@@ -222,34 +248,24 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
             const currentStock = prod.stock_quantity ?? 0;
             const newStock = Math.max(0, currentStock - item.quantity);
 
-            // b. Supabase'deki 'stock_quantity'yi düş ve kaydet
-            const { error: updateErr } = await supabase
+            await supabase
               .from('products')
               .update({ 
                 stock_quantity: newStock,
                 is_active: newStock > 0 
               })
               .eq('id', targetId);
-
-            if (updateErr) {
-              console.error('Stok düşme RLS/DB Hatası:', updateErr);
-            } else {
-              console.log(`Stok başarıyla düşüldü: ${targetId} -> Yeni Stok: ${newStock}`);
-            }
           }
         }
       }
 
-      // 3. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);
       setSubmitting(false);
     }
   };
-
   
-
   const formatCardNumber = (val: string) => {
     const digits = val.replace(/\D/g, '').slice(0, 16);
     return digits.replace(/(.{4})/g, '$1 ').trim();

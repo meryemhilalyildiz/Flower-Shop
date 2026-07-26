@@ -108,10 +108,9 @@ function App() {
 
   const handlePlaceOrder = useCallback(
     async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
-      // 🌸 1. Oturum açmış kullanıcıyı al
       const { data: { user } } = await supabase.auth.getUser();
 
-      // 🌸 2. Supabase 'orders' tablosuna kayıt
+      // 1. orders tablosuna kargo ve ara toplam ile kayıt
       const { data: insertedOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -122,40 +121,33 @@ function App() {
           city: orderData.city || '',
           delivery_date: orderData.deliveryDate || '',
           note: orderData.note || '',
+          subtotal: orderData.subtotal || orderData.total,
+          delivery_fee: orderData.deliveryFee || 0,
           total_amount: orderData.total,
           status: 'pending',
         })
         .select()
         .single();
 
-      if (orderError) {
-        alert(`❌ ORDERS HATASI:\n${orderError.message}`);
-        throw orderError;
-      }
+      if (orderError) throw orderError;
 
       const orderId = insertedOrder.id.toString();
 
-      // 🌸 3. 'order_items' tablosuna ürünleri ekle
+      // 2. order_items tablosuna tam varyantlı ismi yazıyoruz! ✨
       if (orderData.items && orderData.items.length > 0) {
         const itemsToInsert = orderData.items.map((item) => ({
           order_id: orderId,
           product_id: String(item.product.id),
+          product_name: item.product.name, // 👈 Sepetteki tam isim buraya gidiyor
           quantity: item.quantity,
-          unit_price: item.product.price || 0, // 🎯 Eklenen alan
+          unit_price: item.product.price || 0,
         }));
-
-        console.log('order_items tablosuna gönderilen veri:', itemsToInsert);
 
         const { error: itemsError } = await supabase
           .from('order_items')
           .insert(itemsToInsert);
 
-        if (itemsError) {
-          alert(`❌ ORDER_ITEMS HATASI:\n${itemsError.message}`);
-          console.error('ORDER_ITEMS HATASI:', itemsError);
-        } else {
-          alert('✅ Sipariş ve Ürün Detayları Başarıyla Veritabanına Yazıldı!');
-        }
+        if (itemsError) console.error('ORDER_ITEMS HATASI:', itemsError);
       }
 
       const order: OrderInfo = {
@@ -179,7 +171,8 @@ function App() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) return;
-      // 🌸 1. .select() içine tracking_number alanını ekledik!
+
+      // 🌸 Supabase sorgusuna product_name, subtotal ve delivery_fee eklendi!
       const { data: fetchedOrders, error } = await supabase
         .from('orders')
         .select(`
@@ -187,6 +180,8 @@ function App() {
           created_at,
           delivery_date,
           status,
+          subtotal,
+          delivery_fee,
           total_amount,
           shipping_address,
           city,
@@ -197,6 +192,7 @@ function App() {
           order_items (
             id,
             product_id,
+            product_name,
             quantity,
             unit_price
           )
@@ -218,28 +214,34 @@ function App() {
             createdAt: ord.created_at,
             deliveryDate: ord.delivery_date || '',
             status: ord.status || 'Hazırlanıyor',
+            subtotal: ord.subtotal || undefined,
+            deliveryFee: ord.delivery_fee || undefined,
             total: ord.total_amount,
             address: ord.shipping_address,
             city: ord.city,
             recipientName: ord.recipient_name,
             recipientPhone: ord.recipient_phone,
             note: ord.note,
-            // 🚚 2. Kargo takip numarasını buraya aktardık!
             tracking_number: ord.tracking_number || undefined,
             items: ord.order_items ? ord.order_items.map((item: any) => {
+              // 1. Önce ham ürünlerde ara
               const foundProduct = products.find((p) => String(p.id) === String(item.product_id));
+
+              // 2. Varyantlı ürünlerde veritabanına yazdığımız tam ismi öncelikli kullan!
               const fallbackProduct = {
                 id: item.product_id,
-                name: 'Ürün Detayı',
-                price: item.unit_price || 0,
-                image: '',
+                name: item.product_name || (foundProduct ? foundProduct.name : 'Çiçek Ürünü'),
+                price: item.unit_price || (foundProduct ? foundProduct.price : 0),
+                images: foundProduct?.images || [''],
                 slug: 'urun',
                 categoryId: '',
                 description: '',
               };
 
               return {
-                product: (foundProduct || fallbackProduct) as any,
+                product: (foundProduct 
+                  ? { ...foundProduct, name: item.product_name || foundProduct.name, price: item.unit_price || foundProduct.price } 
+                  : fallbackProduct) as any,
                 quantity: item.quantity,
                 price: item.unit_price,
               };
@@ -334,13 +336,12 @@ function App() {
       }
 
       case 'orders':
-        return (
-          <OrdersPage
-            orders={orders}
-            onNavigateToShop={() => navigate({ name: 'shop' })}
-          />
-        );
-
+  return (
+    <OrdersPage
+      orders={Object.values(orders)}
+      navigate={navigate}
+    />
+  );
       case 'about':
         return <AboutPage navigate={navigate} />;
       case 'contact':
