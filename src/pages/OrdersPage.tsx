@@ -1,5 +1,6 @@
 import React from 'react';
 import { OrderInfo } from '../types';
+import { generateInvoicePDF } from '../services/pdfService';
 
 interface OrdersPageProps {
   orders: Record<string, OrderInfo>;
@@ -74,10 +75,21 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, onNavigateToShop
                 <p className="text-sm font-bold text-pink-600">₺{order.total.toFixed(2)}</p>
               </div>
 
-              <div>
+              {/* Status ve Fatura Butonu Alanı */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
                   {order.status || 'Hazırlanıyor'}
                 </span>
+
+                {/* 📄 FATURA İNDİR BUTONU */}
+                <button
+                  type="button"
+                  onClick={() => generateInvoicePDF(order)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 text-xs font-medium rounded-full transition-all cursor-pointer shadow-2xs"
+                  title="Faturayı PDF olarak indir"
+                >
+                  📄 Fatura İndir
+                </button>
               </div>
             </div>
 
@@ -138,7 +150,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, onNavigateToShop
                   )}
                 </div>
 
-                {/* 🚚 KARGO TAKİP NUMARASI (Varsa Ekranın Sağ Tarafında Mavi Kutuda Görünür) */}
+                {/* 🚚 KARGO TAKİP NUMARASI */}
                 {order.tracking_number && (
                   <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
                     <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
