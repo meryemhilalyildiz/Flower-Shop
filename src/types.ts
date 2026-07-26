@@ -62,4 +62,6 @@ export type Route =
   | { name: 'admin-categories' }
   | { name: 'admin-orders' }
   | { name: 'admin-districts' }
-  | { name: 'admin-wiki' }; // 🌸 Tek Route tanımı burada bitti.
+  | { name: 'admin-wiki' }
+  | { name: 'admin-companies' }
+  | { name: 'company-dashboard' }; // 🌸 Tek Route tanımı burada bitti.
