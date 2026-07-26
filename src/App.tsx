@@ -47,12 +47,7 @@ function App() {
   const [orders, setOrders] = useState<Record<string, OrderInfo>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState(mockCategories);
-<<<<<<< HEAD
-  const [bundles, setBundles] = useState<Bundle[]>([]);
-  const [loading, setLoading] = useState(false);
-=======
   const [loading, setLoading] = useState(true);
->>>>>>> parent of a451ee5 (denemen)
   const [useApi, setUseApi] = useState(true);
   const { loading: adminLoading, isAdmin } = useAdminAuth();
 

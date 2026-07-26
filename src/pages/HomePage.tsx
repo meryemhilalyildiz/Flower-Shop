@@ -193,17 +193,6 @@ export default function HomePage({ categories, featured, discounted, navigate, o
       </section>
 
       {/* Campaign Banner */}
-<<<<<<< HEAD
-      <BannerRotator navigate={navigate} bundles={bundles} />
-
-      {/* Bundles */}
-      {bundles.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 py-12">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <h2 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">Kampanyalı Paketler</h2>
-              <p className="text-sand-500 mt-2">Özel günler için hazır paketler</p>
-=======
       <section className="max-w-7xl mx-auto px-4 py-12">
         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-brand-600 to-brand-800">
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -228,7 +217,6 @@ export default function HomePage({ categories, featured, discounted, navigate, o
                 alt="Kampanya"
                 className="relative w-full h-full object-cover rounded-3xl shadow-2xl"
               />
->>>>>>> parent of a451ee5 (denemen)
             </div>
           </div>
         </div>
