@@ -10,11 +10,13 @@ type Props = {
   activeCategorySlug?: string;
   navigate: (r: Route) => void;
   onAddToCart: (p: Product) => void;
+  isFavorite: (productId: string) => boolean;
+  onToggleFavorite: (p: Product) => void;
 };
 
 type SortKey = 'featured' | 'price-asc' | 'price-desc' | 'rating';
 
-export default function ShopPage({ products, categories, activeCategorySlug, navigate, onAddToCart }: Props) {
+export default function ShopPage({ products, categories, activeCategorySlug, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
   const [sort, setSort] = useState<SortKey>('featured');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [showInStock, setShowInStock] = useState(false);
@@ -199,7 +201,13 @@ export default function ShopPage({ products, categories, activeCategorySlug, nav
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
               {filtered.map((p) => (
-                <ProductCard key={p.id} product={p} onAddToCart={onAddToCart} />
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  onAddToCart={onAddToCart}
+                  isFavorite={isFavorite(p.id)}
+                  onToggleFavorite={onToggleFavorite}
+                />
               ))}
             </div>
           )}

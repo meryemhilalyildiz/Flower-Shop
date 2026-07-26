@@ -31,6 +31,13 @@ export type CartItem = {
   quantity: number;
 };
 
+export type Favorite = {
+  id: string;
+  user_id: string;
+  product_id: string;
+  created_at: string;
+};
+
 export type OrderInfo = {
   id: string;
   items: CartItem[];
@@ -42,7 +49,7 @@ export type OrderInfo = {
   deliveryDate: string;
   note: string;
   createdAt: string;
-  status: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi';
+  status: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'İptal Edildi';
 };
 
 export type Route =
@@ -56,6 +63,7 @@ export type Route =
   | { name: 'contact' }
   | { name: 'faq' }
   | { name: 'orders' }
+  | { name: 'favorites' }
   | { name: 'admin-login' }
   | { name: 'admin-dashboard' }
   | { name: 'admin-products' }
@@ -65,7 +73,8 @@ export type Route =
   | { name: 'admin-wiki' }
   | { name: 'admin-companies' }
   | { name: 'company-dashboard' }
-  | { name: 'admin-shipping' };
+  | { name: 'admin-shipping' }
+  | { name: 'admin-reviews' }; // 🌸 Tek Route tanımı burada bitti.
 
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri
@@ -130,4 +139,33 @@ export type City = {
 export type District = {
   id: number;
   name: string;
+};
+
+// =====================================================================
+// 🌸 ÜRÜN YORUMLARI TİPLERİ
+// =====================================================================
+
+/**
+ * Ürün yorumu
+ */
+export type Review = {
+  id: string;
+  product_id: string;
+  user_id?: string | null;
+  user_name: string;
+  rating: number;
+  comment: string;
+  photo_url?: string | null;
+  is_approved: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Ürün için yorum istatistikleri
+ */
+export type ReviewStats = {
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: Record<number, number>; // {1: 5, 2: 3, 3: 10, 4: 20, 5: 30}
 };
