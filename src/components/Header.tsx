@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Flower2, ShoppingBag, Menu, X, Search, Phone, User, LogOut, History } from 'lucide-react';
+import { Flower2, ShoppingBag, Menu, X, Search, Phone, User, LogOut, History, Heart } from 'lucide-react';
 import type { Route } from '../types';
 import { routeToHash } from '../router';
 import { AuthModal } from './AuthModal';
@@ -9,11 +9,12 @@ import { checkAdminAccess } from '../services/adminApi';
 
 type Props = {
   cartCount: number;
+  favoriteCount: number;
   navigate: (r: Route) => void;
   currentRoute: Route;
 };
 
-export default function Header({ cartCount, navigate, currentRoute }: Props) {
+export default function Header({ cartCount, favoriteCount, navigate, currentRoute }: Props) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -85,6 +86,7 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
   const isActive = (route: Route) => {
     if (route.name === 'home' && currentRoute.name === 'home') return true;
     if (route.name === 'shop' && (currentRoute.name === 'shop' || currentRoute.name === 'product')) return true;
+    if (route.name === 'favorites' && currentRoute.name === 'favorites') return true;
     return route.name === currentRoute.name;
   };
 
@@ -142,6 +144,24 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                 aria-label="Ara"
               >
                 <Search className="w-5 h-5" />
+              </button>
+
+              {/* 🌸 Favoriler butonu */}
+              <button
+                onClick={() => navigate({ name: 'favorites' })}
+                className="relative btn-ghost"
+                aria-label="Favorilerim"
+              >
+                <Heart
+                  className={`w-5 h-5 ${
+                    currentRoute.name === 'favorites' ? 'fill-brand-600 text-brand-600' : 'text-sand-600'
+                  }`}
+                />
+                {favoriteCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 text-white text-xs font-bold rounded-full flex items-center justify-center animate-scale-in">
+                    {favoriteCount}
+                  </span>
+                )}
               </button>
 
               <button
@@ -230,6 +250,19 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
                   {link.label}
                 </a>
               ))}
+              <button
+                onClick={() => {
+                  setMobileOpen(false);
+                  window.location.hash = '#/favoriler';
+                  if (typeof navigate === 'function') {
+                    navigate({ name: 'favorites' as any });
+                  }
+                }}
+                className="mt-2 w-full py-3 rounded-xl bg-brand-50 text-brand-700 font-semibold flex items-center justify-center gap-2 border border-brand-200"
+              >
+                <Heart className="w-5 h-5" />
+                Favorilerim ({favoriteCount})
+              </button>
               {user ? (
                 <>
                   <button
