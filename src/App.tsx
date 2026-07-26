@@ -10,7 +10,7 @@ import {
   mockCategories,
 } from './data';
 import { fetchCategoriesFromSupabase, fetchProductsFromSupabase } from './services/supabaseData';
-import type { Product, OrderInfo, Bundle } from './types';
+import type { Product, OrderInfo } from './types';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
@@ -32,10 +32,6 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboardNew from './pages/AdminDashboardNew';
 import AdminCategoriesPage from './pages/AdminCategoriesPage';
 import AdminWikiPage from './pages/AdminWikiPage';
-import AdminAnalyticsPage from './pages/AdminAnalyticsPage';
-import AdminCouponsPage from './pages/AdminCouponsPage';
-import AdminBannersPage from './pages/AdminBannersPage';
-import AdminBundlesPage from './pages/AdminBundlesPage';
 import { useAdminAuth } from './hooks/useAdminAuth';
 import AdminLayout from './components/admin/AdminLayout';
 
@@ -46,8 +42,12 @@ function App() {
   const [orders, setOrders] = useState<Record<string, OrderInfo>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState(mockCategories);
+<<<<<<< HEAD
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [loading, setLoading] = useState(false);
+=======
+  const [loading, setLoading] = useState(true);
+>>>>>>> parent of a451ee5 (denemen)
   const [useApi, setUseApi] = useState(true);
   const { loading: adminLoading, isAdmin } = useAdminAuth();
 
@@ -108,15 +108,6 @@ function App() {
       showToast(`${product.name} sepete eklendi`);
     },
     [cart, showToast],
-  );
-
-  const handleAddBundleToCart = useCallback(
-    (bundle: Bundle) => {
-      showToast(`${bundle.name} sepete eklendi`);
-      // Bundle items would need to be added to cart here
-      // For now, just show a toast message
-    },
-    [showToast],
   );
 
   const handlePlaceOrder = useCallback(
@@ -290,10 +281,8 @@ function App() {
             categories={categories}
             featured={getFeaturedProducts(products)}
             discounted={getDiscountedProducts(products)}
-            bundles={bundles}
             navigate={navigate}
             onAddToCart={handleAddToCart}
-            onAddBundleToCart={handleAddBundleToCart}
           />
         );
       case 'shop':
@@ -401,30 +390,6 @@ function App() {
             <AdminWikiPage />
           </AdminLayout>
         );
-      case 'admin-analytics':
-        return (
-          <AdminLayout currentPage="admin-analytics" navigate={navigate}>
-            <AdminAnalyticsPage navigate={navigate} />
-          </AdminLayout>
-        );
-      case 'admin-coupons':
-        return (
-          <AdminLayout currentPage="admin-coupons" navigate={navigate}>
-            <AdminCouponsPage navigate={navigate} />
-          </AdminLayout>
-        );
-      case 'admin-banners':
-        return (
-          <AdminLayout currentPage="admin-banners" navigate={navigate}>
-            <AdminBannersPage navigate={navigate} />
-          </AdminLayout>
-        );
-      case 'admin-bundles':
-        return (
-          <AdminLayout currentPage="admin-bundles" navigate={navigate}>
-            <AdminBundlesPage navigate={navigate} />
-          </AdminLayout>
-        );
 
       default:
         return (
@@ -432,10 +397,8 @@ function App() {
             categories={categories}
             featured={getFeaturedProducts(products)}
             discounted={getDiscountedProducts(products)}
-            bundles={bundles}
             navigate={navigate}
             onAddToCart={handleAddToCart}
-            onAddBundleToCart={handleAddBundleToCart}
           />
         );
     }

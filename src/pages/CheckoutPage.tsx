@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck, Calendar, Clock, Info, RefreshCw, Truck, Tag, X } from 'lucide-react';
-import type { CartItem, Route, OrderInfo, Coupon } from '../types';
+import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck, Calendar, Clock, Info, RefreshCw, Truck } from 'lucide-react';
+import type { CartItem, Route, OrderInfo } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { CITIES_DATA, fetchDistrictsByCity } from '../services/dataFetching';
 import type { City, District } from '../services/dataFetching';
@@ -10,7 +10,6 @@ import {
   generateDeliveryDateOptions,
   formatDateTurkish,
 } from '../services/shipping';
-import { validateCoupon, calculateDiscount, applyCoupon } from '../services/api';
 import type { ShippingCalculation } from '../types';
 
 type Props = {
@@ -34,8 +33,6 @@ type FormState = {
   cardName: string;
   cardExpiry: string;
   cardCvv: string;
-  paymentMethod: 'credit_card' | 'cash_on_delivery';
-  installments: string;
 };
 
 type SavedAddress = {
@@ -60,8 +57,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
     cardName: '',
     cardExpiry: '',
     cardCvv: '',
-    paymentMethod: 'credit_card',
-    installments: '1',
   });
 
   // 🌸 Kayıtlı Adres / Alıcı State'leri
@@ -78,12 +73,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
   const [shippingInfo, setShippingInfo] = useState<ShippingCalculation | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [deliveryDateOptions, setDeliveryDateOptions] = useState<string[]>([]);
-
-  // 🌸 Kupon State'leri
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [couponError, setCouponError] = useState('');
-  const [couponLoading, setCouponLoading] = useState(false);
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -175,39 +164,7 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
 
   // 🌸 Dinamik toplam hesaplama
   const dynamicDeliveryFee = shippingInfo ? shippingInfo.shippingFee : 0;
-  const discountAmount = appliedCoupon ? calculateDiscount(appliedCoupon, subtotal) : 0;
-  const dynamicTotal = subtotal + dynamicDeliveryFee - discountAmount;
-
-  // 🌸 Kupon doğrulama fonksiyonu
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
-      setCouponError('Lütfen kupon kodu girin');
-      return;
-    }
-
-    setCouponLoading(true);
-    setCouponError('');
-
-    try {
-      const coupon = await validateCoupon(couponCode.trim(), subtotal);
-      if (coupon) {
-        setAppliedCoupon(coupon);
-        setCouponCode('');
-      } else {
-        setCouponError('Geçersiz veya süresi dolmuş kupon kodu');
-      }
-    } catch (error) {
-      console.error('Kupon doğrulama hatası:', error);
-      setCouponError('Kupon doğrulanırken bir hata oluştu');
-    } finally {
-      setCouponLoading(false);
-    }
-  };
-
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponError('');
-  };
+  const dynamicTotal = subtotal + dynamicDeliveryFee;
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof FormState, string>> = {};
@@ -221,15 +178,10 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
     if (!form.address.trim()) newErrors.address = 'Adres gerekli';
     if (!form.city.trim()) newErrors.city = 'İlçe seçimi gerekli';
     if (!form.deliveryDate) newErrors.deliveryDate = 'Teslimat tarihi gerekli';
-    
-    // Validate payment fields based on payment method
-    if (form.paymentMethod === 'credit_card') {
-      if (!form.cardNumber.trim() || form.cardNumber.replace(/\s/g, '').length < 16) newErrors.cardNumber = 'Geçerli kart numarası girin';
-      if (!form.cardName.trim()) newErrors.cardName = 'Kart üzerindeki isim gerekli';
-      if (!form.cardExpiry.trim()) newErrors.cardExpiry = 'Son kullanma tarihi gerekli';
-      if (!form.cardCvv.trim() || form.cardCvv.length < 3) newErrors.cardCvv = 'CVV gerekli';
-    }
-    
+    if (!form.cardNumber.trim() || form.cardNumber.replace(/\s/g, '').length < 16) newErrors.cardNumber = 'Geçerli kart numarası girin';
+    if (!form.cardName.trim()) newErrors.cardName = 'Kart üzerindeki isim gerekli';
+    if (!form.cardExpiry.trim()) newErrors.cardExpiry = 'Son kullanma tarihi gerekli';
+    if (!form.cardCvv.trim() || form.cardCvv.length < 3) newErrors.cardCvv = 'CVV gerekli';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -253,11 +205,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
           address: form.address,
           district: form.city,
         });
-      }
-
-      // 🌸 Kuponu uygula
-      if (appliedCoupon) {
-        await applyCoupon(appliedCoupon.id);
       }
 
       const orderId = await onPlaceOrder({
@@ -561,135 +508,57 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
               <h2 className="font-display text-xl font-bold text-sand-900">Ödeme Bilgileri</h2>
             </div>
 
-            {/* Payment Method Selection */}
-            <div className="space-y-3 mb-6">
-              <label className="label">Ödeme Yöntemi</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => update('paymentMethod', 'credit_card')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    form.paymentMethod === 'credit_card'
-                      ? 'border-brand-600 bg-brand-50'
-                      : 'border-sand-200 hover:border-brand-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <CreditCard className="w-5 h-5 text-brand-600" />
-                    <span className="font-semibold text-sand-900">Kredi Kartı</span>
-                  </div>
-                  <p className="text-xs text-sand-500">Taksitli ödeme imkanı</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => update('paymentMethod', 'cash_on_delivery')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    form.paymentMethod === 'cash_on_delivery'
-                      ? 'border-brand-600 bg-brand-50'
-                      : 'border-sand-200 hover:border-brand-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <MapPin className="w-5 h-5 text-brand-600" />
-                    <span className="font-semibold text-sand-900">Kapıda Ödeme</span>
-                  </div>
-                  <p className="text-xs text-sand-500">Nakit veya kredi kartı</p>
-                </button>
+            <div className="space-y-4">
+              <div data-error={!!errors.cardNumber}>
+                <label className="label">Kart Numarası *</label>
+                <input
+                  type="text"
+                  value={form.cardNumber}
+                  onChange={(e) => update('cardNumber', formatCardNumber(e.target.value))}
+                  className="input"
+                  placeholder="0000 0000 0000 0000"
+                  maxLength={19}
+                />
+                {errors.cardNumber && <p className="text-xs text-red-500 mt-1">{errors.cardNumber}</p>}
+              </div>
+              <div data-error={!!errors.cardName}>
+                <label className="label">Kart Üzerindeki İsim *</label>
+                <input
+                  type="text"
+                  value={form.cardName}
+                  onChange={(e) => update('cardName', e.target.value)}
+                  className="input"
+                  placeholder="AD SOYAD"
+                />
+                {errors.cardName && <p className="text-xs text-red-500 mt-1">{errors.cardName}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div data-error={!!errors.cardExpiry}>
+                  <label className="label">Son Kullanma *</label>
+                  <input
+                    type="text"
+                    value={form.cardExpiry}
+                    onChange={(e) => update('cardExpiry', formatExpiry(e.target.value))}
+                    className="input"
+                    placeholder="MM/YY"
+                    maxLength={5}
+                  />
+                  {errors.cardExpiry && <p className="text-xs text-red-500 mt-1">{errors.cardExpiry}</p>}
+                </div>
+                <div data-error={!!errors.cardCvv}>
+                  <label className="label">CVV *</label>
+                  <input
+                    type="text"
+                    value={form.cardCvv}
+                    onChange={(e) => update('cardCvv', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="input"
+                    placeholder="123"
+                    maxLength={4}
+                  />
+                  {errors.cardCvv && <p className="text-xs text-red-500 mt-1">{errors.cardCvv}</p>}
+                </div>
               </div>
             </div>
-
-            {/* Credit Card Form */}
-            {form.paymentMethod === 'credit_card' && (
-              <div className="space-y-4">
-                {/* Installment Options */}
-                <div>
-                  <label className="label">Taksit Seçenekleri</label>
-                  <select
-                    value={form.installments}
-                    onChange={(e) => update('installments', e.target.value)}
-                    className="input"
-                  >
-                    <option value="1">Tek Çekim</option>
-                    <option value="2">2 Taksit</option>
-                    <option value="3">3 Taksit</option>
-                    <option value="6">6 Taksit</option>
-                    <option value="9">9 Taksit</option>
-                    <option value="12">12 Taksit</option>
-                  </select>
-                  {Number(form.installments) > 1 && (
-                    <p className="text-xs text-sand-500 mt-1">
-                      {form.installments} x {(dynamicTotal / Number(form.installments)).toFixed(2)} TL = {dynamicTotal} TL
-                    </p>
-                  )}
-                </div>
-
-                <div data-error={!!errors.cardNumber}>
-                  <label className="label">Kart Numarası *</label>
-                  <input
-                    type="text"
-                    value={form.cardNumber}
-                    onChange={(e) => update('cardNumber', formatCardNumber(e.target.value))}
-                    className="input"
-                    placeholder="0000 0000 0000 0000"
-                    maxLength={19}
-                  />
-                  {errors.cardNumber && <p className="text-xs text-red-500 mt-1">{errors.cardNumber}</p>}
-                </div>
-                <div data-error={!!errors.cardName}>
-                  <label className="label">Kart Üzerindeki İsim *</label>
-                  <input
-                    type="text"
-                    value={form.cardName}
-                    onChange={(e) => update('cardName', e.target.value)}
-                    className="input"
-                    placeholder="AD SOYAD"
-                  />
-                  {errors.cardName && <p className="text-xs text-red-500 mt-1">{errors.cardName}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div data-error={!!errors.cardExpiry}>
-                    <label className="label">Son Kullanma *</label>
-                    <input
-                      type="text"
-                      value={form.cardExpiry}
-                      onChange={(e) => update('cardExpiry', formatExpiry(e.target.value))}
-                      className="input"
-                      placeholder="MM/YY"
-                      maxLength={5}
-                    />
-                    {errors.cardExpiry && <p className="text-xs text-red-500 mt-1">{errors.cardExpiry}</p>}
-                  </div>
-                  <div data-error={!!errors.cardCvv}>
-                    <label className="label">CVV *</label>
-                    <input
-                      type="text"
-                      value={form.cardCvv}
-                      onChange={(e) => update('cardCvv', e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      className="input"
-                      placeholder="123"
-                      maxLength={4}
-                    />
-                    {errors.cardCvv && <p className="text-xs text-red-500 mt-1">{errors.cardCvv}</p>}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Cash on Delivery Info */}
-            {form.paymentMethod === 'cash_on_delivery' && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-sand-900 mb-1">Kapıda Ödeme</h4>
-                    <p className="text-sm text-sand-600">
-                      Teslimat sırasında nakit veya kredi kartı ile ödeme yapabilirsiniz. 
-                      Kuryemiz size pos cihazı ile hizmet verecektir.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="flex items-center gap-2 mt-4 text-sm text-sand-500">
               <Lock className="w-4 h-4 text-leaf-600" />
@@ -733,71 +602,11 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
                   )}
                 </span>
               </div>
-              {appliedCoupon && (
-                <div className="flex justify-between text-green-600">
-                  <span>İndirim ({appliedCoupon.code})</span>
-                  <span className="font-medium">-{discountAmount} TL</span>
-                </div>
-              )}
               <div className="border-t border-sand-100 pt-2 flex justify-between items-baseline">
                 <span className="font-semibold text-sand-800">Toplam</span>
                 <span className="text-2xl font-bold text-brand-700">{dynamicTotal} TL</span>
               </div>
             </div>
-
-            {/* 🌸 Kupon Kodu Alanı */}
-            {!appliedCoupon ? (
-              <div className="mt-4 space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-sand-700">
-                  <Tag className="w-4 h-4 text-brand-600" />
-                  İndirim Kuponu
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="Kupon kodu girin (örn: WELCOME10)"
-                    className="input flex-1 text-sm"
-                    onKeyPress={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyCoupon}
-                    disabled={couponLoading}
-                    className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {couponLoading ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      'Uygula'
-                    )}
-                  </button>
-                </div>
-                {couponError && <p className="text-xs text-red-500">{couponError}</p>}
-              </div>
-            ) : (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-green-600" />
-                  <div>
-                    <p className="text-sm font-semibold text-green-800">{appliedCoupon.code}</p>
-                    <p className="text-xs text-green-600">
-                      {appliedCoupon.discount_type === 'percentage'
-                        ? `%${appliedCoupon.discount_value} indirim`
-                        : `${appliedCoupon.discount_value} TL indirim`}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleRemoveCoupon}
-                  className="p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
 
             <button type="submit" disabled={submitting} className="btn-primary w-full mt-6">
               {submitting ? (

@@ -62,10 +62,6 @@ export type Route =
   | { name: 'admin-orders' }
   | { name: 'admin-shipping' }
   | { name: 'admin-wiki' }
-  | { name: 'admin-analytics' }
-  | { name: 'admin-coupons' }
-  | { name: 'admin-banners' }
-  | { name: 'admin-bundles' }
   | { name: 'admin-login' }; // 🌸 Tek Route tanımı burada bitti.
 
 // =====================================================================
@@ -132,6 +128,7 @@ export type District = {
   id: number;
   name: string;
 };
+<<<<<<< HEAD
 
 // =====================================================================
 // 🌸 İndirim Kuponları Modülü Tipleri
@@ -257,3 +254,5 @@ export type CouponAnalytics = {
   created_at: string;
   updated_at: string;
 };
+=======
+>>>>>>> parent of a451ee5 (denemen)

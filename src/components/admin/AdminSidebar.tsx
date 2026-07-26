@@ -1,4 +1,4 @@
-import { Home, Package, ShoppingBag, FolderTree, X, LogOut, Flower2, Truck, BookOpen, BarChart3, Tag, Image as ImageIcon, Gift } from 'lucide-react';
+import { Home, Package, ShoppingBag, FolderTree, X, LogOut, Flower2, Truck, BookOpen } from 'lucide-react';
 
 interface Props {
   currentPage: string;
@@ -14,10 +14,6 @@ const menuItems = [
   { id: 'admin-orders', label: 'Siparişler', icon: ShoppingBag },
   { id: 'admin-shipping', label: 'Kargo Yönetimi', icon: Truck },
   { id: 'admin-wiki', label: 'Botanik Wiki', icon: BookOpen },
-  { id: 'admin-coupons', label: 'İndirim Kuponları', icon: Tag },
-  { id: 'admin-banners', label: 'Kampanya Bannerları', icon: ImageIcon },
-  { id: 'admin-bundles', label: 'Kampanyalı Paketler', icon: Gift },
-  { id: 'admin-analytics', label: 'Satış Analitikleri', icon: BarChart3 },
 ];
 
 export default function AdminSidebar({ currentPage, navigate, onSignOut, onClose }: Props) {

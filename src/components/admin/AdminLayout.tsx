@@ -17,10 +17,6 @@ const PAGE_TITLES: Record<string, string> = {
   'admin-orders': 'Siparişler',
   'admin-shipping': 'Kargo Yönetimi',
   'admin-wiki': 'Botanik Wiki',
-  'admin-coupons': 'İndirim Kuponları',
-  'admin-banners': 'Kampanya Bannerları',
-  'admin-bundles': 'Kampanyalı Paketler',
-  'admin-analytics': 'Satış Analitikleri',
 };
 
 export default function AdminLayout({ children, currentPage, navigate }: Props) {
