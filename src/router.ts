@@ -25,7 +25,6 @@ function parseHash(): Route {
     if (parts[1] === 'kategoriler') return { name: 'admin-categories' };
     if (parts[1] === 'siparisler') return { name: 'admin-orders' };
     if (parts[1] === 'kargo') return { name: 'admin-shipping' };
-    if (parts[1] === 'ilceler') return { name: 'admin-districts' };
     if (parts[1] === 'wiki') return { name: 'admin-wiki' };
   }
   return { name: 'home' };
@@ -65,8 +64,6 @@ export function routeToHash(route: Route): string {
       return '#/admin/siparisler';
     case 'admin-shipping':
       return '#/admin/kargo';
-    case 'admin-districts':
-      return '#/admin/ilceler';
     case 'admin-wiki':
       return '#/admin/wiki';
     default:

@@ -1,4 +1,4 @@
-import { Home, Package, ShoppingBag, FolderTree, X, LogOut, Flower2, MapPin, BookOpen } from 'lucide-react';
+import { Home, Package, ShoppingBag, FolderTree, X, LogOut, Flower2, Truck, BookOpen } from 'lucide-react';
 
 interface Props {
   currentPage: string;
@@ -12,7 +12,7 @@ const menuItems = [
   { id: 'admin-products', label: 'Ürünler', icon: Package },
   { id: 'admin-categories', label: 'Kategoriler', icon: FolderTree },
   { id: 'admin-orders', label: 'Siparişler', icon: ShoppingBag },
-  { id: 'admin-districts', label: 'İlçeler', icon: MapPin },
+  { id: 'admin-shipping', label: 'Kargo Yönetimi', icon: Truck },
   { id: 'admin-wiki', label: 'Botanik Wiki', icon: BookOpen },
 ];
 

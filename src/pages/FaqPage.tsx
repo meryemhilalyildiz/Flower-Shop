@@ -12,7 +12,7 @@ const faqs = [
     category: 'Teslimat',
     questions: [
       { q: 'Siparişim ne zaman teslim edilir?', a: 'Saat 16:00\'dan önce verilen siparişler aynı gün, 16:00\'dan sonra verilen siparişler ertesi gün teslim edilir. Teslimat saatleri 09:00-22:00 arasındadır.' },
-      { q: 'Teslimat ücreti ne kadar?', a: '500 TL ve üzeri siparişlerde kargo ücretsizdir. 500 TL altındaki siparişlerde 49 TL teslimat ücreti uygulanır.' },
+      { q: 'Teslimat ücreti ne kadar?', a: 'Teslimat ücreti 49 TL\'dir.' },
       { q: 'Türkiye\'nin her yerine teslimat yapıyor musunuz?', a: 'Evet, Türkiye\'nin 81 iline teslimat yapıyoruz. Kırsal bölgelerde teslimat süresi 1-2 gün uzayabilir.' },
       { q: 'Teslimat saatini seçebilir miyim?', a: 'Sipariş sırasında teslimat tarihini belirtebilirsiniz. Özel saat talepleri için müşteri hizmetlerimizi arayabilirsiniz.' },
     ],

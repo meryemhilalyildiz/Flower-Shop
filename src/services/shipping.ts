@@ -284,10 +284,39 @@ export function matchShippingRule(distance: number, rules: ShippingRule[]): Ship
 // 📅 İlk Uygun Teslimat Tarihini Hesaplama
 // =====================================================================
 export function calculateEarliestDeliveryDate(deliveryDays: number): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+
+  // 🌸 Türkiye saat diliminde (Europe/Istanbul, UTC+3) güncel tarih ve saat
+  // Mağazanın bulunduğu saat dilimine göre kesici saat kontrolü yapılır
+  const formatter = new Intl.DateTimeFormat('tr-TR', {
+    timeZone: 'Europe/Istanbul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.format(now).split(' ');
+  const dateParts = parts[0].split('.');
+  const timeParts = parts[1].split(':');
+
+  const today = new Date(
+    parseInt(dateParts[2]),       // year
+    parseInt(dateParts[1]) - 1,   // month (0-indexed)
+    parseInt(dateParts[0]),       // day
+  );
+  const currentHour = parseInt(timeParts[0]);
+
+  // 🌸 Aynı gün siparişi için 16:00 kesici saati kontrol et
+  // 16:00'dan sonra verilen siparişler ertesi günden itibaren hesaplanır
+  const ORDER_CUTOFF_HOUR = 16;
+  const isAfterCutoff = currentHour >= ORDER_CUTOFF_HOUR;
+
+  // Teslimat süresi kadar ileri tarih + kesici saat kontrolü
   const deliveryDate = new Date(today);
-  deliveryDate.setDate(today.getDate() + deliveryDays);
+  deliveryDate.setDate(today.getDate() + deliveryDays + (isAfterCutoff ? 1 : 0));
   return deliveryDate.toISOString().split('T')[0];
 }
 

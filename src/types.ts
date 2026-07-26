@@ -60,10 +60,7 @@ export type Route =
   | { name: 'admin-products' }
   | { name: 'admin-categories' }
   | { name: 'admin-orders' }
-  | { name: 'admin-companies' }
-  | { name: 'company-dashboard' }
   | { name: 'admin-shipping' }
-  | { name: 'admin-districts' }
   | { name: 'admin-wiki' }
   | { name: 'admin-login' }; // 🌸 Tek Route tanımı burada bitti.
 
