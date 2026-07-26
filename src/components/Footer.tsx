@@ -1,5 +1,6 @@
 import { Flower2, Instagram, Facebook, Twitter, Mail, Phone, MapPin } from 'lucide-react';
 import { routeToHash } from '../router';
+import type { Route } from '../types';
 
 export default function Footer() {
   const linkGroups = [

@@ -27,10 +27,10 @@ import FaqPage from './pages/FaqPage';
 import AdminOrdersPage from './pages/AdminOrdersPage';
 import AdminOrdersPageNew from './pages/AdminOrdersPageNew';
 import { AdminDashboard } from './pages/AdminDashboardPage'; // 👈 Sadece tek bir tane kalsın!
+import { AdminShippingPage } from './pages/AdminShippingPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboardNew from './pages/AdminDashboardNew';
 import AdminCategoriesPage from './pages/AdminCategoriesPage';
-import AdminDistrictsPage from './pages/AdminDistrictsPage';
 import AdminWikiPage from './pages/AdminWikiPage';
 import { useAdminAuth } from './hooks/useAdminAuth';
 import AdminLayout from './components/admin/AdminLayout';
@@ -373,10 +373,10 @@ function App() {
             <AdminOrdersPageNew />
           </AdminLayout>
         );
-      case 'admin-districts':
+      case 'admin-shipping':
         return (
-          <AdminLayout currentPage="admin-districts" navigate={navigate}>
-            <AdminDistrictsPage />
+          <AdminLayout currentPage="admin-shipping" navigate={navigate}>
+            <AdminShippingPage />
           </AdminLayout>
         );
       case 'admin-wiki':

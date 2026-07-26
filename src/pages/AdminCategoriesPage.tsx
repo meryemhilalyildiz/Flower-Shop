@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit3, Trash2, RefreshCw, Save, X, FolderTree } from 'lucide-react';
-import { fetchAllCategories, addCategory, updateCategory, deleteCategory, slugify } from '../services/adminApi';
+import { Plus, Edit3, Trash2, RefreshCw, Save, X, FolderTree, Upload } from 'lucide-react';
+import { fetchAllCategories, addCategory, updateCategory, deleteCategory, uploadCategoryImage, slugify } from '../services/adminApi';
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -10,16 +10,21 @@ export default function AdminCategoriesPage() {
 
   const [newCategory, setNewCategory] = useState({
     name: '',
-    slug: ''
+    slug: '',
   });
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newImagePreview, setNewImagePreview] = useState<string>('');
+
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<Record<string, string>>({});
 
   const loadCategories = async () => {
     setLoading(true);
     try {
       const data = await fetchAllCategories();
       setCategories(data || []);
-    } catch (err) {
-      alert('Kategoriler yüklenirken hata oluştu.');
+    } catch (err: any) {
+      alert('Kategoriler yüklenirken hata: ' + (err?.message || err));
     } finally {
       setLoading(false);
     }
@@ -29,28 +34,55 @@ export default function AdminCategoriesPage() {
     loadCategories();
   }, []);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setFile: (f: File | null) => void, setPreview: (p: string) => void) => {
+    const file = e.target.files?.[0] || null;
+    setFile(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPreview(url);
+    } else {
+      setPreview('');
+    }
+  };
+
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const slug = newCategory.slug || slugify(newCategory.name);
-      await addCategory(newCategory.name, slug);
+      let imageUrl: string | undefined = undefined;
+
+      if (newImageFile) {
+        imageUrl = await uploadCategoryImage(newImageFile);
+      }
+
+      await addCategory(newCategory.name, slug, imageUrl);
       alert('Kategori başarıyla eklendi!');
       setShowAddModal(false);
       setNewCategory({ name: '', slug: '' });
+      setNewImageFile(null);
+      setNewImagePreview('');
       loadCategories();
-    } catch (err) {
-      alert('Ekleme sırasında hata oluştu.');
+    } catch (err: any) {
+      alert('Ekleme hatası: ' + (err?.message || err));
     }
   };
 
-  const handleUpdateCategory = async (id: string, name: string, slug: string) => {
+  const handleUpdateCategory = async (id: string, name: string, slug: string, existingImage: string) => {
     try {
-      await updateCategory(id, name, slug);
-      setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name, slug } : c)));
+      let imageUrl = existingImage;
+
+      if (editImageFile) {
+        imageUrl = await uploadCategoryImage(editImageFile);
+      }
+
+      await updateCategory(id, name, slug, imageUrl || undefined);
+      setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name, slug, image: imageUrl } : c)));
       setEditingCategory(null);
+      setEditImageFile(null);
+      setEditImagePreview({});
       alert('Kategori güncellendi!');
-    } catch (err) {
-      alert('Güncelleme başarısız.');
+    } catch (err: any) {
+      alert('Güncelleme hatası: ' + (err?.message || err));
     }
   };
 
@@ -60,8 +92,8 @@ export default function AdminCategoriesPage() {
       await deleteCategory(id);
       setCategories((prev) => prev.filter((c) => c.id !== id));
       alert('Kategori silindi.');
-    } catch (err) {
-      alert('Silme işlemi başarısız.');
+    } catch (err: any) {
+      alert('Silme hatası: ' + (err?.message || err));
     }
   };
 
@@ -79,7 +111,7 @@ export default function AdminCategoriesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-sand-900 font-display">Kategori Yönetimi</h1>
-          <p className="text-sm text-sand-600">Ürün kategorilerini yönetin.</p>
+          <p className="text-sm text-sand-600">Ürün kategorilerini ve görsellerini yönetin.</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -94,6 +126,7 @@ export default function AdminCategoriesPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-sand-200 text-xs font-semibold text-sand-500 uppercase">
+                <th className="p-3">Görsel</th>
                 <th className="p-3">Kategori Adı</th>
                 <th className="p-3">Slug</th>
                 <th className="p-3">Ürün Sayısı</th>
@@ -103,6 +136,43 @@ export default function AdminCategoriesPage() {
             <tbody className="divide-y divide-sand-100 text-sm">
               {categories.map((cat) => (
                 <tr key={cat.id} className="hover:bg-sand-50">
+                  <td className="p-3">
+                    {editingCategory?.id === cat.id ? (
+                      <div className="space-y-2">
+                        <label className="flex items-center justify-center w-12 h-12 rounded-lg overflow-hidden bg-sand-100 border-2 border-dashed border-sand-300 cursor-pointer hover:border-brand-500">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, setEditImageFile, (p) => setEditImagePreview({ ...editImagePreview, [cat.id]: p }))}
+                            className="hidden"
+                          />
+                          {editImagePreview[cat.id] ? (
+                            <img src={editImagePreview[cat.id]} alt="Önizleme" className="w-full h-full object-cover" />
+                          ) : (
+                            <Upload className="w-4 h-4 text-sand-400" />
+                          )}
+                        </label>
+                        {cat.image && !editImagePreview[cat.id] && (
+                          <img src={cat.image} alt={cat.name} className="w-12 h-12 rounded-lg object-cover" />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-sand-100 flex items-center justify-center">
+                        {cat.image ? (
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = 'https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600';
+                            }}
+                          />
+                        ) : (
+                          <FolderTree className="w-5 h-5 text-sand-400" />
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="p-3 font-semibold text-sand-900">
                     {editingCategory?.id === cat.id ? (
                       <input
@@ -138,7 +208,7 @@ export default function AdminCategoriesPage() {
                         onClick={() => {
                           const name = (document.getElementById(`name-${cat.id}`) as HTMLInputElement).value;
                           const slug = (document.getElementById(`slug-${cat.id}`) as HTMLInputElement).value;
-                          handleUpdateCategory(cat.id, name, slug);
+                          handleUpdateCategory(cat.id, name, slug, cat.image || '');
                         }}
                         className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                         title="Kaydet"
@@ -199,6 +269,26 @@ export default function AdminCategoriesPage() {
                   placeholder="gul-buketleri"
                   className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-brand-500 outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-sand-700">Kategori Görseli</label>
+                <label className="flex items-center justify-center w-full h-24 rounded-xl border-2 border-dashed border-sand-300 cursor-pointer hover:border-brand-500 mt-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setNewImageFile, setNewImagePreview)}
+                    className="hidden"
+                  />
+                  {newImagePreview ? (
+                    <img src={newImagePreview} alt="Önizleme" className="w-full h-full object-cover rounded-xl" />
+                  ) : (
+                    <div className="text-center">
+                      <Upload className="w-6 h-6 text-sand-400 mx-auto mb-1" />
+                      <span className="text-xs text-sand-500">Fotoğraf seç</span>
+                    </div>
+                  )}
+                </label>
               </div>
 
               <button type="submit" className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl">

@@ -95,36 +95,6 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
   return data;
 }
 
-// 🌸 Onay bekleyen tüm şirket başvurularını çek
-export async function fetchPendingCompanies() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('role', 'company')
-    .eq('is_approved', false);
-
-  if (error) {
-    console.error('Bekleyen şirketler çekilemedi:', error);
-    throw error;
-  }
-  return data;
-}
-
-// 🌸 Şirketi Onayla (is_approved = true yap)
-export async function approveCompany(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ is_approved: true })
-    .eq('id', userId)
-    .select();
-
-  if (error) {
-    console.error('Şirket onaylanırken hata oluştu:', error);
-    throw error;
-  }
-  return data;
-}
-
 // 🌸 Admin: Yeni Ürün Ekle
 export async function addProduct(productData: any) {
   const { data, error } = await supabase

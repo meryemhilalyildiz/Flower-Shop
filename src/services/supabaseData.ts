@@ -6,6 +6,8 @@ type SupabaseCategory = {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
+  image?: string | null;
   created_at: string;
 };
 
@@ -22,13 +24,15 @@ type SupabaseProduct = {
 };
 
 // Supabase Category → App Category mapping
+const DEFAULT_CATEGORY_IMAGE = 'https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600';
+
 const mapCategory = (cat: SupabaseCategory): Category => ({
   id: cat.id,
   name: cat.name,
   slug: cat.slug,
-  description: cat.name, // Supabase'de description yok, name kullanıyoruz
-  image: 'https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600', // Varsayılan görsel
-  icon: 'Flower2', // Varsayılan icon
+  description: cat.description || cat.name,
+  image: cat.image || DEFAULT_CATEGORY_IMAGE,
+  icon: 'Flower2',
 });
 
 // Supabase Product → App Product mapping

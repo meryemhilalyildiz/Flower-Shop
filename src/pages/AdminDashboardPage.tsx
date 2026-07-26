@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, Edit3, ShoppingBag, Building2, RefreshCw, Save, X, Upload } from 'lucide-react';
+import { Package, Plus, Trash2, Edit3, ShoppingBag, RefreshCw, Save, X, Upload } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { addProduct, updateProduct, deleteProduct, fetchAllProducts, fetchAllCategories } from '../services/adminApi';
 
@@ -250,7 +250,7 @@ export function AdminDashboard() {
             <ShoppingBag className="w-4 h-4" /> Siparişleri Kontrol Et
           </button>
           <button
-            onClick={openAddModal}
+            onClick={() => setShowAddModal(true)}
             className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Yeni Çiçek Ekle
