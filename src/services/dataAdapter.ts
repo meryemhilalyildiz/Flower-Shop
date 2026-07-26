@@ -2,22 +2,30 @@ import type { Category, Product } from '../types';
 import type { ApiProduct, ApiCategory, ApiDistrict } from './api';
 
 // Transform API Product to Frontend Product
-export function transformApiProduct(apiProduct: ApiProduct): Product {
+export function transformApiProduct(apiProduct: any): Product {
+  // 🌸 Supabase'deki 'stock_quantity' kolonunu öncelikle okuyoruz
+  const stockCount = apiProduct.stock_quantity ?? apiProduct.stockQuantity ?? apiProduct.stock ?? 0;
+  
+  // Stok adedi 0'dan büyükse stokta kabul et
+  const isAvailable = (apiProduct.is_active !== false) && (Number(stockCount) > 0);
+
   return {
     id: apiProduct.id.toString(),
     name: apiProduct.name,
     slug: generateSlug(apiProduct.name),
-    categoryId: apiProduct.categoryId.toString(),
+    categoryId: (apiProduct.categoryId ?? apiProduct.category_id ?? '').toString(),
     price: apiProduct.price,
-    images: [apiProduct.imageUrl],
-    description: apiProduct.name,
-    longDescription: `${apiProduct.name} - Tazelik skoru: ${apiProduct.freshnessScore}/10, Vazo ömrü: ${apiProduct.defaultVaseLifeDays} gün`,
-    ingredients: [],
-    rating: apiProduct.freshnessScore / 2, // Convert 10-point scale to 5-point
-    reviewCount: 0,
-    inStock: apiProduct.stock > 0,
-    deliveryInfo: apiProduct.stock > 0 ? 'Stokta' : 'Stokta yok',
-  };
+    images: apiProduct.imageUrl ? [apiProduct.imageUrl] : (apiProduct.images ?? ['https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600']),
+    description: apiProduct.description ?? apiProduct.name,
+    longDescription: apiProduct.longDescription ?? `${apiProduct.name} - Tazelik skoru: ${apiProduct.freshnessScore ?? 10}/10`,
+    ingredients: apiProduct.ingredients ?? [],
+    rating: apiProduct.freshnessScore ? apiProduct.freshnessScore / 2 : 4.5,
+    reviewCount: apiProduct.reviewCount ?? 0,
+    inStock: isAvailable,
+    deliveryInfo: isAvailable ? 'Stokta' : 'Stokta yok',
+    stock: Number(stockCount),
+    stock_quantity: Number(stockCount),
+  } as Product;
 }
 
 // Transform API Category to Frontend Category

@@ -7,7 +7,6 @@ export type Category = {
   icon: string;
 };
 
-
 export type Product = {
   id: string;
   name: string;
@@ -23,12 +22,20 @@ export type Product = {
   reviewCount: number;
   badge?: 'Yeni' | 'Çok Satan' | 'İndirim' | 'Mevsimlik';
   inStock: boolean;
-  deliveryInfo: string;
+  deliveryInfo: string;stock?: number;          
+  stock_quantity?: number; 
 };
 
 export type CartItem = {
   product: Product;
   quantity: number;
+};
+
+export type Favorite = {
+  id: string;
+  user_id: string;
+  product_id: string;
+  created_at: string;
 };
 
 export type OrderInfo = {
@@ -42,7 +49,7 @@ export type OrderInfo = {
   deliveryDate: string;
   note: string;
   createdAt: string;
-  status: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi';
+  status: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'İptal Edildi';
 };
 
 export type Route =
@@ -56,13 +63,18 @@ export type Route =
   | { name: 'contact' }
   | { name: 'faq' }
   | { name: 'orders' }
+  | { name: 'favorites' }
+  | { name: 'admin-login' }
   | { name: 'admin-dashboard' }
   | { name: 'admin-products' }
   | { name: 'admin-categories' }
   | { name: 'admin-orders' }
-  | { name: 'admin-shipping' }
+  | { name: 'admin-districts' }
   | { name: 'admin-wiki' }
-  | { name: 'admin-login' }; // 🌸 Tek Route tanımı burada bitti.
+  | { name: 'admin-companies' }
+  | { name: 'company-dashboard' }
+  | { name: 'admin-shipping' }
+  | { name: 'admin-reviews' }; // 🌸 Tek Route tanımı burada bitti.
 
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri
@@ -112,7 +124,7 @@ export type ShippingCalculation = {
   earliestDeliveryDate: string; // İlk uygun teslimat tarihi (ISO string)
   storeCity: string;       // Mağaza şehri
   storeDistrict: string;   // Mağaza ilçesi
-  customerCity: string;    // Müşteri şehri
+  customerCity: string;    // Müşteri şehiri
   customerDistrict: string; // Müşteri ilçesi
 };
 
@@ -128,7 +140,6 @@ export type District = {
   id: number;
   name: string;
 };
-<<<<<<< HEAD
 
 // =====================================================================
 // 🌸 İndirim Kuponları Modülü Tipleri
@@ -254,5 +265,32 @@ export type CouponAnalytics = {
   created_at: string;
   updated_at: string;
 };
-=======
->>>>>>> parent of a451ee5 (denemen)
+
+// =====================================================================
+// 🌸 ÜRÜN YORUMLARI TİPLERİ
+// =====================================================================
+
+/**
+ * Ürün yorumu
+ */
+export type Review = {
+  id: string;
+  product_id: string;
+  user_id?: string | null;
+  user_name: string;
+  rating: number;
+  comment: string;
+  photo_url?: string | null;
+  is_approved: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Ürün için yorum istatistikleri
+ */
+export type ReviewStats = {
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: Record<number, number>; // {1: 5, 2: 3, 3: 10, 4: 20, 5: 30}
+};

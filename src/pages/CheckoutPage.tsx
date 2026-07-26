@@ -195,18 +195,7 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
     }
     setSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && saveForNextTime && addressTitle.trim()) {
-        await supabase.from('saved_addresses').insert({
-          user_id: user.id,
-          title: addressTitle.trim(),
-          recipient_name: form.recipientName,
-          recipient_phone: form.recipientPhone,
-          address: form.address,
-          district: form.city,
-        });
-      }
-
+      // 1. Önce siparişi veritabanına ekliyoruz
       const orderId = await onPlaceOrder({
         items,
         total: dynamicTotal,
@@ -216,13 +205,50 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
         city: form.city,
         deliveryDate: form.deliveryDate,
         note: form.note,
-      });
+      });// 🌸 2. ANINDA STOK DÜŞME (Admin onayını beklemeden)
+      for (const item of items) {
+        // item.product.id veya item.product._id kontrolü
+        const targetId = item.product.id;
+
+        if (targetId) {
+          // a. Güncel stok miktarını çek
+          const { data: prod } = await supabase
+            .from('products')
+            .select('stock_quantity')
+            .eq('id', targetId)
+            .single();
+
+          if (prod) {
+            const currentStock = prod.stock_quantity ?? 0;
+            const newStock = Math.max(0, currentStock - item.quantity);
+
+            // b. Supabase'deki 'stock_quantity'yi düş ve kaydet
+            const { error: updateErr } = await supabase
+              .from('products')
+              .update({ 
+                stock_quantity: newStock,
+                is_active: newStock > 0 
+              })
+              .eq('id', targetId);
+
+            if (updateErr) {
+              console.error('Stok düşme RLS/DB Hatası:', updateErr);
+            } else {
+              console.log(`Stok başarıyla düşüldü: ${targetId} -> Yeni Stok: ${newStock}`);
+            }
+          }
+        }
+      }
+
+      // 3. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
-      console.error('Error placing order:', error);
+      console.error('Sipariş verilirken hata oluştu:', error);
       setSubmitting(false);
     }
   };
+
+  
 
   const formatCardNumber = (val: string) => {
     const digits = val.replace(/\D/g, '').slice(0, 16);

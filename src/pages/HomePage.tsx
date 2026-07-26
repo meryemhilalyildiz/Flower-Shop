@@ -9,6 +9,8 @@ type Props = {
   discounted: Product[];
   navigate: (r: Route) => void;
   onAddToCart: (p: Product) => void;
+  isFavorite: (productId: string) => boolean;
+  onToggleFavorite: (p: Product) => void;
 };
 
 const features = [
@@ -18,7 +20,7 @@ const features = [
   { icon: Sparkles, title: 'Usta İşçiliği', desc: 'Profesyonel floristler tarafından' },
 ];
 
-export default function HomePage({ categories, featured, discounted, navigate, onAddToCart }: Props) {
+export default function HomePage({ categories, featured, discounted, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
   return (
     <div className="animate-fade-in">
       {/* Hero */}
@@ -134,7 +136,7 @@ export default function HomePage({ categories, featured, discounted, navigate, o
         <div className="flex items-end justify-between mb-8">
           <div>
             <h2 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">Kategoriler</h2>
-            <p className="text-sand-500 mt-2">Her duruma uygun çiçekler</p>
+            <p className="text-sand-500 mt-2">Her durasa uygun çiçekler</p>
           </div>
           <button onClick={() => navigate({ name: 'shop' })} className="btn-ghost text-brand-600 hidden sm:flex">
             Tümünü Gör
@@ -179,7 +181,13 @@ export default function HomePage({ categories, featured, discounted, navigate, o
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
           {featured.slice(0, 4).map((p) => (
-            <ProductCard key={p.id} product={p} onAddToCart={onAddToCart} />
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAddToCart={onAddToCart}
+              isFavorite={isFavorite(p.id)}
+              onToggleFavorite={onToggleFavorite}
+            />
           ))}
         </div>
       </section>
@@ -237,7 +245,13 @@ export default function HomePage({ categories, featured, discounted, navigate, o
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
           {discounted.slice(0, 4).map((p) => (
-            <ProductCard key={p.id} product={p} onAddToCart={onAddToCart} />
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAddToCart={onAddToCart}
+              isFavorite={isFavorite(p.id)}
+              onToggleFavorite={onToggleFavorite}
+            />
           ))}
         </div>
       </section>
