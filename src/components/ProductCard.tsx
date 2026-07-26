@@ -5,6 +5,8 @@ import { routeToHash } from '../router';
 type Props = {
   product: Product;
   onAddToCart: (product: Product) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (product: Product) => void;
 };
 
 const badgeStyles: Record<string, string> = {
@@ -14,7 +16,7 @@ const badgeStyles: Record<string, string> = {
   'Mevsimlik': 'bg-sky-100 text-sky-700',
 };
 
-export default function ProductCard({ product, onAddToCart }: Props) {
+export default function ProductCard({ product, onAddToCart, isFavorite, onToggleFavorite }: Props) {
   // 🌸 STOK KONTROLÜ
   const isOutOfStock = !product.inStock;
 
@@ -59,11 +61,18 @@ export default function ProductCard({ product, onAddToCart }: Props) {
         <button
           onClick={(e) => {
             e.preventDefault();
+            if (onToggleFavorite) onToggleFavorite(product);
           }}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center hover:bg-brand-50 hover:scale-110 transition-all z-20"
-          aria-label="Favorilere ekle"
+          className={`absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center hover:bg-brand-50 hover:scale-110 transition-all ${
+            isFavorite ? 'bg-brand-50' : ''
+          }`}
+          aria-label={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
         >
-          <Heart className="w-4 h-4 text-brand-500" />
+          <Heart
+            className={`w-4 h-4 transition-all ${
+              isFavorite ? 'fill-brand-500 text-brand-500' : 'text-brand-500'
+            }`}
+          />
         </button>
       </a>
 
@@ -76,9 +85,15 @@ export default function ProductCard({ product, onAddToCart }: Props) {
         </a>
 
         <div className="flex items-center gap-1 mt-2">
-          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          <span className="text-sm font-medium text-sand-700">{product.rating}</span>
-          <span className="text-xs text-sand-400">({product.reviewCount})</span>
+          {product.reviewCount > 0 ? (
+            <>
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              <span className="text-sm font-medium text-sand-700">{product.rating}</span>
+              <span className="text-xs text-sand-400">({product.reviewCount})</span>
+            </>
+          ) : (
+            <span className="text-xs text-sand-400">Henüz yorum yok</span>
+          )}
         </div>
 
         <div className="flex items-end justify-between mt-3">

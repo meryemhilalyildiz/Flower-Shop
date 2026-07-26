@@ -1,24 +1,28 @@
 import { useState } from 'react';
-import { Star, Minus, Plus, ShoppingBag, Truck, ShieldCheck, RefreshCw, ChevronLeft, Check } from 'lucide-react';
+import { Star, Minus, Plus, ShoppingBag, Truck, ShieldCheck, RefreshCw, ChevronLeft, Check, Heart } from 'lucide-react';
 import type { Product, Route, Category } from '../types';
-import { getCategoryById, products as allProducts } from '../data';
+import { getCategoryById } from '../data';
 import Breadcrumbs from '../components/Breadcrumbs';
 import ProductCard from '../components/ProductCard';
+import ReviewSection from '../components/ReviewSection';
 
 type Props = {
   product: Product;
+  products: Product[];
   categories: Category[];
   navigate: (r: Route) => void;
   onAddToCart: (p: Product, qty: number) => void;
+  isFavorite: (productId: string) => boolean;
+  onToggleFavorite: (p: Product) => void;
 };
 
-export default function ProductPage({ product, categories, navigate, onAddToCart }: Props) {
+export default function ProductPage({ product, products, categories, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
 
   const category = getCategoryById(product.categoryId, categories);
-  const related = allProducts
+  const related = products
     .filter((p) => p.categoryId === product.categoryId && p.id !== product.id)
     .slice(0, 4);
 
@@ -84,19 +88,45 @@ export default function ProductPage({ product, categories, navigate, onAddToCart
             )}
           </div>
 
-          <h1 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">{product.name}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">{product.name}</h1>
+
+            {/* 🌸 Favori butonu */}
+            <button
+              onClick={() => onToggleFavorite(product)}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                isFavorite(product.id)
+                  ? 'bg-brand-100 text-brand-600 scale-110'
+                  : 'bg-sand-100 text-sand-500 hover:bg-brand-50 hover:text-brand-600 hover:scale-110'
+              }`}
+              aria-label={isFavorite(product.id) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+              title={isFavorite(product.id) ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+            >
+              <Heart
+                className={`w-5 h-5 transition-all ${
+                  isFavorite(product.id) ? 'fill-brand-600 text-brand-600' : ''
+                }`}
+              />
+            </button>
+          </div>
 
           <div className="flex items-center gap-3 mt-3">
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Star
-                  key={i}
-                  className={`w-4 h-4 ${i <= Math.round(product.rating) ? 'fill-amber-400 text-amber-400' : 'text-sand-200'}`}
-                />
-              ))}
-            </div>
-            <span className="text-sm font-medium text-sand-700">{product.rating}</span>
-            <span className="text-sm text-sand-400">· {product.reviewCount} değerlendirme</span>
+            {product.reviewCount > 0 ? (
+              <>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Star
+                      key={i}
+                      className={`w-4 h-4 ${i <= Math.round(product.rating) ? 'fill-amber-400 text-amber-400' : 'text-sand-200'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm font-medium text-sand-700">{product.rating}</span>
+                <span className="text-sm text-sand-400">· {product.reviewCount} değerlendirme</span>
+              </>
+            ) : (
+              <span className="text-sm text-sand-400">Henüz değerlendirme yok</span>
+            )}
           </div>
 
           <p className="text-sand-600 mt-4 leading-relaxed">{product.description}</p>
@@ -182,13 +212,22 @@ export default function ProductPage({ product, categories, navigate, onAddToCart
         </div>
       </div>
 
+      {/* Review Section */}
+      <ReviewSection product={product} />
+
       {/* Related */}
       {related.length > 0 && (
         <div className="mt-16">
           <h2 className="font-display text-2xl lg:text-3xl font-bold text-sand-900 mb-6">Benzer Ürünler</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} onAddToCart={(prod) => onAddToCart(prod, 1)} />
+              <ProductCard
+                key={p.id}
+                product={p}
+                onAddToCart={(prod) => onAddToCart(prod, 1)}
+                isFavorite={isFavorite(p.id)}
+                onToggleFavorite={onToggleFavorite}
+              />
             ))}
           </div>
         </div>

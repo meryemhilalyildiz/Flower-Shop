@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from './router';
 import { useCart } from './useCart';
+import { useFavorites } from './useFavorites';
 import { supabase } from './supabaseClient';
 import {
   getFeaturedProducts,
@@ -24,6 +25,7 @@ import OrderSuccessPage from './pages/OrderSuccessPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
+import FavoritesPage from './pages/FavoritesPage';
 import AdminOrdersPage from './pages/AdminOrdersPage';
 import AdminOrdersPageNew from './pages/AdminOrdersPageNew';
 import { AdminDashboard } from './pages/AdminDashboardPage'; // 👈 Sadece tek bir tane kalsın!
@@ -32,13 +34,16 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboardNew from './pages/AdminDashboardNew';
 import AdminCategoriesPage from './pages/AdminCategoriesPage';
 import AdminWikiPage from './pages/AdminWikiPage';
+import AdminReviewsPage from './pages/AdminReviewsPage';
 import { useAdminAuth } from './hooks/useAdminAuth';
+import { normalizeOrderStatusToTurkish } from './services/adminApi';
 import AdminLayout from './components/admin/AdminLayout';
 import { transformApiOrders } from './services/dataAdapter'; // dataAdapter dosya yoluna göre ayarla
 
 function App() {
   const { route, navigate } = useRouter();
   const cart = useCart();
+  const favorites = useFavorites();
   const [toast, setToast] = useState<string | null>(null);
   const [orders, setOrders] = useState<Record<string, OrderInfo>>({});
   const [products, setProducts] = useState<Product[]>([]);
@@ -216,8 +221,8 @@ function App() {
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
-            deliveryDate: ord.delivery_date || '',
-            status: ord.status || 'Hazırlanıyor',
+            deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
+            status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
             total: ord.total_amount,
             address: ord.shipping_address,
             city: ord.city,
@@ -280,6 +285,8 @@ function App() {
             discounted={getDiscountedProducts(products)}
             navigate={navigate}
             onAddToCart={handleAddToCart}
+            isFavorite={favorites.isFavorite}
+            onToggleFavorite={favorites.toggleFavorite}
           />
         );
       case 'shop':
@@ -290,6 +297,8 @@ function App() {
             activeCategorySlug={route.categorySlug}
             navigate={navigate}
             onAddToCart={handleAddToCart}
+            isFavorite={favorites.isFavorite}
+            onToggleFavorite={favorites.toggleFavorite}
           />
         );
       case 'product': {
@@ -302,7 +311,17 @@ function App() {
             </div>
           );
         }
-        return <ProductPage product={product} categories={categories} navigate={navigate} onAddToCart={handleAddToCart} />;
+        return (
+          <ProductPage
+            product={product}
+            products={products}
+            categories={categories}
+            navigate={navigate}
+            onAddToCart={handleAddToCart}
+            isFavorite={favorites.isFavorite}
+            onToggleFavorite={favorites.toggleFavorite}
+          />
+        );
       }
       case 'cart':
         return (
@@ -337,7 +356,19 @@ function App() {
         return (
           <OrdersPage
             orders={orders}
+            navigate={navigate}
             onNavigateToShop={() => navigate({ name: 'shop' })}
+          />
+        );
+
+      case 'favorites':
+        return (
+          <FavoritesPage
+            products={products}
+            favoriteIds={favorites.favoriteIds}
+            navigate={navigate}
+            onAddToCart={handleAddToCart}
+            onToggleFavorite={favorites.toggleFavorite}
           />
         );
 
@@ -387,6 +418,12 @@ function App() {
             <AdminWikiPage />
           </AdminLayout>
         );
+      case 'admin-reviews':
+        return (
+          <AdminLayout currentPage="admin-reviews" navigate={navigate}>
+            <AdminReviewsPage />
+          </AdminLayout>
+        );
 
       default:
         return (
@@ -396,6 +433,8 @@ function App() {
             discounted={getDiscountedProducts(products)}
             navigate={navigate}
             onAddToCart={handleAddToCart}
+            isFavorite={favorites.isFavorite}
+            onToggleFavorite={favorites.toggleFavorite}
           />
         );
     }
@@ -403,7 +442,12 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-sand-50">
-      <Header cartCount={cart.totalItems} navigate={navigate} currentRoute={route} />
+      <Header
+        cartCount={cart.totalItems}
+        favoriteCount={favorites.favoriteCount}
+        navigate={navigate}
+        currentRoute={route}
+      />
       <main className="flex-1">{renderPage()}</main>
       <Footer />
       {toast && <Toast message={String(toast)} onClose={() => setToast(null)} />}
