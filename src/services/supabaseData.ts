@@ -20,9 +20,13 @@ type SupabaseProduct = {
   name: string;
   description: string;
   price: number;
-  image_url: string;
-  stock_quantity: number;
-  is_active: boolean;
+  original_price?: number | null;
+  rating?: number;
+  reviews_count?: number;
+  image: string;
+  stock: number;
+  is_best_seller?: boolean;
+  is_featured?: boolean;
   created_at: string;
 };
 
@@ -45,18 +49,18 @@ const mapProduct = (prod: SupabaseProduct): Product => ({
   slug: prod.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
   categoryId: prod.category_id,
   price: prod.price,
-  oldPrice: undefined,
-  images: prod.image_url ? [prod.image_url] : ['https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=800'],
+  oldPrice: prod.original_price ? Number(prod.original_price) : undefined,
+  images: prod.image ? [prod.image] : ['https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=800'],
   description: prod.description || '',
   longDescription: prod.description || '',
   ingredients: [],
-  rating: 0,
-  reviewCount: 0,
-  badge: undefined,
-  inStock: prod.stock_quantity > 0, // 🌸 Stok 0 ise inStock false olur, ProductCard "TÜKENDİ" basar!
-  deliveryInfo: prod.stock_quantity > 0 ? 'Aynı gün teslimat' : 'Stokta yok',
-  stock: prod.stock_quantity,
-  stock_quantity: prod.stock_quantity,
+  rating: prod.rating ?? 0,
+  reviewCount: prod.reviews_count ?? 0,
+  badge: prod.is_best_seller ? 'Çok Satan' : undefined,
+  inStock: prod.stock > 0, // 🌸 Stok 0 ise inStock false olur, ProductCard "TÜKENDİ" basar!
+  deliveryInfo: prod.stock > 0 ? 'Aynı gün teslimat' : 'Stokta yok',
+  stock: prod.stock,
+  stock_quantity: prod.stock,
 } as Product);
 
 function applyReviewStats(
@@ -109,7 +113,7 @@ export async function fetchCategoriesFromSupabase(): Promise<Category[]> {
 export async function fetchProductsFromSupabase(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, description, price, original_price, rating, reviews_count, category_id, stock, in_stock, image, is_best_seller, is_featured')
+    .select('id, name, description, price, original_price, rating, reviews_count, category_id, stock, image, is_best_seller, is_featured, freshness_score, vase_life_days')
 
   if (error) {
     console.error('Supabase ürün çekme hatası:', error);
@@ -193,7 +197,7 @@ export async function fetchOrdersFromSupabase(): Promise<Record<string, OrderInf
 export async function decreaseProductStock(productId: string, quantity: number) {
   const { data: product, error: fetchError } = await supabase
     .from('products')
-    .select('stock_quantity')
+    .select('stock')
     .eq('id', productId)
     .single();
 
@@ -202,11 +206,11 @@ export async function decreaseProductStock(productId: string, quantity: number) 
     return;
   }
 
-  const newStock = Math.max(0, product.stock_quantity - quantity);
+  const newStock = Math.max(0, product.stock - quantity);
 
   const { error: updateError } = await supabase
     .from('products')
-    .update({ stock_quantity: newStock })
+    .update({ stock: newStock })
     .eq('id', productId);
 
   if (updateError) {

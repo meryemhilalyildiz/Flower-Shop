@@ -17,8 +17,8 @@ export function AdminDashboard() {
   const [newProduct, setNewProduct] = useState({
     name: '',
     price: '',
-    stock_quantity: '',
-    image_url: '',
+    stock: '',
+    image: '',
     category_id: '',
     description: '',
     freshness_score: 10,
@@ -90,12 +90,12 @@ export function AdminDashboard() {
         throw new Error('Yüklenen görselin public URLsi alınamadı.');
       }
 
-      setNewProduct((prev) => ({ ...prev, image_url: uploadedUrl }));
+      setNewProduct((prev) => ({ ...prev, image: uploadedUrl }));
       setUploadMessage('Görsel yüklendi.');
     } catch (error) {
       console.error('Resim yüklenirken hata oluştu:', error);
       const fallbackImage = 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
-      setNewProduct((prev) => ({ ...prev, image_url: fallbackImage }));
+      setNewProduct((prev) => ({ ...prev, image: fallbackImage }));
       setUploadMessage(error instanceof Error ? error.message : 'Görsel yüklenemedi.');
     } finally {
       setUploadingImage(false);
@@ -106,8 +106,8 @@ export function AdminDashboard() {
     setNewProduct({
       name: '',
       price: '',
-      stock_quantity: '',
-      image_url: '',
+      stock: '',
+      image: '',
       category_id: '',
       description: '',
       freshness_score: 10,
@@ -129,8 +129,8 @@ export function AdminDashboard() {
     setNewProduct({
       name: product.name || '',
       price: product.price?.toString() || '',
-      stock_quantity: product.stock_quantity?.toString() || '',
-      image_url: product.image_url || '',
+      stock: product.stock?.toString() || '',
+      image: product.image || '',
       category_id: product.category_id || '',
       description: product.description || '',
       freshness_score: product.freshness_score ?? 10,
@@ -148,8 +148,8 @@ export function AdminDashboard() {
         await updateProduct(editingProduct.id, {
           name: newProduct.name,
           price: parseFloat(newProduct.price),
-          stock_quantity: parseInt(newProduct.stock_quantity),
-          image_url: newProduct.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
+          stock: parseInt(newProduct.stock),
+          image: newProduct.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
           category_id: newProduct.category_id,
           description: newProduct.description,
           freshness_score: newProduct.freshness_score,
@@ -165,21 +165,21 @@ export function AdminDashboard() {
           alert('Lütfen geçerli bir fiyat girin.');
           return;
         }
-        if (!newProduct.stock_quantity || parseInt(newProduct.stock_quantity) < 0) {
+        if (!newProduct.stock || parseInt(newProduct.stock) < 0) {
           alert('Lütfen geçerli bir stok miktarı girin.');
           return;
         }
 
         await addProduct({
+          id: crypto.randomUUID(),
           name: newProduct.name,
           price: parseFloat(newProduct.price),
-          stock_quantity: parseInt(newProduct.stock_quantity),
-          image_url: newProduct.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
+          stock: parseInt(newProduct.stock),
+          image: newProduct.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
           category_id: newProduct.category_id,
           description: newProduct.description,
           freshness_score: newProduct.freshness_score,
           vase_life_days: newProduct.vase_life_days,
-          is_active: true,
         });
         alert('Yeni çiçek başarıyla eklendi!');
       }
@@ -287,7 +287,7 @@ export function AdminDashboard() {
                 <tr key={p.id} className="hover:bg-sand-50/50 transition-all">
                   <td className="p-3">
                     <img
-                      src={p.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800'}
+                      src={p.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800'}
                       alt={p.name}
                       onError={(e) => {
                         e.currentTarget.src = 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
@@ -300,8 +300,8 @@ export function AdminDashboard() {
                   
                   <td className="p-3 font-bold text-rose-800">₺{p.price}</td>
                   <td className="p-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.stock_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                      {p.stock_quantity || 0} Adet Stok
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.stock > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                      {p.stock || 0} Adet Stok
                     </span>
                   </td>
 
@@ -384,16 +384,16 @@ export function AdminDashboard() {
                     required
                     min="0"
                     step="1"
-                    value={newProduct.stock_quantity}
-                    onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value })}
+                    value={newProduct.stock}
+                    onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
                     placeholder="25"
                     className={`w-full px-3 py-2 border rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none ${
-                      newProduct.stock_quantity && parseInt(newProduct.stock_quantity) >= 0
+                      newProduct.stock && parseInt(newProduct.stock) >= 0
                         ? 'border-sand-300'
                         : 'border-red-500 bg-red-50'
                     }`}
                   />
-                  {newProduct.stock_quantity && parseInt(newProduct.stock_quantity) < 0 && (
+                  {newProduct.stock && parseInt(newProduct.stock) < 0 && (
                     <p className="text-xs text-red-600 mt-1">Stok negatif olamaz</p>
                   )}
                 </div>
@@ -426,8 +426,8 @@ export function AdminDashboard() {
                 <div className="flex gap-2 mt-1">
                   <input
                     type="url"
-                    value={newProduct.image_url}
-                    onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
+                    value={newProduct.image}
+                    onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
                     placeholder="https://images.unsplash.com/..."
                     className="flex-1 px-3 py-2 border border-sand-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 outline-none"
                   />

@@ -173,9 +173,9 @@ export default function AdminDashboardNew({ navigate }: Props) {
                 <ul className="divide-y divide-sand-100">
                   {recentProducts.map((p: any) => (
                     <li key={p.id} className="py-3 flex items-center gap-3">
-                      {p.image_url ? (
+                      {p.image ? (
                         <img
-                          src={p.image_url}
+                          src={p.image}
                           alt={p.name}
                           className="h-12 w-12 rounded-xl object-cover bg-sand-100"
                         />
@@ -187,7 +187,7 @@ export default function AdminDashboardNew({ navigate }: Props) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-sand-900 truncate">{p.name}</p>
                         <p className="text-xs text-sand-500">
-                          Stok: {p.stock_quantity}
+                          Stok: {p.stock}
                         </p>
                       </div>
                       <span className="text-sm font-semibold text-brand-700">

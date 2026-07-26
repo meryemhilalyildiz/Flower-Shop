@@ -76,13 +76,19 @@ export function useFavorites() {
     setUserId(uid);
 
     if (uid) {
+      // 🌸 Giriş yapıldı: cihazda henüz hesaba bağlanmamış (anonim) favori varsa
+      // bir kereliğine bu hesaba taşı, sonra paylaşımlı localStorage'ı temizle.
+      // Aksi halde aynı cihazda sonra giriş yapan BAŞKA bir kullanıcı bu
+      // favorileri de görüp kendi hesabına kopyalamış olurdu.
       setLoading(true);
       const localIds = loadFromLocalStorage();
       const merged = await syncLocalStorageToSupabase(uid, localIds);
       setFavorites(merged);
-      saveToLocalStorage(merged);
+      localStorage.removeItem(STORAGE_KEY);
       setLoading(false);
     } else {
+      // 🌸 Çıkış yapıldı / giriş yok: önceki kullanıcının favorilerini
+      // bellekte tutmayı bırak, sadece bu cihaza ait anonim favorileri göster.
       setFavorites(loadFromLocalStorage());
     }
   }, [syncLocalStorageToSupabase]);
@@ -101,22 +107,22 @@ export function useFavorites() {
 
   const addFavorite = useCallback(async (product: Product) => {
     const productId = product.id;
+    const uid = userIdRef.current;
 
     setFavorites((prev) => {
       const next = new Set(prev);
       next.add(productId);
-      saveToLocalStorage(next);
+      if (!uid) saveToLocalStorage(next);
       return next;
     });
 
-    const uid = userIdRef.current;
     if (uid) {
       const { error } = await supabase
         .from('favorites')
         .insert({ user_id: uid, product_id: productId });
 
       if (error && error.code !== '23505') {
-        console.warn('Supabase favori kaydı başarısız (localStorage korunuyor):', error.message);
+        console.warn('Supabase favori kaydı başarısız:', error.message);
       }
     }
 
@@ -124,14 +130,15 @@ export function useFavorites() {
   }, []);
 
   const removeFavorite = useCallback(async (productId: string) => {
+    const uid = userIdRef.current;
+
     setFavorites((prev) => {
       const next = new Set(prev);
       next.delete(productId);
-      saveToLocalStorage(next);
+      if (!uid) saveToLocalStorage(next);
       return next;
     });
 
-    const uid = userIdRef.current;
     if (uid) {
       const { error } = await supabase
         .from('favorites')
@@ -140,7 +147,7 @@ export function useFavorites() {
         .eq('product_id', productId);
 
       if (error) {
-        console.warn('Supabase favori silme başarısız (localStorage korunuyor):', error.message);
+        console.warn('Supabase favori silme başarısız:', error.message);
       }
     }
 

@@ -35,8 +35,8 @@ export async function fetchDashboardStats() {
   const [orders, pending, products, lowStock] = await Promise.all([
     supabase.from('orders').select('id', { count: 'exact', head: true }),
     supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('products').select('id', { count: 'exact', head: true }).lt('stock_quantity', 5),
+    supabase.from('products').select('id', { count: 'exact', head: true }).gt('stock', 0),
+    supabase.from('products').select('id', { count: 'exact', head: true }).lt('stock', 5),
   ]);
   
   return {

@@ -31,6 +31,8 @@ export type Product = {
   deliveryInfo: string;
   stock?: number;
   stock_quantity?: number;
+  freshness_score?: number;
+  vase_life_days?: number;
   sizes?: ProductVariant[]; // 🌸 Boyut Seçenekleri
   vases?: ProductVariant[]; // 🌸 Vazo Seçenekleri
 };
@@ -172,17 +174,13 @@ export type Coupon = {
   id: string;
   code: string;
   discount_type: 'percentage' | 'fixed';
-  discount_value: number;
+  discount_amount: number;
   min_order_amount: number;
-  max_discount_amount: number | null;
-  usage_limit: number | null;
+  usage_limit: number;
   used_count: number;
-  valid_from: string;
-  valid_until: string | null;
+  expires_at: string;
   is_active: boolean;
-  description: string | null;
   created_at: string;
-  updated_at: string;
 };
 
 // =====================================================================

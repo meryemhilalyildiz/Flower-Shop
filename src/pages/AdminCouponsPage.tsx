@@ -36,15 +36,18 @@ export default function AdminCouponsPage() {
       return;
     }
 
+    const defaultExpiry = new Date();
+    defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
+
     const { error } = await supabase.from('coupons').insert([
       {
         code: code.toUpperCase().trim(),
         discount_type: discountType,
-        discount_value: Number(discountValue),
+        discount_amount: Number(discountValue),
         min_order_amount: Number(minOrder) || 0,
         usage_limit: Number(maxUses),
         used_count: 0,
-        valid_until: expiresAt ? new Date(expiresAt).toISOString() : null,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : defaultExpiry.toISOString(),
         is_active: true,
       },
     ]);
@@ -200,7 +203,7 @@ export default function AdminCouponsPage() {
                     <div>
                       <h4 className="font-bold text-sand-900 font-mono text-base">{c.code}</h4>
                       <p className="text-xs text-sand-500">
-                        İndirim: <strong className="text-sand-800">{c.discount_type === 'percentage' ? `%${c.discount_value}` : `₺${c.discount_value}`}</strong> · 
+                        İndirim: <strong className="text-sand-800">{c.discount_type === 'percentage' ? `%${c.discount_amount ?? c.discount_value}` : `₺${c.discount_amount ?? c.discount_value}`}</strong> · 
                         Min. Sepet: ₺{c.min_order_amount}
                       </p>
                     </div>
