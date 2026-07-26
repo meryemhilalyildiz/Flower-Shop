@@ -1,14 +1,18 @@
 import { ArrowRight, Truck, Clock, ShieldCheck, Sparkles, Star } from 'lucide-react';
-import type { Product, Route, Category } from '../types';
+import type { Product, Route, Category, Bundle } from '../types';
 import { routeToHash } from '../router';
 import ProductCard from '../components/ProductCard';
+import BannerRotator from '../components/BannerRotator';
+import BundleCard from '../components/BundleCard';
 
 type Props = {
   categories: Category[];
   featured: Product[];
   discounted: Product[];
+  bundles: Bundle[];
   navigate: (r: Route) => void;
   onAddToCart: (p: Product) => void;
+  onAddBundleToCart: (b: Bundle) => void;
 };
 
 const features = [
@@ -18,7 +22,7 @@ const features = [
   { icon: Sparkles, title: 'Usta İşçiliği', desc: 'Profesyonel floristler tarafından' },
 ];
 
-export default function HomePage({ categories, featured, discounted, navigate, onAddToCart }: Props) {
+export default function HomePage({ categories, featured, discounted, bundles, navigate, onAddToCart, onAddBundleToCart }: Props) {
   return (
     <div className="animate-fade-in">
       {/* Hero */}
@@ -185,34 +189,25 @@ export default function HomePage({ categories, featured, discounted, navigate, o
       </section>
 
       {/* Campaign Banner */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-brand-600 to-brand-800">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="relative px-8 py-12 lg:px-16 lg:py-20 flex flex-col lg:flex-row items-center justify-between gap-8">
-            <div className="text-white max-w-lg">
-              <span className="chip bg-white/20 text-white mb-4">Kampanya</span>
-              <h2 className="font-display text-3xl lg:text-4xl font-bold leading-tight">
-                İlk siparişe özel %20 indirim
-              </h2>
-              <p className="text-white/80 mt-3 text-lg">
-                Sepetinizde 400 TL ve üzeri çiçeklerde, ilk siparişinizde geçerli.
-              </p>
-              <button onClick={() => navigate({ name: 'shop' })} className="btn bg-white text-brand-700 px-6 py-3 mt-6 hover:bg-sand-50 hover:scale-105 active:scale-95 transition-all">
-                Hemen Keşfet
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="relative w-48 h-48 lg:w-64 lg:h-64 flex-shrink-0">
-              <div className="absolute inset-0 bg-white/10 rounded-full blur-2xl" />
-              <img
-                src="https://images.pexels.com/photos/165826/pexels-photo-165826.jpeg?auto=compress&cs=tinysrgb&w=600"
-                alt="Kampanya"
-                className="relative w-full h-full object-cover rounded-3xl shadow-2xl"
-              />
+      <BannerRotator navigate={navigate} />
+
+      {/* Bundles */}
+      {bundles.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 py-12">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <h2 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">Kampanyalı Paketler</h2>
+              <p className="text-sand-500 mt-2">Özel günler için hazır paketler</p>
             </div>
           </div>
-        </div>
-      </section>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {bundles.slice(0, 3).map((bundle) => (
+              <BundleCard key={bundle.id} bundle={bundle} onAddToCart={onAddBundleToCart} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Discounted Products */}
       <section className="max-w-7xl mx-auto px-4 py-12">

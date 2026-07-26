@@ -26,6 +26,10 @@ function parseHash(): Route {
     if (parts[1] === 'siparisler') return { name: 'admin-orders' };
     if (parts[1] === 'kargo') return { name: 'admin-shipping' };
     if (parts[1] === 'wiki') return { name: 'admin-wiki' };
+    if (parts[1] === 'analitik') return { name: 'admin-analytics' };
+    if (parts[1] === 'kuponlar') return { name: 'admin-coupons' };
+    if (parts[1] === 'bannerlar') return { name: 'admin-banners' };
+    if (parts[1] === 'paketler') return { name: 'admin-bundles' };
   }
   return { name: 'home' };
 }
@@ -66,6 +70,14 @@ export function routeToHash(route: Route): string {
       return '#/admin/kargo';
     case 'admin-wiki':
       return '#/admin/wiki';
+    case 'admin-analytics':
+      return '#/admin/analitik';
+    case 'admin-coupons':
+      return '#/admin/kuponlar';
+    case 'admin-banners':
+      return '#/admin/bannerlar';
+    case 'admin-bundles':
+      return '#/admin/paketler';
     default:
       return '#/';
   }
