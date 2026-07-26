@@ -1,5 +1,30 @@
 import { supabase } from '../supabaseClient';
+import { transformApiOrders } from './dataAdapter';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5177/api';
+
+export async function fetchUserOrders(userId?: string) {
+  let query = supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (*)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Kullanıcı siparişleri çekilirken hata:', error);
+    throw error;
+  }
+
+  // 🌸 Supabase'den gelen ham veriyi adaptörden geçirip ön yüze veriyoruz!
+  return transformApiOrders(data || []);
+}
 
 // Types
 export interface ApiProduct {

@@ -1,5 +1,7 @@
 import { supabase } from '../supabaseClient';
 import type { Product, Category } from '../types';
+import { transformApiOrders } from './dataAdapter';
+import type { OrderInfo } from '../types';
 
 // Supabase tablo tipleri
 type SupabaseCategory = {
@@ -105,6 +107,39 @@ export async function fetchProductsByCategoryFromSupabase(categoryId: string): P
   } catch (error) {
     console.error('Kategori ürünleri çekilirken hata:', error);
     return [];
+  }
+}
+
+export async function fetchOrdersFromSupabase(): Promise<Record<string, OrderInfo>> {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supabase sipariş çekme hatası:', error);
+      return {};
+    }
+
+    if (!data || data.length === 0) return {};
+
+    // Ham veriyi adaptörden geçirip OrderInfo objelerine dönüştürüyoruz
+    const formattedOrders = transformApiOrders(data);
+
+    // Record<string, OrderInfo> formatına çeviriyoruz
+    const ordersMap: Record<string, OrderInfo> = {};
+    formattedOrders.forEach((order) => {
+      ordersMap[order.id] = order;
+    });
+
+    return ordersMap;
+  } catch (err) {
+    console.error('Sipariş yüklenirken beklenmeyen hata:', err);
+    return {};
   }
 }
 

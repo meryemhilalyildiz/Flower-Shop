@@ -25,7 +25,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, onNavigateToShop
           {onNavigateToShop && (
             <button
               onClick={onNavigateToShop}
-              className="bg-pink-600 hover:bg-pink-700 text-white font-medium px-6 py-3 rounded-xl transition-colors shadow-md shadow-pink-200"
+              className="bg-pink-600 hover:bg-pink-700 text-white font-medium px-6 py-3 rounded-xl transition-colors shadow-md shadow-pink-200 cursor-pointer"
             >
               Çiçekleri Keşfet
             </button>
@@ -37,7 +37,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, onNavigateToShop
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2 font-display">
         <span>📦</span> Sipariş Geçmişim ({orderList.length})
       </h1>
 
@@ -82,13 +82,11 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, onNavigateToShop
             </div>
 
             {/* Sipariş İçindeki Ürünler */}
-            {/* Sipariş İçindeki Ürünler */}
             <div className="p-6">
               <div className="divide-y divide-gray-100">
                 {order.items.map((item, index) => {
-                  // Resim alanını güvenli hale getirelim (images bir dizi mi yoksa string mi?)
-                  const imageUrl = Array.isArray(item.product.images) 
-                    ? item.product.images[0] 
+                  const imageUrl = Array.isArray(item.product.images)
+                    ? item.product.images[0]
                     : (item.product.images as unknown as string);
 
                   return (
@@ -124,15 +122,41 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, onNavigateToShop
                   );
                 })}
               </div>
-            
-              {/* Adres ve Not Bilgisi */}
-              <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-600 bg-gray-50/50 p-3 rounded-xl">
-                <div>
-                  <span className="font-semibold text-gray-700">📍 Teslimat Adresi:</span> {order.address}
-                </div>
-                {order.note && (
+
+              {/* Adres, Not ve Kargo Takip Bilgisi */}
+              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-gray-600 bg-gray-50/80 p-3.5 rounded-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
                   <div>
-                    <span className="font-semibold text-gray-700">📝 Sipariş Notu:</span> {order.note}
+                    <span className="font-semibold text-gray-700">📍 Teslimat Adresi:</span>{' '}
+                    {order.shipping_address || order.address || 'Belirtilmemiş'}
+                  </div>
+                  {order.note && (
+                    <div>
+                      <span className="font-semibold text-gray-700">📝 Sipariş Notu:</span>{' '}
+                      {order.note}
+                    </div>
+                  )}
+                </div>
+
+                {/* 🚚 KARGO TAKİP NUMARASI (Varsa Ekranın Sağ Tarafında Mavi Kutuda Görünür) */}
+                {order.tracking_number && (
+                  <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
+                    <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
+                    <span className="font-mono font-bold text-xs text-blue-800">
+                      {order.tracking_number}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (order.tracking_number) {
+                          navigator.clipboard.writeText(order.tracking_number);
+                          alert('Kargo takip numarası kopyalandı! 📋');
+                        }
+                      }}
+                      className="ml-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
+                    >
+                      Kopyala
+                    </button>
                   </div>
                 )}
               </div>

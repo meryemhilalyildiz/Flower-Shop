@@ -34,6 +34,7 @@ import AdminCategoriesPage from './pages/AdminCategoriesPage';
 import AdminWikiPage from './pages/AdminWikiPage';
 import { useAdminAuth } from './hooks/useAdminAuth';
 import AdminLayout from './components/admin/AdminLayout';
+import { transformApiOrders } from './services/dataAdapter'; // dataAdapter dosya yoluna göre ayarla
 
 function App() {
   const { route, navigate } = useRouter();
@@ -178,8 +179,7 @@ function App() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) return;
-
-      // 🌸 1. .select() içine delivery_date alanını ekledik
+      // 🌸 1. .select() içine tracking_number alanını ekledik!
       const { data: fetchedOrders, error } = await supabase
         .from('orders')
         .select(`
@@ -193,6 +193,7 @@ function App() {
           recipient_name,
           recipient_phone,
           note,
+          tracking_number,
           order_items (
             id,
             product_id,
@@ -211,11 +212,11 @@ function App() {
       if (fetchedOrders) {
         const ordersMap: Record<string, OrderInfo> = {};
 
-        fetchedOrders.forEach((ord: any) => { // 🌸 (ord: any) yaparak TypeScript'i rahatlattık
+        fetchedOrders.forEach((ord: any) => {
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
-            deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
+            deliveryDate: ord.delivery_date || '',
             status: ord.status || 'Hazırlanıyor',
             total: ord.total_amount,
             address: ord.shipping_address,
@@ -223,6 +224,8 @@ function App() {
             recipientName: ord.recipient_name,
             recipientPhone: ord.recipient_phone,
             note: ord.note,
+            // 🚚 2. Kargo takip numarasını buraya aktardık!
+            tracking_number: ord.tracking_number || undefined,
             items: ord.order_items ? ord.order_items.map((item: any) => {
               const foundProduct = products.find((p) => String(p.id) === String(item.product_id));
               const fallbackProduct = {
@@ -250,7 +253,6 @@ function App() {
       console.error('Sipariş çekme hatası:', err);
     }
   }, [products]);
-  
   // 🌸 Uygulama yüklendiğinde veya kullanıcı oturumu değiştiğinde siparişleri çek
   useEffect(() => {
     fetchUserOrders();

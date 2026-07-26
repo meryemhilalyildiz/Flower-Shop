@@ -182,14 +182,25 @@ export async function fetchAllOrders() {
   return data ?? [];
 }
 
-// Sipariş durumu güncelle
-export async function updateOrderStatus(id: string, status: string) {
+// Sipariş durumu ve opsiyonel kargo takip numarası güncelle
+export async function updateOrderStatus(id: string, status: string, trackingNumber?: string) {
   const normalizedStatus = normalizeOrderStatus(status);
+  
+  // Güncellenecek veriyi hazırlıyoruz
+  const updatePayload: { status: string; tracking_number?: string } = {
+    status: normalizedStatus,
+  };
+
+  // Eğer kargo takip numarası parametre olarak geldiyse payload'a ekliyoruz
+  if (trackingNumber !== undefined) {
+    updatePayload.tracking_number = trackingNumber;
+  }
+
   const { data, error } = await supabase
     .from('orders')
-    .update({ status: normalizedStatus })
+    .update(updatePayload)
     .eq('id', id)
-    .select('id, status')
+    .select('id, status, tracking_number')
     .limit(1);
 
   if (error) {

@@ -1,9 +1,9 @@
-import type { Category, Product } from '../types';
+import type { Category, Product, OrderInfo } from '../types';
 import type { ApiProduct, ApiCategory, ApiDistrict } from './api';
 
 // Transform API Product to Frontend Product
 export function transformApiProduct(apiProduct: any): Product {
-  // 🌸 Supabase'deki 'stock_quantity' kolonunu öncelikle okuyoruz
+  // 🌸 Supabase'deki 'stock_quantity' kolonunu okuyoruz
   const stockCount = apiProduct.stock_quantity ?? apiProduct.stockQuantity ?? apiProduct.stock ?? 0;
   
   // Stok adedi 0'dan büyükse stokta kabul et
@@ -49,6 +49,34 @@ export function transformApiDistrict(apiDistrict: ApiDistrict) {
   };
 }
 
+// 🌸 Transform API Order to Frontend OrderInfo (Kargo Takip No Eklendi!)
+export function transformApiOrder(apiOrder: any): OrderInfo {
+  return {
+    id: apiOrder.id,
+    createdAt: apiOrder.created_at || apiOrder.createdAt || new Date().toISOString(),
+    recipientName: apiOrder.recipient_name || apiOrder.recipientName || 'Belirtilmemiş',
+    recipientPhone: apiOrder.recipient_phone || apiOrder.recipientPhone || '',
+    address: apiOrder.shipping_address || apiOrder.address || 'Belirtilmemiş',
+    shipping_address: apiOrder.shipping_address || apiOrder.address || 'Belirtilmemiş',
+    city: apiOrder.city || '',
+    deliveryDate: apiOrder.delivery_date || apiOrder.deliveryDate || '',
+    note: apiOrder.note || '',
+    total: Number(apiOrder.total_amount || apiOrder.total || 0),
+    status: apiOrder.status,
+    // 🚚 Kargo Takip Numarası Eşleştirmesi:
+    tracking_number: apiOrder.tracking_number || apiOrder.trackingNumber || undefined,
+    items: (apiOrder.order_items || apiOrder.items || []).map((item: any) => ({
+      product: item.product ? transformApiProduct(item.product) : {
+        id: item.product_id || item.productId || '1',
+        name: item.product_name || item.name || 'Çiçek Ürünü',
+        price: item.unit_price || item.price || 0,
+        images: item.image_url ? [item.image_url] : ['https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600'],
+      } as Product,
+      quantity: item.quantity || 1,
+    })),
+  };
+}
+
 // Generate slug from name
 function generateSlug(name: string): string {
   return name
@@ -57,17 +85,19 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-// Transform array of API products
+// Transform array helpers
 export function transformApiProducts(apiProducts: ApiProduct[]): Product[] {
   return apiProducts.map(transformApiProduct);
 }
 
-// Transform array of API categories
 export function transformApiCategories(apiCategories: ApiCategory[]): Category[] {
   return apiCategories.map(transformApiCategory);
 }
 
-// Transform array of API districts
 export function transformApiDistricts(apiDistricts: ApiDistrict[]) {
   return apiDistricts.map(transformApiDistrict);
+}
+
+export function transformApiOrders(apiOrders: any[]): OrderInfo[] {
+  return apiOrders.map(transformApiOrder);
 }

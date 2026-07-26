@@ -31,19 +31,24 @@ export type CartItem = {
   quantity: number;
 };
 
-export type OrderInfo = {
+export interface OrderInfo {
   id: string;
-  items: CartItem[];
-  total: number;
-  recipientName: string;
-  recipientPhone: string;
-  address: string;
-  city: string;
-  deliveryDate: string;
-  note: string;
   createdAt: string;
-  status: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi';
-};
+  recipientName: string;
+  recipientPhone?: string;
+  address: string;
+  shipping_address?: string; // Supabase sütun uyumluluğu için
+  city: string;
+  deliveryDate?: string;
+  note?: string;
+  total: number;
+  status?: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | string;
+  tracking_number?: string; // Kargo takip numarası
+  items: Array<{
+    product: Product;
+    quantity: number;
+  }> | CartItem[];
+}
 
 export type Route =
   | { name: 'home' }
