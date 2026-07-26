@@ -14,6 +14,7 @@ function parseHash(): Route {
   if (parts[0] === 'sepet') return { name: 'cart' };
   if (parts[0] === 'odeme') return { name: 'checkout' };
   if (parts[0] === 'siparislerim') return { name: 'orders' }; // 🌸 Siparişlerim rotası yakalanıyor
+  if (parts[0] === 'favoriler') return { name: 'favorites' }; // 🌸 Favorilerim rotası
   if (parts[0] === 'siparis-tamamlandi' && parts[1]) return { name: 'order-success', orderId: decodeURIComponent(parts[1]) };
   if (parts[0] === 'hakkimizda') return { name: 'about' };
   if (parts[0] === 'iletisim') return { name: 'contact' };
@@ -26,6 +27,7 @@ function parseHash(): Route {
     if (parts[1] === 'siparisler') return { name: 'admin-orders' };
     if (parts[1] === 'kargo') return { name: 'admin-shipping' };
     if (parts[1] === 'wiki') return { name: 'admin-wiki' };
+    if (parts[1] === 'yorumlar') return { name: 'admin-reviews' };
   }
   return { name: 'home' };
 }
@@ -44,6 +46,8 @@ export function routeToHash(route: Route): string {
       return '#/odeme';
     case 'orders':
       return '#/siparislerim'; // 🌸 'orders' rotasını hash adresine çevirir
+    case 'favorites':
+      return '#/favoriler'; // 🌸 'favorites' rotasını hash adresine çevirir
     case 'order-success':
       return `#/siparis-tamamlandi/${route.orderId}`;
     case 'about':
@@ -66,6 +70,8 @@ export function routeToHash(route: Route): string {
       return '#/admin/kargo';
     case 'admin-wiki':
       return '#/admin/wiki';
+    case 'admin-reviews':
+      return '#/admin/yorumlar';
     default:
       return '#/';
   }
