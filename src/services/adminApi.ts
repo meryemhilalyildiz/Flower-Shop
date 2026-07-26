@@ -30,25 +30,6 @@ export async function checkAdminAccess(userId: string): Promise<boolean> {
   return data?.role === 'admin';
 }
 
-// B2B özelliklerini kaldırmak için SQL komutları
-// Supabase SQL Editor'da sırayla çalıştırın:
-/*
--- 1. Önce company rolündeki kullanıcıları customer rolüne güncelle
-UPDATE public.profiles 
-SET role = 'customer' 
-WHERE role = 'company';
-
--- 2. Company rolünü constraint'ten kaldır
-ALTER TABLE public.profiles 
-DROP CONSTRAINT IF EXISTS profiles_role_check,
-ADD CONSTRAINT profiles_role_check CHECK (role = ANY (ARRAY['admin'::text, 'customer'::text]));
-
--- 3. B2B alanlarını kaldır
-ALTER TABLE public.profiles 
-DROP COLUMN IF EXISTS company_name,
-DROP COLUMN IF EXISTS is_approved;
-*/
-
 // Dashboard istatistikleri
 export async function fetchDashboardStats() {
   const [orders, pending, products, lowStock] = await Promise.all([
@@ -126,14 +107,18 @@ export async function fetchAllCategories() {
 }
 
 // Kategori ekle
-export async function addCategory(name: string, slug: string) {
-  const { error } = await supabase.from('categories').insert({ name, slug });
+export async function addCategory(name: string, slug: string, image?: string) {
+  const insertData: Record<string, any> = { name, slug };
+  if (image) insertData.image = image;
+  const { error } = await supabase.from('categories').insert(insertData);
   if (error) throw error;
 }
 
 // Kategori güncelle
-export async function updateCategory(id: string, name: string, slug: string) {
-  const { error } = await supabase.from('categories').update({ name, slug }).eq('id', id);
+export async function updateCategory(id: string, name: string, slug: string, image?: string) {
+  const updateData: Record<string, any> = { name, slug };
+  if (image) updateData.image = image;
+  const { error } = await supabase.from('categories').update(updateData).eq('id', id);
   if (error) throw error;
 }
 
@@ -141,6 +126,22 @@ export async function updateCategory(id: string, name: string, slug: string) {
 export async function deleteCategory(id: string) {
   const { error } = await supabase.from('categories').delete().eq('id', id);
   if (error) throw error;
+}
+
+// Kategori görseli yükle (Supabase Storage - 'categories' bucket)
+export async function uploadCategoryImage(file: File): Promise<string> {
+  const fileName = `category-${Date.now()}-${file.name}`;
+  const { data, error } = await supabase.storage
+    .from('categories')
+    .upload(fileName, file);
+  
+  if (error) throw error;
+  
+  const { data: { publicUrl } } = supabase.storage
+    .from('categories')
+    .getPublicUrl(data.path);
+  
+  return publicUrl;
 }
 
 // Ürün ekle

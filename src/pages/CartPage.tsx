@@ -42,7 +42,6 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
     );
   }
 
-  const remainingForFree = 500 - subtotal;
   const isTimeRunningLow = timeRemaining !== null && timeRemaining < 60000; // Less than 1 minute
 
   return (
@@ -71,7 +70,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
             <div className="bg-brand-50 border border-brand-100 rounded-2xl p-4 flex items-center gap-3">
               <Truck className="w-5 h-5 text-brand-600 flex-shrink-0" />
               <p className="text-sm text-brand-700">
-                <span className="font-bold">{remainingForFree} TL</span> daha ekleyin, kargo bedava olsun!
+                Kargo ücreti checkout sayfasında hesaplanacaktır.
               </p>
             </div>
           )}

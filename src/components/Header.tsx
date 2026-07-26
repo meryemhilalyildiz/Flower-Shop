@@ -97,7 +97,6 @@ export default function Header({ cartCount, navigate, currentRoute }: Props) {
             <span className="hidden sm:inline">Aynı gün teslimat · 0850 123 45 67</span>
             <span className="sm:hidden">Aynı gün teslimat</span>
           </span>
-          <span className="hidden md:block">500 TL ve üzeri siparişlerde ücretsiz kargo</span>
         </div>
       </div>
 

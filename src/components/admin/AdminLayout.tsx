@@ -15,7 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   'admin-products': 'Ürünler',
   'admin-categories': 'Kategoriler',
   'admin-orders': 'Siparişler',
-  'admin-districts': 'İlçe Yönetimi',
+  'admin-shipping': 'Kargo Yönetimi',
   'admin-wiki': 'Botanik Wiki',
 };
 

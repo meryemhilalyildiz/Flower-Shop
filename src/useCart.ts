@@ -106,7 +106,10 @@ export function useCart() {
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-  const deliveryFee = subtotal >= 500 ? 0 : 49;
+
+  // 🌸 Kargo ücreti CheckoutPage'de dinamik olarak hesaplanır.
+  // Sepet sayfasında varsayılan olarak 0 TL gösterilir.
+  const deliveryFee = 0;
   const total = subtotal + deliveryFee;
 
   return {

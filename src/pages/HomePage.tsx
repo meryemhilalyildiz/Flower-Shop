@@ -68,37 +68,37 @@ export default function HomePage({ categories, featured, discounted, navigate, o
             <div className="relative animate-scale-in">
               <div className="relative grid grid-cols-2 gap-4">
                 <div className="space-y-4">
-                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
-                    <img
-                      src="https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600"
-                      alt="Buket"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
-                    <img
-                      src="https://images.pexels.com/photos/1084199/pexels-photo-1084199.jpeg?auto=compress&cs=tinysrgb&w=600"
-                      alt="Saksılı"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
+                  <img
+                    src="https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600"
+                    alt="Buket"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <div className="space-y-4 pt-8">
-                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
-                    <img
-                      src="https://images.pexels.com/photos/1932467/pexels-photo-1932467.jpeg?auto=compress&cs=tinysrgb&w=600"
-                      alt="Gül"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
-                    <img
-                      src="https://images.pexels.com/photos/1580280/pexels-photo-1580280.jpeg?auto=compress&cs=tinysrgb&w=600"
-                      alt="Özel gün"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
+                  <img
+                    src="https://images.pexels.com/photos/1084199/pexels-photo-1084199.jpeg?auto=compress&cs=tinysrgb&w=600"
+                    alt="Saksılı"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
+              </div>
+              <div className="space-y-4 pt-8">
+                <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
+                  <img
+                    src="https://images.pexels.com/photos/1932467/pexels-photo-1932467.jpeg?auto=compress&cs=tinysrgb&w=600"
+                    alt="Gül"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
+                  <img
+                    src="https://images.pexels.com/photos/1580280/pexels-photo-1580280.jpeg?auto=compress&cs=tinysrgb&w=600"
+                    alt="Özel gün"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
               </div>
               <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl shadow-soft px-5 py-3 flex items-center gap-3 animate-float">
                 <div className="w-10 h-10 rounded-full bg-leaf-100 flex items-center justify-center">
