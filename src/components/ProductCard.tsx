@@ -18,7 +18,10 @@ const badgeStyles: Record<string, string> = {
 
 export default function ProductCard({ product, onAddToCart, isFavorite, onToggleFavorite }: Props) {
   // 🌸 STOK KONTROLÜ
-  const isOutOfStock = !product.inStock;
+// 🌸 STOK KONTROLÜ (Garantili Düzeltme)
+const isOutOfStock = product.stock !== undefined && product.stock !== null
+? Number(product.stock) <= 0
+: (product.inStock === false);
 
   const discount = product.oldPrice
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
