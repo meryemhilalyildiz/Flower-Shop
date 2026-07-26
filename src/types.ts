@@ -58,9 +58,12 @@ export type OrderInfo = {
     product: Product;
     quantity: number;
   }> | CartItem[];
+<<<<<<< HEAD
   subtotal?: number;
   deliveryFee?: number;
   delivery_fee?: number;
+=======
+>>>>>>> origin/main
 };
 
 export type Route =

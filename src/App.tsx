@@ -205,7 +205,11 @@ function App() {
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
+<<<<<<< HEAD
             deliveryDate: ord.delivery_date || '',
+=======
+            deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
+>>>>>>> origin/main
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
             total: ord.total_amount,
             address: ord.shipping_address,

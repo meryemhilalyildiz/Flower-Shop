@@ -208,7 +208,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, navigate, onNavi
                     )}
                   </div>
 
-                  {/* 🚚 KARGO TAKİP NUMARASI */}
+                  {/* 🚚 KARGO TAKİP NUMARASI (Varsa Ekranın Sağ Tarafında Mavi Kutuda Görünür) */}
                   {order.tracking_number && (
                     <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
                       <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
