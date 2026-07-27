@@ -127,7 +127,13 @@ export default function ProductPage({
     .filter((p) => p.categoryId === product.categoryId && p.id !== product.id)
     .slice(0, 4);
 
+  // 🌸 STOK KONTROLÜ
+  const isOutOfStock = product.stock !== undefined && product.stock !== null
+    ? Number(product.stock) <= 0
+    : (product.inStock === false);
+
   const handleAdd = () => {
+    if (isOutOfStock) return;
     onAddToCart(product, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -246,7 +252,8 @@ export default function ProductPage({
             <div className="flex items-center gap-1 bg-sand-100 rounded-full p-1">
               <button
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
+                disabled={isOutOfStock}
+                className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Azalt"
               >
                 <Minus className="w-4 h-4" />
@@ -254,7 +261,8 @@ export default function ProductPage({
               <span className="w-10 text-center font-semibold text-sand-800">{quantity}</span>
               <button
                 onClick={() => setQuantity((q) => q + 1)}
-                className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
+                disabled={isOutOfStock}
+                className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Artır"
               >
                 <Plus className="w-4 h-4" />
@@ -263,9 +271,14 @@ export default function ProductPage({
 
             <button
               onClick={handleAdd}
-              className={`btn-primary flex-1 cursor-pointer ${added ? 'bg-leaf-600 hover:bg-leaf-600' : ''}`}
+              disabled={isOutOfStock}
+              className={`btn-primary flex-1 cursor-pointer ${added ? 'bg-leaf-600 hover:bg-leaf-600' : ''} ${isOutOfStock ? 'bg-sand-400 hover:bg-sand-400 cursor-not-allowed' : ''}`}
             >
-              {added ? (
+              {isOutOfStock ? (
+                <>
+                  Stok Yok
+                </>
+              ) : added ? (
                 <>
                   <Check className="w-5 h-5" />
                   Sepete Eklendi
@@ -278,6 +291,10 @@ export default function ProductPage({
               )}
             </button>
           </div>
+
+          {isOutOfStock && (
+            <p className="text-red-600 text-sm mt-2 font-medium">Bu ürün şu anda stokta yok.</p>
+          )}
 
           {/* Trust badges */}
           <div className="grid grid-cols-3 gap-3 mt-8">
