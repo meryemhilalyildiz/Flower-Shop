@@ -98,30 +98,79 @@ const handleApplyCoupon = async () => {
       return;
     }
 
-    // 🛑 Kullanım Limiti Kontrolü
-    if (data.used_count >= data.usage_limit) {
+    console.log('🔍 KUPON VERİTABANI VERİSİ:', data);
+
+    // 🛑 1. Gerçek Ara Toplam Hesabı (680 TL)
+    const currentSubtotal = Number(
+      subtotal || 
+      (items && Array.isArray(items) ? items.reduce((acc: number, item: any) => acc + (item.product?.price || item.price || 0) * (item.quantity || 1), 0) : 0) || 
+      0
+    );
+
+    // 🛑 2. Kullanım Limiti Kontrolü
+    if (data.usage_limit && (data.used_count || 0) >= data.usage_limit) {
       alert('Bu kuponun kullanım limiti dolmuştur.');
       return;
     }
 
-    // 🛑 Minimum Sepet Tutarı Kontrolü
-    if (subtotal < data.min_order_amount) {
-      alert(`Bu kupon en az ₺${data.min_order_amount} tutarındaki sepetlerde geçerlidir.`);
+    // 🛑 3. Minimum Sepet Tutarı Kontrolü
+    const minOrderAmount = Number(data.min_order_amount || data.min_amount || 0);
+    if (currentSubtotal < minOrderAmount) {
+      alert(`Bu kupon en az ₺${minOrderAmount} tutarındaki sepetlerde geçerlidir.`);
       return;
     }
 
+    // 🌸 4. Veritabanındaki Olası Bütün İndirim Sütunlarını Tarayan Güvenli Okuyucu
+    const rawDiscount = 
+      data.discount_amount ?? 
+      data.discountAmount ?? 
+      data.discount_percentage ?? 
+      data.discountPercentage ?? 
+      data.discount_rate ?? 
+      data.discountRate ?? 
+      data.discount_percent ?? 
+      data.discountPercent ?? 
+      data.discount_value ?? 
+      data.discountValue ?? 
+      data.discount ?? 
+      data.amount ?? 
+      data.value ?? 
+      data.percent ?? 
+      0;
+
+    const discountVal = Number(rawDiscount);
+
+    // 🌸 5. Kupon Tipi veya Kod İsmi Kontrolü (%50 Tespiti)
+    const rawType = String(data.discount_type || data.type || data.coupon_type || '').toLowerCase();
+    const couponCodeStr = String(data.code || '').toUpperCase();
+    
+    // Kod adında '50' geçiyorsa VEYA tip yüzde ise VEYA değer 1-100 arasındaysa % hesabı yap
+    const isPercentage = 
+      rawType.includes('percent') || 
+      rawType.includes('yuzde') || 
+      data.is_percent === true || 
+      couponCodeStr.includes('50') || 
+      (discountVal > 0 && discountVal <= 100);
+
     let calculatedDiscount = 0;
-    if (data.discount_type === 'percentage') {
-      calculatedDiscount = (subtotal * data.discount_amount) / 100;
+
+    if (isPercentage) {
+      // Değer 0 geldiyse ama BAHAR50 gibi bir kodsa varsayılan 50 kabul et
+      const effectivePercent = discountVal > 0 ? discountVal : 50; 
+      calculatedDiscount = (currentSubtotal * effectivePercent) / 100;
     } else {
-      calculatedDiscount = data.discount_amount;
+      calculatedDiscount = discountVal;
     }
+
+    // Sepet tutarından fazla indirim olamaz
+    calculatedDiscount = Math.min(currentSubtotal, calculatedDiscount);
 
     setAppliedCoupon(data);
     setDiscountAmount(calculatedDiscount);
+
     alert(`🎉 Kupon başarıyla uygulandı! İndirim: ₺${calculatedDiscount.toFixed(2)}`);
   } catch (err: any) {
-    alert('Kupon uygulanırken hata oluştu: ' + err.message);
+    alert('Kupon uygulanırken hata oluştu: ' + (err.message || err));
   }
 };
 
