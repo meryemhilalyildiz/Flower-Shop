@@ -36,6 +36,7 @@ import { useAdminAuth } from './hooks/useAdminAuth';
 import { normalizeOrderStatusToTurkish } from './services/adminApi';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminCouponsPage from './pages/AdminCouponsPage';
+import AdminEditorPage from './pages/AdminEditorPage';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -443,6 +444,14 @@ function App() {
         return (
           <AdminLayout currentPage="admin-coupons" navigate={navigate}>
             <AdminCouponsPage />
+          </AdminLayout>
+        );
+
+      /* ✏️ DÜZENLEME SAYFASI ROTASI */
+      case 'admin-editor':
+        return (
+          <AdminLayout currentPage="admin-editor" navigate={navigate}>
+            <AdminEditorPage navigate={navigate} />
           </AdminLayout>
         );
 

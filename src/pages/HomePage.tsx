@@ -4,6 +4,10 @@ import type { Product, Route, Category } from '../types';
 import { routeToHash } from '../router';
 import ProductCard from '../components/ProductCard';
 import { fetchRandomApprovedReviews, type FeaturedReview } from '../services/adminApi';
+import { usePageContent } from '../hooks/usePageContent';
+import EditableText from '../components/admin/EditableText';
+import EditableImage from '../components/admin/EditableImage';
+import { useAdminEditing } from '../contexts/AdminEditingContext';
 
 type Props = {
   categories: Category[];
@@ -23,8 +27,18 @@ const features = [
 ];
 
 export default function HomePage({ categories, featured, discounted, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
+  const { content, loading } = usePageContent('home');
+  const { isEditing, onTextChange, onImageChange } = useAdminEditing();
   const [testimonials, setTestimonials] = useState<FeaturedReview[]>([]);
   const [testimonialsLoading, setTestimonialsLoading] = useState(true);
+
+  // Varsayılan değerler
+  const heroTitle = content?.hero_title || 'Sevdiklerinize Çiçek Gönderin';
+  const heroSubtitle = content?.hero_subtitle || 'Türkiye\'nin her yerine aynı gün teslimat ile duygularınızı çiçeklerle iletin';
+  const heroCta = content?.hero_cta || 'Hemen Sipariş Ver';
+  const heroImage1 = content?.hero_image_1 || 'https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600';
+  const heroImage2 = content?.hero_image_2 || 'https://images.pexels.com/photos/568685/pexels-photo-568685.jpeg?auto=compress&cs=tinysrgb&w=600';
+  const heroImage3 = content?.hero_image_3 || 'https://images.pexels.com/photos/6340978/pexels-photo-6340978.jpeg?auto=compress&cs=tinysrgb&w=600';
 
   useEffect(() => {
     let cancelled = false;
@@ -60,14 +74,36 @@ export default function HomePage({ categories, featured, discounted, navigate, o
                 Taze çiçekler her gün
               </span>
               <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-sand-900 leading-tight text-balance">
-                Sevdiklerinize <span className="text-brand-600">çiçek</span> gönderin
+                {isEditing ? (
+                  <EditableText
+                    value={heroTitle}
+                    onSave={(newValue) => onTextChange('hero_title', newValue)}
+                  />
+                ) : (
+                  heroTitle
+                )}
               </h1>
               <p className="text-lg text-sand-600 mt-5 max-w-md leading-relaxed">
-                El yapımı buketler, aynı gün teslimat ve tazelik garantisi ile kalbinizi iletmenin en güzel yolu.
+                {isEditing ? (
+                  <EditableText
+                    value={heroSubtitle}
+                    onSave={(newValue) => onTextChange('hero_subtitle', newValue)}
+                    multiline
+                  />
+                ) : (
+                  heroSubtitle
+                )}
               </p>
               <div className="flex flex-wrap gap-3 mt-8">
                 <button onClick={() => navigate({ name: 'shop' })} className="btn-primary group">
-                  Alışverişe Başla
+                  {isEditing ? (
+                    <EditableText
+                      value={heroCta}
+                      onSave={(newValue) => onTextChange('hero_cta', newValue)}
+                    />
+                  ) : (
+                    heroCta
+                  )}
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
                 <button onClick={() => navigate({ name: 'about' })} className="btn-secondary">
@@ -95,34 +131,70 @@ export default function HomePage({ categories, featured, discounted, navigate, o
               <div className="relative grid grid-cols-2 gap-4">
                 <div className="space-y-4">
                 <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
-                  <img
-                    src="https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600"
-                    alt="Buket"
-                    className="w-full h-full object-cover"
-                  />
+                  {isEditing ? (
+                    <EditableImage
+                      src={heroImage1}
+                      alt="Buket"
+                      onSave={(newSrc) => onImageChange('hero_image_1', newSrc)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={heroImage1}
+                      alt="Buket"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                 </div>
                 <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
-                  <img
-                    src="https://images.pexels.com/photos/1084199/pexels-photo-1084199.jpeg?auto=compress&cs=tinysrgb&w=600"
-                    alt="Saksılı"
-                    className="w-full h-full object-cover"
-                  />
+                  {isEditing ? (
+                    <EditableImage
+                      src={heroImage2}
+                      alt="Saksılı"
+                      onSave={(newSrc) => onImageChange('hero_image_2', newSrc)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={heroImage2}
+                      alt="Saksılı"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                 </div>
               </div>
               <div className="space-y-4 pt-8">
                 <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
-                  <img
-                    src="https://images.pexels.com/photos/1932467/pexels-photo-1932467.jpeg?auto=compress&cs=tinysrgb&w=600"
-                    alt="Gül"
-                    className="w-full h-full object-cover"
-                  />
+                  {isEditing ? (
+                    <EditableImage
+                      src={heroImage3}
+                      alt="Gül"
+                      onSave={(newSrc) => onImageChange('hero_image_3', newSrc)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={heroImage3}
+                      alt="Gül"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                 </div>
                 <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
-                  <img
-                    src="https://images.pexels.com/photos/1580280/pexels-photo-1580280.jpeg?auto=compress&cs=tinysrgb&w=600"
-                    alt="Özel gün"
-                    className="w-full h-full object-cover"
-                  />
+                  {isEditing ? (
+                    <EditableImage
+                      src={heroImage1}
+                      alt="Özel gün"
+                      onSave={(newSrc) => onImageChange('hero_image_1', newSrc)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={heroImage1}
+                      alt="Özel gün"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                 </div>
               </div>
               </div>
