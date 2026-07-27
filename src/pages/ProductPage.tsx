@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Star, Minus, Plus, ShoppingBag, Truck, ShieldCheck, RefreshCw, ChevronLeft, Check, Heart } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Truck, ShieldCheck, RefreshCw, ChevronLeft, Check, Heart, Star } from 'lucide-react';
 import type { Product, Route, Category } from '../types';
 import { getCategoryById } from '../data';
 import Breadcrumbs from '../components/Breadcrumbs';
 import ProductCard from '../components/ProductCard';
 import ReviewSection from '../components/ReviewSection';
+import ReviewModal from '../components/ReviewModal';
 import { supabase } from '../supabaseClient';
+import { fetchProductReviewStats, checkUserCanReview } from '../services/adminApi';
 import WikiCareSection from '../components/WikiCareSection';
 
 type Props = {
@@ -34,6 +36,8 @@ export default function ProductPage({
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [canReview, setCanReview] = useState(false);
 
   // 🌸 Supabase'den ürün verisini doğrudan slug/id ile çekme garantisi
   useEffect(() => {
@@ -62,6 +66,9 @@ export default function ProductPage({
         if (data) {
           const imgUrl = data.image || data.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
           
+          // ⭐ Gerçek yorum istatistiklerini çek (mock data yok!)
+          const reviewStats = await fetchProductReviewStats(data.id);
+          
           const mappedProduct: Product = {
             id: data.id,
             name: data.name,
@@ -72,8 +79,8 @@ export default function ProductPage({
             oldPrice: data.original_price ? Number(data.original_price) : undefined,
             images: [imgUrl],
             categoryId: data.category_id || data.category || 'all',
-            rating: Number(data.rating || 5.0),
-            reviewCount: Number(data.reviews_count || 0), // 👈 Sadece 'reviewCount' kalıyor!
+            rating: reviewStats.averageRating,
+            reviewCount: reviewStats.totalReviews,
             stock: Number(data.stock ?? data.stock_quantity ?? 0),
             inStock: Number(data.stock ?? data.stock_quantity ?? 0) > 0,
             badge: data.is_best_seller ? 'Çok Satan' : (data.is_featured ? 'Yeni' : undefined),
@@ -92,6 +99,29 @@ export default function ProductPage({
 
     fetchProductFromDb();
   }, [initialProduct, productSlug]);
+
+  // 🌸 Kullanıcı bu ürünü teslim aldıysa yorum yapabilir
+  useEffect(() => {
+    if (!product?.id) return;
+
+    const productId = product.id;
+
+    async function checkReviewPermission() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setCanReview(false);
+        return;
+      }
+      try {
+        const canReviewResult = await checkUserCanReview(productId, user.id);
+        setCanReview(canReviewResult);
+      } catch (err) {
+        console.error('Yorum yetki kontrolü hatası:', err);
+        setCanReview(false);
+      }
+    }
+    checkReviewPermission();
+  }, [product?.id]);
 
   if (loading) {
     return (
@@ -219,25 +249,6 @@ export default function ProductPage({
             </button>
           </div>
 
-          <div className="flex items-center gap-3 mt-3">
-            {(product.reviewCount || 0) > 0 ? (
-              <>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      className={`w-4 h-4 ${i <= Math.round(product.rating || 5) ? 'fill-amber-400 text-amber-400' : 'text-sand-200'}`}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm font-medium text-sand-700">{product.rating}</span>
-                <span className="text-sm text-sand-400">· {product.reviewCount} değerlendirme</span>
-              </>
-            ) : (
-              <span className="text-sm text-sand-400">Henüz değerlendirme yok</span>
-            )}
-          </div>
-
           <p className="text-sand-600 mt-4 leading-relaxed">{product.description}</p>
 
           <div className="flex items-end gap-3 mt-6">
@@ -310,6 +321,17 @@ export default function ProductPage({
               </div>
             ))}
           </div>
+
+          {/* 🌸 Yorum Yap Butonu (Teslim aldıysan göster) */}
+          {canReview && (
+            <button
+              onClick={() => setReviewModalOpen(true)}
+              className="mt-6 flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-100 transition-all cursor-pointer"
+            >
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              Ürünü Değerlendir
+            </button>
+          )}
         </div>
       </div>
 
@@ -354,6 +376,18 @@ export default function ProductPage({
             ))}
           </div>
         </div>
+      )}
+
+      {/* 🌸 Ürün Değerlendirme Modalı */}
+      {reviewModalOpen && product && (
+        <ReviewModal
+          product={product}
+          isOpen={true}
+          onClose={() => setReviewModalOpen(false)}
+          onReviewSubmitted={() => {
+            setReviewModalOpen(false);
+          }}
+        />
       )}
     </div>
   );

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { OrderInfo, Route } from '../types';
-import { Star, Download, MessageCircle, RefreshCw } from 'lucide-react';
+import { OrderInfo, Route, Product } from '../types';
+import { Star, Download, MessageCircle, RefreshCw, X } from 'lucide-react';
 import { supabase } from "../supabaseClient";
 import { generateInvoicePDF } from "../services/pdfService";
 import { openWhatsApp } from "../services/whatsappService";
+import ReviewModal from '../components/ReviewModal';
 
 interface OrdersPageProps {
   orders?: Record<string, OrderInfo>;
@@ -14,6 +15,8 @@ interface OrdersPageProps {
 export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, navigate, onNavigateToShop }) => {
   const [dbOrders, setDbOrders] = useState<OrderInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
+  const [reviewProductSelection, setReviewProductSelection] = useState<{ order: OrderInfo; products: Product[] } | null>(null);
 
   // 🔄 Supabase'den kullanıcının canlı siparişlerini çekme
   const fetchUserOrders = async () => {
@@ -57,16 +60,27 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
           status: o.status || 'pending',
           note: o.note,
           tracking_number: o.tracking_number,
-          items: (o.order_items || []).map((item: any) => ({
-            id: item.id,
-            quantity: item.quantity,
-            price: item.unit_price,
-            product: item.products || {
-              name: 'Çiçek Ürünü',
+          items: (o.order_items || []).map((item: any) => {
+            const joinedProduct = item.products;
+            const productId = joinedProduct?.id || item.product_id;
+            const productImages = joinedProduct?.images
+              ?? (joinedProduct?.image ? [joinedProduct.image] : []);
+
+            return {
+              id: item.id,
+              quantity: item.quantity,
               price: item.unit_price,
-              images: []
-            }
-          }))
+              product_id: productId,
+              product: productId
+                ? {
+                    id: productId,
+                    name: joinedProduct?.name || 'Çiçek Ürünü',
+                    price: joinedProduct?.price ?? item.unit_price,
+                    images: productImages,
+                  }
+                : null,
+            };
+          })
         }));
 
         setDbOrders(mappedOrders);
@@ -107,6 +121,36 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
       fetchUserOrders();
     } catch (err: any) {
       alert('İptal talebi oluşturulurken hata: ' + err.message);
+    }
+  };
+
+  // 🌸 Siparişin teslim edilmiş ürünlerinden yorum yap
+  const handleReviewOrder = (order: OrderInfo) => {
+    const deliveredProducts = order.items
+      .map((item: any) => {
+        const productId = item.product?.id || item.product_id;
+        if (!productId) return null;
+
+        const baseProduct = item.product || {};
+        return {
+          id: productId,
+          name: baseProduct.name || item.product_name || 'Çiçek Ürünü',
+          price: baseProduct.price ?? item.price ?? item.unit_price ?? 0,
+          images: baseProduct.images
+            ?? (baseProduct.image ? [baseProduct.image] : []),
+        } as Product;
+      })
+      .filter((product): product is Product => product !== null);
+
+    if (deliveredProducts.length === 0) {
+      alert('Bu siparişteki ürün bilgisi bulunamadı. Lütfen destek ile iletişime geçin.');
+      return;
+    }
+
+    if (deliveredProducts.length === 1) {
+      setReviewProduct(deliveredProducts[0]);
+    } else {
+      setReviewProductSelection({ order, products: deliveredProducts });
     }
   };
 
@@ -238,6 +282,17 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                       🚫 İptal Et
                     </button>
                   )}
+
+                  {/* 🌸 Yorum Yap Butonu (Teslim Edildiyse) */}
+                  {isDelivered && (
+                    <button
+                      onClick={() => handleReviewOrder(order)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
+                    >
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      Yorum Yap
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -292,19 +347,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                           </div>
                         </div>
 
-                        <div className="text-right flex flex-col items-end gap-2">
+                        <div className="text-right">
                           <p className="text-sm font-semibold text-gray-800">
                             ₺{(itemUnitPrice * item.quantity).toFixed(2)}
                           </p>
-                          {isDelivered && item.product?.slug && (
-                            <button
-                              onClick={() => navigate({ name: 'product', slug: item.product.slug })}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
-                            >
-                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                              Yorum Yap
-                            </button>
-                          )}
                         </div>
                       </div>
                     );
@@ -400,6 +446,55 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
           );
         })}
       </div>
+
+      {/* 🌸 Ürün Seçimi Modalı (Birden fazla ürün varsa) */}
+      {reviewProductSelection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-sand-200">
+              <h2 className="text-xl font-bold text-sand-900">Yorum Yapılacak Ürünü Seçin</h2>
+              <button
+                onClick={() => setReviewProductSelection(null)}
+                className="w-8 h-8 rounded-full bg-sand-100 hover:bg-sand-200 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4 text-sand-600" />
+              </button>
+            </div>
+            <div className="p-6">
+              {reviewProductSelection.products.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => {
+                    setReviewProduct(product);
+                    setReviewProductSelection(null);
+                  }}
+                  className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-sand-50 transition-colors text-left"
+                >
+                  {product.images?.[0] ? (
+                    <img src={product.images[0]} alt={product.name} className="w-12 h-12 object-cover rounded-xl" />
+                  ) : (
+                    <div className="w-12 h-12 bg-pink-50 rounded-xl flex items-center justify-center text-pink-400">🌸</div>
+                  )}
+                  <span className="font-medium text-sand-800">{product.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌸 Ürün Değerlendirme Modalı */}
+      {reviewProduct && (
+        <ReviewModal
+          product={reviewProduct}
+          isOpen={true}
+          onClose={() => setReviewProduct(null)}
+          onReviewSubmitted={() => {
+            // Yorum gönderildikten sonra siparişleri yenile
+            fetchUserOrders();
+          }}
+        />
+      )}
     </div>
   );
 };
