@@ -67,6 +67,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
               item.title ||
               'Çiçek Ürünü';
 
+            // 🌸 Ürün görselini products tablosundan çek
+            const productImage = item.products?.image || item.products?.image_url || item.image || item.image_url;
+            const productImages = productImage ? [productImage] : [];
+
             return {
               id: item.id || item.product_id,
               quantity: Number(item.quantity || 1),
@@ -76,7 +80,12 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
               product: item.products || {
                 name: productName,
                 price: effectivePrice,
-              }
+                images: productImages,
+                image: productImage,
+              },
+              // 🌸 Görsel bilgisini doğrudan item'e de ekle
+              images: productImages,
+              image: productImage,
             };
           });
           const phoneNum = o.recipient_phone || o.recipientPhone || o.phone || 'Belirtilmedi';

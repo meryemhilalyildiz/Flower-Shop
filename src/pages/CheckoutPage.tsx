@@ -383,13 +383,96 @@ const handleApplyCoupon = async () => {
         }
       }
   
-      // 6. Başarılı sayfasına yönlendir
+      // 🌸 6. Anında Stok Düşme İşlemi (Güvenli & Detaylı Loglu)
+      for (const item of items) {
+        const targetId = item.product?.id || (item as any).productId || (item as any).id;
+        const buyQuantity = item.quantity || 1;
+
+        console.log('🔍 Stok düşülecek ürün aranıyor. ID:', targetId, 'Adet:', buyQuantity);
+
+        if (targetId) {
+          const { data: prod, error: fetchErr } = await supabase
+            .from('products')
+            .select('stock')
+            .eq('id', targetId)
+            .single();
+
+          if (fetchErr) {
+            console.error('❌ Ürün bulunamadı veya çekilemedi:', fetchErr.message);
+            continue;
+          }
+
+          if (prod) {
+            const currentStock = Number(prod.stock || 0);
+            const newStock = Math.max(0, currentStock - buyQuantity);
+
+            const { error: updateErr } = await supabase
+              .from('products')
+              .update({ 
+                stock: newStock,
+                is_active: newStock > 0 
+              })
+              .eq('id', targetId);
+
+            if (updateErr) {
+              console.error('❌ Stok güncelleme hatası:', updateErr.message);
+            } else {
+              console.log(`✅ Stok başarıyla düşüldü! Ürün ID: ${targetId} | Eski Stok: ${currentStock} -> Yeni Stok: ${newStock}`);
+            }
+          }
+        }
+      }
+
+      // 🌸 Adresi kaydet (checkbox işaretliyse)
+      await handleSaveAddress();
+
+      // 7. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);
       alert('Sipariş verilirken bir hata oluştu.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // 🌸 Kayıtlı Adresi Veritabanına Kaydetme
+  const handleSaveAddress = async () => {
+    if (!saveForNextTime || !addressTitle.trim()) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('saved_addresses')
+        .insert({
+          user_id: user.id,
+          title: addressTitle.trim(),
+          recipient_name: form.recipientName,
+          recipient_phone: form.recipientPhone,
+          address: form.address,
+          district: form.city,
+        });
+
+      if (error) {
+        console.error('Adres kaydedilirken hata:', error);
+      } else {
+        // Kaydedilen adresi listeye ekle
+        const newAddress: SavedAddress = {
+          id: crypto.randomUUID(),
+          title: addressTitle.trim(),
+          recipient_name: form.recipientName,
+          recipient_phone: form.recipientPhone,
+          address: form.address,
+          district: form.city,
+        };
+        setSavedAddresses([...savedAddresses, newAddress]);
+        setAddressTitle('');
+        setSaveForNextTime(false);
+      }
+    } catch (err) {
+      console.error('Adres kaydetme hatası:', err);
     }
   };
 

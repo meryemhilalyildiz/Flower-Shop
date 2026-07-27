@@ -4,6 +4,7 @@ import type { Product, Route, Category } from '../types';
 import ProductCard from '../components/ProductCard';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { supabase } from '../supabaseClient';
+import { fetchProductReviewStats } from '../services/adminApi';
 
 type Props = {
   products?: Product[]; // Opsiyonel hale getirdik, DB'den de dolacak
@@ -48,8 +49,11 @@ export default function ShopPage({
 
       if (data) {
         // Supabase veri yapısını Product arayüzüne eksiksiz eşliyoruz
-        const mappedProducts: Product[] = data.map((p: any) => {
+        const mappedProducts: Product[] = await Promise.all(data.map(async (p: any) => {
           const imgUrl = p.image || p.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
+          
+          // ⭐ Gerçek yorum istatistiklerini çek
+          const reviewStats = await fetchProductReviewStats(p.id);
 
           return {
             id: p.id,
@@ -63,16 +67,16 @@ export default function ShopPage({
             images: [imgUrl],
             categoryId: p.category_id || p.category || 'all',
             category: p.category_id || p.category || 'all',
-            rating: Number(p.rating || 5.0),
-            reviewCount: Number(p.reviews_count || 0),
-            reviewsCount: Number(p.reviews_count || 0),
+            rating: reviewStats.averageRating,
+            reviewCount: reviewStats.totalReviews,
+            reviewsCount: reviewStats.totalReviews,
             stock: Number(p.stock ?? p.stock_quantity ?? 0),
             inStock: Number(p.stock ?? p.stock_quantity ?? 0) > 0,
             badge: p.is_best_seller ? 'Çok Satan' : (p.is_featured ? 'Öne Çıkan' : undefined),
             ingredients: [],
             deliveryInfo: 'Aynı gün teslimat'
           } as Product;
-        });
+        }));
 
         setDbProducts(mappedProducts);
       }
