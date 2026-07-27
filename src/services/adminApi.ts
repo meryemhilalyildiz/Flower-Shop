@@ -318,6 +318,52 @@ export async function fetchProductReviews(productId: string): Promise<Review[]> 
   return data ?? [];
 }
 
+export type FeaturedReview = Review & {
+  product_name?: string;
+};
+
+function shuffleReviews<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Ana sayfa için onaylı yorumlardan rastgele seçim
+export async function fetchRandomApprovedReviews(limit = 3): Promise<FeaturedReview[]> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*, products(name)')
+    .eq('is_approved', true)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    if (error.code === 'PGRST205') {
+      return [];
+    }
+    console.error('Öne çıkan yorumlar çekilirken hata:', error);
+    return [];
+  }
+
+  const reviews: FeaturedReview[] = (data ?? []).map((row: any) => ({
+    id: row.id,
+    product_id: row.product_id,
+    user_id: row.user_id,
+    user_name: row.user_name,
+    rating: row.rating,
+    comment: row.comment,
+    photo_url: row.photo_url,
+    is_approved: row.is_approved,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    product_name: row.products?.name,
+  }));
+
+  return shuffleReviews(reviews).slice(0, limit);
+}
+
 export type ProductReviewSummary = {
   rating: number;
   reviewCount: number;
