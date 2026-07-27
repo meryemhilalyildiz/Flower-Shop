@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { ArrowRight, Truck, Clock, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import type { Product, Route, Category } from '../types';
 import { routeToHash } from '../router';
 import ProductCard from '../components/ProductCard';
+import { fetchRandomApprovedReviews, type FeaturedReview } from '../services/adminApi';
 
 type Props = {
   categories: Category[];
@@ -21,6 +23,28 @@ const features = [
 ];
 
 export default function HomePage({ categories, featured, discounted, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
+  const [testimonials, setTestimonials] = useState<FeaturedReview[]>([]);
+  const [testimonialsLoading, setTestimonialsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchRandomApprovedReviews(3)
+      .then((reviews) => {
+        if (!cancelled) setTestimonials(reviews);
+      })
+      .catch(() => {
+        if (!cancelled) setTestimonials([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTestimonialsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="animate-fade-in">
       {/* Hero */}
@@ -245,38 +269,65 @@ export default function HomePage({ categories, featured, discounted, navigate, o
       </section>
 
       {/* Testimonials */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="text-center mb-10">
-          <h2 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">Müşterilerimiz Ne Diyor?</h2>
-          <p className="text-sand-500 mt-2">Binlerce mutlu müşteri</p>
-        </div>
+      {(testimonialsLoading || testimonials.length > 0) && (
+        <section className="max-w-7xl mx-auto px-4 py-12">
+          <div className="text-center mb-10">
+            <h2 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">Müşterilerimiz Ne Diyor?</h2>
+            <p className="text-sand-500 mt-2">Gerçek müşteri yorumları</p>
+          </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {[
-            { name: 'Ayşe K.', text: 'Çiçekler çok taze ve güzel paketlenmişti. Aynı gün teslimat gerçekten çalışıyor!', role: 'İstanbul' },
-            { name: 'Mehmet T.', text: 'Anneler Günü için sipariş verdim, çok memnun kaldık. Buket resimdeki gibi geldi.', role: 'Ankara' },
-            { name: 'Zeynep A.', text: 'Müşteri hizmetleri çok ilgili. Çiçekler 5 günden uzun süre taze kaldı.', role: 'İzmir' },
-          ].map((t, i) => (
-            <div key={i} className="card p-6">
-              <div className="flex items-center gap-1 mb-3">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Star key={s} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-              <p className="text-sand-700 leading-relaxed">"{t.text}"</p>
-              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-sand-100">
-                <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold">
-                  {t.name[0]}
+          {testimonialsLoading ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="card p-6 animate-pulse">
+                  <div className="h-4 bg-sand-100 rounded w-24 mb-3" />
+                  <div className="space-y-2">
+                    <div className="h-3 bg-sand-100 rounded" />
+                    <div className="h-3 bg-sand-100 rounded w-5/6" />
+                    <div className="h-3 bg-sand-100 rounded w-4/6" />
+                  </div>
+                  <div className="flex items-center gap-3 mt-4 pt-4 border-t border-sand-100">
+                    <div className="w-10 h-10 rounded-full bg-sand-100" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-3 bg-sand-100 rounded w-24" />
+                      <div className="h-2 bg-sand-100 rounded w-16" />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-sand-800 text-sm">{t.name}</p>
-                  <p className="text-xs text-sand-500">{t.role}</p>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-6">
+              {testimonials.map((review) => (
+                <div key={review.id} className="card p-6">
+                  <div className="flex items-center gap-1 mb-3">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`w-4 h-4 ${
+                          s <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-sand-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sand-700 leading-relaxed">"{review.comment}"</p>
+                  <div className="flex items-center gap-3 mt-4 pt-4 border-t border-sand-100">
+                    <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold">
+                      {review.user_name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sand-800 text-sm">{review.user_name}</p>
+                      <p className="text-xs text-sand-500">
+                        {review.product_name || 'Ürün değerlendirmesi'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { OrderInfo, Route } from '../types';
-import { Star, Download, MessageCircle, RefreshCw } from 'lucide-react';
+import { OrderInfo, Route, Product } from '../types';
+import { Star, Download, MessageCircle, RefreshCw, X } from 'lucide-react';
 import { supabase } from "../supabaseClient";
 import { generateInvoicePDF } from "../services/pdfService";
 import { openWhatsApp } from "../services/whatsappService";
+import ReviewModal from '../components/ReviewModal';
 
 interface OrdersPageProps {
   orders?: Record<string, OrderInfo>;
@@ -14,107 +15,109 @@ interface OrdersPageProps {
 export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, navigate, onNavigateToShop }) => {
   const [dbOrders, setDbOrders] = useState<OrderInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
+  const [reviewProductSelection, setReviewProductSelection] = useState<{ order: OrderInfo; products: Product[] } | null>(null);
 
   // 🔄 Supabase'den kullanıcının canlı siparişlerini çekme
- // 🔄 Supabase'den kullanıcının canlı siparişlerini çekme
- const fetchUserOrders = async () => {
-  setLoading(true);
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
+  const fetchUserOrders = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      // 🌸 Hem order_items hem de doğrudan sipariş verisini detaylı çekiyoruz
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            *,
+            products (*)
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      console.log('🔍 SİPARİŞLER VE İÇİNDEKİ İTEMLAR:', data);
+
+      if (data) {
+        const mappedOrders: OrderInfo[] = data.map((o: any) => {
+          // 🌸 Ürün listesini her olası alandan topla
+          const rawItems = o.order_items || o.items || o.products || [];
+
+          const mappedItems = rawItems.map((item: any) => {
+            const effectivePrice = Number(
+              item.unit_price ??
+              item.price ??
+              item.products?.price ??
+              item.product_price ??
+              0
+            );
+
+            const productName =
+              item.product_name ||
+              item.products?.name ||
+              item.name ||
+              item.title ||
+              'Çiçek Ürünü';
+
+            return {
+              id: item.id || item.product_id,
+              quantity: Number(item.quantity || 1),
+              price: effectivePrice,
+              unit_price: effectivePrice,
+              product_name: productName,
+              product: item.products || {
+                name: productName,
+                price: effectivePrice,
+              }
+            };
+          });
+          const phoneNum = o.recipient_phone || o.recipientPhone || o.phone || 'Belirtilmedi';
+
+          return {
+            id: String(o.id),
+            createdAt: o.created_at,
+            recipientName: o.recipient_name || o.recipientName || 'Belirtilmedi',
+            recipientPhone: phoneNum,
+            recipient_phone: phoneNum,
+            city: o.city || o.province || 'Belirtilmedi',
+            shipping_address: o.shipping_address || o.address || 'Belirtilmedi',
+            address: o.shipping_address || o.address || 'Belirtilmedi',
+            total: Number(o.total_amount || o.total || 0),
+            subtotal: Number(o.subtotal || 0),
+            deliveryFee: Number(o.delivery_fee || o.deliveryFee || 0),
+            discountAmount: Number(o.discount_amount || o.discountAmount || 0),
+            status: o.status || 'pending',
+            note: o.note,
+            tracking_number: o.tracking_number,
+            // 🌸 DİKKAT: Ürünleri hem items hem order_items içerisine atıyoruz ki fatura servisi kesin bulsun!
+            items: mappedItems,
+            order_items: mappedItems
+          };
+        });
+        setDbOrders(mappedOrders);
+      }
+    } catch (err) {
+      console.error('Siparişler çekilirken hata:', err);
+    } finally {
       setLoading(false);
-      return;
     }
-// 🌸 Hem order_items hem de doğrudan sipariş verisini detaylı çekiyoruz
-const { data, error } = await supabase
-.from('orders')
-.select(`
-  *,
-  order_items (
-    *,
-    products (*)
-  )
-`)
-.eq('user_id', user.id)
-.order('created_at', { ascending: false });
-
-if (error) throw error;
-
-console.log('🔍 SİPARİŞLER VE İÇİNDEKİ İTEMLAR:', data);
-
-if (data) {
-  const mappedOrders: OrderInfo[] = data.map((o: any) => {
-    // 🌸 Ürün listesini her olası alandan topla
-    const rawItems = o.order_items || o.items || o.products || [];
-
-    const mappedItems = rawItems.map((item: any) => {
-      const effectivePrice = Number(
-        item.unit_price ?? 
-        item.price ?? 
-        item.products?.price ?? 
-        item.product_price ?? 
-        0
-      );
-
-      const productName = 
-      item.product_name || 
-      item.products?.name || 
-      item.name || 
-      item.title || 
-      'Çiçek Ürünü';
-
-      return {
-        id: item.id || item.product_id,
-        quantity: Number(item.quantity || 1),
-        price: effectivePrice,
-        unit_price: effectivePrice,
-        product_name: productName,
-        product: item.products || {
-          name: productName,
-          price: effectivePrice,
-        }
-      };
-    });
-    const phoneNum = o.recipient_phone || o.recipientPhone || o.phone || 'Belirtilmedi';
-
-    return {
-      id: String(o.id),
-      createdAt: o.created_at,
-      recipientName: o.recipient_name || o.recipientName || 'Belirtilmedi',
-      recipientPhone: phoneNum,
-      recipient_phone: phoneNum,
-      city: o.city || o.province || 'Belirtilmedi',
-      shipping_address: o.shipping_address || o.address || 'Belirtilmedi',
-      address: o.shipping_address || o.address || 'Belirtilmedi',
-      total: Number(o.total_amount || o.total || 0),
-      subtotal: Number(o.subtotal || 0),
-      deliveryFee: Number(o.delivery_fee || o.deliveryFee || 0),
-      discountAmount: Number(o.discount_amount || o.discountAmount || 0),
-      status: o.status || 'pending',
-      note: o.note,
-      tracking_number: o.tracking_number,
-      // 🌸 DİKKAT: Ürünleri hem items hem order_items içerisine atıyoruz ki fatura servisi kesin bulsun!
-      items: mappedItems,
-      order_items: mappedItems
-    };
-  });
-  setDbOrders(mappedOrders);
-}
-} catch (err) {
-console.error('Siparişler çekilirken hata:', err);
-} finally {
-setLoading(false);
-}
-};
+  };
 
   useEffect(() => {
     fetchUserOrders();
   }, []);
 
   // Prop'tan gelen veya DB'den çekilen siparişleri harmanla
-  const orderList = dbOrders.length > 0 
-    ? dbOrders 
+  const orderList = dbOrders.length > 0
+    ? dbOrders
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // 🌸 Sipariş İptal Talebi Fonksiyonu
@@ -137,6 +140,36 @@ setLoading(false);
       fetchUserOrders();
     } catch (err: any) {
       alert('İptal talebi oluşturulurken hata: ' + err.message);
+    }
+  };
+
+  // 🌸 Siparişin teslim edilmiş ürünlerinden yorum yap
+  const handleReviewOrder = (order: OrderInfo) => {
+    const deliveredProducts = order.items
+      .map((item: any) => {
+        const productId = item.product?.id || item.product_id;
+        if (!productId) return null;
+
+        const baseProduct = item.product || {};
+        return {
+          id: productId,
+          name: baseProduct.name || item.product_name || 'Çiçek Ürünü',
+          price: baseProduct.price ?? item.price ?? item.unit_price ?? 0,
+          images: baseProduct.images
+            ?? (baseProduct.image ? [baseProduct.image] : []),
+        } as Product;
+      })
+      .filter((product): product is Product => product !== null);
+
+    if (deliveredProducts.length === 0) {
+      alert('Bu siparişteki ürün bilgisi bulunamadı. Lütfen destek ile iletişime geçin.');
+      return;
+    }
+
+    if (deliveredProducts.length === 1) {
+      setReviewProduct(deliveredProducts[0]);
+    } else {
+      setReviewProductSelection({ order, products: deliveredProducts });
     }
   };
 
@@ -187,8 +220,8 @@ setLoading(false);
 
           // Sipariş Hesaplama Değerleri
           const currentSubtotal = Number(order?.subtotal || 0);
-          const calculatedSubtotal = currentSubtotal > 0 
-            ? currentSubtotal 
+          const calculatedSubtotal = currentSubtotal > 0
+            ? currentSubtotal
             : (order.items || []).reduce((sum: number, item: any) => {
                 const price = Number(item.price || item.unit_price || item.product?.price || 0);
                 const qty = Number(item.quantity || 1);
@@ -215,11 +248,11 @@ setLoading(false);
                 </div>
 
                 <div>
-  <p className="text-xs text-gray-500 font-medium">ALICI & ŞEHİR / İLÇE</p>
-  <p className="text-sm font-semibold text-gray-700">
-    {order.recipientName} ({order.city})
-  </p>
-</div>
+                  <p className="text-xs text-gray-500 font-medium">ALICI & ŞEHİR / İLÇE</p>
+                  <p className="text-sm font-semibold text-gray-700">
+                    {order.recipientName} ({order.city})
+                  </p>
+                </div>
 
                 <div>
                   <p className="text-xs text-gray-500 font-medium">TOPLAM TUTAR</p>
@@ -239,7 +272,7 @@ setLoading(false);
                     {order.status || 'Hazırlanıyor'}
                   </span>
 
-                  {/* 💬 WhatsApp Destek Butonu */}
+                  {/* 💬 WhatsApp Destek Buttonu */}
                   <button
                     onClick={() => openWhatsApp(order)}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-emerald-200"
@@ -251,11 +284,19 @@ setLoading(false);
 
                   {/* 📄 Fatura İndir Butonu */}
                   <button
-                    onClick={() => generateInvoicePDF(order)}
-                    className="flex items-center gap-1 px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-full text-xs font-semibold transition-all cursor-pointer border border-pink-200"
-                    title="Fatura İndir"
+                    onClick={() => {
+                      // Faturaya gönderilmeden önce items dizisinin dolu olduğundan emin olunur
+                      const invoiceData = {
+                        ...order,
+                        items: (order.items && order.items.length > 0)
+                          ? order.items
+                          : ((order as any).order_items || [])
+                      };
+                      generateInvoicePDF(invoiceData);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors cursor-pointer"
                   >
-                    <Download className="w-3 h-3" />
+                    <Download className="w-3.5 h-3.5" />
                     Fatura
                   </button>
 
@@ -266,6 +307,17 @@ setLoading(false);
                       className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-full text-xs font-semibold transition-colors cursor-pointer border border-red-200"
                     >
                       🚫 İptal Et
+                    </button>
+                  )}
+
+                  {/* 🌸 Yorum Yap Butonu (Teslim Edildiyse) */}
+                  {isDelivered && (
+                    <button
+                      onClick={() => handleReviewOrder(order)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
+                    >
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      Yorum Yap
                     </button>
                   )}
                 </div>
@@ -322,144 +374,163 @@ setLoading(false);
                           </div>
                         </div>
 
-                        <div className="text-right flex flex-col items-end gap-2">
+                        <div className="text-right">
                           <p className="text-sm font-semibold text-gray-800">
                             ₺{(itemUnitPrice * item.quantity).toFixed(2)}
                           </p>
-                          {isDelivered && item.product?.slug && (
-                            <button
-                              onClick={() => navigate({ name: 'product', slug: item.product.slug })}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
-                            >
-                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                              Yorum Yap
-                            </button>
-                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
 
+                {/* 🧾 Sipariş Tutar Detayları */}
+                <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
+                  {(() => {
+                    // 🌸 1. Değişkenleri Çekme
+                    const tot = Number(order.total ?? (order as any).total_amount ?? 0);
+                    const recordedDiscount = Number(order.discountAmount ?? (order as any).discount_amount ?? 0);
+                    let fee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
 
-{/* 🧾 Sipariş Tutar Detayları */}
-<div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
-  {(() => {
-    // 🌸 1. Değişkenleri Çekme
-    const tot = Number(order.total ?? (order as any).total_amount ?? 0);
-    const recordedDiscount = Number(order.discountAmount ?? (order as any).discount_amount ?? 0);
-    let fee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
+                    // 🌸 2. Kargo DB'de 0 ise akıllı kargo varsayımı (300 TL)
+                    if (fee === 0 && tot > 0) {
+                      fee = 300; // Varsayılan kargo ücreti
+                    }
 
-    // 🌸 2. Kargo DB'de 0 ise akıllı kargo varsayımı (300 TL)
-    if (fee === 0 && tot > 0) {
-      fee = 300; // Varsayılan kargo ücreti
-    }
+                    // 🌸 3. Gerçek Net Ürün Tutarı (Subtotal)
+                    let rawSubtotal = Number(order.subtotal || 0);
+                    if (rawSubtotal <= 0 || rawSubtotal >= tot) {
+                      rawSubtotal = tot - fee + recordedDiscount;
+                    }
 
-    // 🌸 3. Gerçek Net Ürün Tutarı (Subtotal)
-    let rawSubtotal = Number(order.subtotal || 0);
-    if (rawSubtotal <= 0 || rawSubtotal >= tot) {
-      rawSubtotal = tot - fee + recordedDiscount;
-    }
+                    // 🌸 4. Gerçek İndirim Yüzdesi (%10)
+                    const discountRate = rawSubtotal > 0 && recordedDiscount > 0
+                      ? Math.round((recordedDiscount / rawSubtotal) * 100)
+                      : 0;
 
-    // 🌸 4. Gerçek İndirim Yüzdesi (%10)
-    const discountRate = rawSubtotal > 0 && recordedDiscount > 0 
-      ? Math.round((recordedDiscount / rawSubtotal) * 100) 
-      : 0;
+                    return (
+                      <div className="space-y-1.5 text-sm">
+                        {/* Ürünler Toplamı (290 TL) */}
+                        <div className="flex justify-between text-gray-600">
+                          <span>Ürünler Toplamı:</span>
+                          <span className="font-semibold text-gray-800">₺{rawSubtotal.toFixed(2)}</span>
+                        </div>
 
-    return (
-      <div className="space-y-1.5 text-sm">
-        {/* Ürünler Toplamı (290 TL) */}
-        <div className="flex justify-between text-gray-600">
-          <span>Ürünler Toplamı:</span>
-          <span className="font-semibold text-gray-800">₺{rawSubtotal.toFixed(2)}</span>
-        </div>
+                        {/* 🎟️ Kupon İndirimi (%10 -> -29 TL) */}
+                        {recordedDiscount > 0 && (
+                          <div className="flex justify-between text-emerald-600 font-semibold">
+                            <span>🎟️ Kupon İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</span>
+                            <span>-₺{recordedDiscount.toFixed(2)}</span>
+                          </div>
+                        )}
 
-        {/* 🎟️ Kupon İndirimi (%10 -> -29 TL) */}
-        {recordedDiscount > 0 && (
-          <div className="flex justify-between text-emerald-600 font-semibold">
-            <span>🎟️ Kupon İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</span>
-            <span>-₺{recordedDiscount.toFixed(2)}</span>
-          </div>
-        )}
+                        {/* 🚚 Kargo / Teslimat Ücreti (300 TL) */}
+                        <div className="flex justify-between text-gray-600">
+                          <span>🚚 Kargo / Teslimat Ücreti:</span>
+                          <span className="font-semibold text-gray-800">₺{fee.toFixed(2)}</span>
+                        </div>
 
-        {/* 🚚 Kargo / Teslimat Ücreti (300 TL) */}
-        <div className="flex justify-between text-gray-600">
-          <span>🚚 Kargo / Teslimat Ücreti:</span>
-          <span className="font-semibold text-gray-800">₺{fee.toFixed(2)}</span>
-        </div>
+                        {/* Genel Toplam (561 TL) */}
+                        <div className="flex justify-between pt-2 border-t border-gray-200 text-base font-bold text-pink-600">
+                          <span>Genel Toplam:</span>
+                          <span>₺{tot.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
 
-        {/* Genel Toplam (561 TL) */}
-        <div className="flex justify-between pt-2 border-t border-gray-200 text-base font-bold text-pink-600">
-          <span>Genel Toplam:</span>
-          <span>₺{tot.toFixed(2)}</span>
-        </div>
-      </div>
-    );
-  })()}
-</div>
+                {/* Adres, Not ve Kargo Takip Bilgisi */}
+                <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-gray-600 bg-gray-50/80 p-3.5 rounded-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+                    <div>
+                      <span className="font-semibold text-gray-700">📍 Teslimat Adresi:</span>{' '}
+                      {order.shipping_address || order.address || 'Belirtilmemiş'}
+                    </div>
+                    {order.note && (
+                      <div>
+                        <span className="font-semibold text-gray-700">📝 Sipariş Notu:</span>{' '}
+                        {order.note}
+                      </div>
+                    )}
+                  </div>
 
-{/* Adres, Not ve Kargo Takip Bilgisi */}
-<div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-gray-600 bg-gray-50/80 p-3.5 rounded-xl">
-  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-    <div>
-      <span className="font-semibold text-gray-700">📍 Teslimat Adresi:</span>{' '}
-      {order.shipping_address || order.address || 'Belirtilmemiş'}
-    </div>
-    {order.note && (
-      <div>
-        <span className="font-semibold text-gray-700">📝 Sipariş Notu:</span>{' '}
-        {order.note}
-      </div>
-    )}
-  </div>
-
-  {/* 🚚 KARGO TAKİP NUMARASI */}
-  {order.tracking_number && (
-    <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
-      <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
-      <span className="font-mono font-bold text-xs text-blue-800">
-        {order.tracking_number}
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          if (order.tracking_number) {
-            navigator.clipboard.writeText(order.tracking_number);
-            alert('Kargo takip numarası kopyalandı! 📋');
-          }
-        }}
-        className="ml-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
-      >
-        Kopyala
-      </button>
-    </div>
-  )}
-  {/* 🌸 GÜNCELLENMİŞ FATURA BUTONU */}
-<button
-  type="button"
-  onClick={() => {
-    // Faturaya gönderilmeden önce items dizisinin dolu olduğundan emin olunur
-    const invoiceData = {
-      ...order,
-      items: (order.items && order.items.length > 0) 
-        ? order.items 
-        : ((order as any).order_items || [])
-    };
-    generateInvoicePDF(invoiceData);
-  }}
-  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors cursor-pointer"
->
-  <Download className="w-3.5 h-3.5" />
-  Fatura
-</button>
-</div>
-
-                
+                  {/* 🚚 KARGO TAKİP NUMARASI */}
+                  {order.tracking_number && (
+                    <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
+                      <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
+                      <span className="font-mono font-bold text-xs text-blue-800">
+                        {order.tracking_number}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (order.tracking_number) {
+                            navigator.clipboard.writeText(order.tracking_number);
+                            alert('Kargo takip numarası kopyalandı! 📋');
+                          }
+                        }}
+                        className="ml-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
+                      >
+                        Kopyala
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* 🌸 Ürün Seçimi Modalı (Birden fazla ürün varsa) */}
+      {reviewProductSelection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-sand-200">
+              <h2 className="text-xl font-bold text-sand-900">Yorum Yapılacak Ürünü Seçin</h2>
+              <button
+                onClick={() => setReviewProductSelection(null)}
+                className="w-8 h-8 rounded-full bg-sand-100 hover:bg-sand-200 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4 text-sand-600" />
+              </button>
+            </div>
+            <div className="p-6">
+              {reviewProductSelection.products.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => {
+                    setReviewProduct(product);
+                    setReviewProductSelection(null);
+                  }}
+                  className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-sand-50 transition-colors text-left"
+                >
+                  {product.images?.[0] ? (
+                    <img src={product.images[0]} alt={product.name} className="w-12 h-12 object-cover rounded-xl" />
+                  ) : (
+                    <div className="w-12 h-12 bg-pink-50 rounded-xl flex items-center justify-center text-pink-400">🌸</div>
+                  )}
+                  <span className="font-medium text-sand-800">{product.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌸 Ürün Değerlendirme Modalı */}
+      {reviewProduct && (
+        <ReviewModal
+          product={reviewProduct}
+          isOpen={true}
+          onClose={() => setReviewProduct(null)}
+          onReviewSubmitted={() => {
+            // Yorum gönderildikten sonra siparişleri yenile
+            fetchUserOrders();
+          }}
+        />
+      )}
     </div>
   );
 };

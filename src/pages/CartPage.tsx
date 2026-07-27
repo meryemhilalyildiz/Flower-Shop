@@ -13,6 +13,10 @@ type Props = {
   navigate: (r: Route) => void;
   onUpdateQuantity: (productId: string, qty: number) => void;
   onRemove: (productId: string) => void;
+  appliedCoupon: any;
+  discountAmount: number;
+  onApplyCoupon: (coupon: any, discount: number) => void;
+  onRemoveCoupon: () => void;
 };
 
 // 🎟️ SUPABASE KUPON SORGULAMA VE DOĞRULAMA FONKSİYONU
@@ -70,10 +74,8 @@ export async function applyCouponCode(code: string, cartTotal: number) {
   };
 }
 
-export default function CartPage({ items, subtotal, deliveryFee, total, timeRemaining, navigate, onUpdateQuantity, onRemove }: Props) {
+export default function CartPage({ items, subtotal, deliveryFee, total, timeRemaining, navigate, onUpdateQuantity, onRemove, appliedCoupon, discountAmount, onApplyCoupon, onRemoveCoupon }: Props) {
   const [couponCodeInput, setCouponCodeInput] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [couponMessage, setCouponMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [loadingCoupon, setLoadingCoupon] = useState(false);
 
@@ -100,12 +102,10 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
     const result = await applyCouponCode(couponCodeInput, subtotal);
 
     if (result.success) {
-      setAppliedCoupon(result.coupon);
-      setDiscountAmount(result.discountAmount || 0); // 🎯 İşte eklenecek düzeltme burası!
+      onApplyCoupon(result.coupon, result.discountAmount || 0);
       setCouponMessage({ text: result.message, isError: false });
     } else {
-      setAppliedCoupon(null);
-      setDiscountAmount(0);
+      onRemoveCoupon();
       setCouponMessage({ text: result.message, isError: true });
     }
     setLoadingCoupon(false);
@@ -113,8 +113,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
 
   // KUPONU KALDIR
   const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    setDiscountAmount(0);
+    onRemoveCoupon();
     setCouponCodeInput('');
     setCouponMessage(null);
   };
@@ -155,7 +154,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
             }`}>
               <Clock className={`w-5 h-5 flex-shrink-0 ${isTimeRunningLow ? 'text-red-600' : 'text-amber-600'}`} />
               <p className={`text-sm font-semibold ${isTimeRunningLow ? 'text-red-700' : 'text-amber-700'}`}>
-                Sipariş verme süresi: <span className="font-bold">{formatTimeRemaining(timeRemaining)}</span> | Sepete eklediğiniz ürünler 5 dakika sonra silinecek
+                Sipariş verme süresi: <span className="font-bold">{formatTimeRemaining(timeRemaining)}</span> | Sepete eklediğiniz ürünler 15 dakika sonra silinecek
               </p>
             </div>
           )}

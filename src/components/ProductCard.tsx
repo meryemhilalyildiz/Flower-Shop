@@ -1,4 +1,4 @@
-import { Star, Plus, Heart } from 'lucide-react';
+import { Plus, Heart } from 'lucide-react';
 import type { Product } from '../types';
 import { routeToHash } from '../router';
 
@@ -89,18 +89,6 @@ const isOutOfStock = product.stock !== undefined && product.stock !== null
           </h3>
           <p className="text-sm text-sand-500 mt-1 line-clamp-1">{product.description}</p>
         </a>
-
-        <div className="flex items-center gap-1 mt-2">
-          {product.reviewCount > 0 ? (
-            <>
-              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-              <span className="text-sm font-medium text-sand-700">{product.rating}</span>
-              <span className="text-xs text-sand-400">({product.reviewCount})</span>
-            </>
-          ) : (
-            <span className="text-xs text-sand-400">Henüz yorum yok</span>
-          )}
-        </div>
 
         <div className="flex items-end justify-between mt-3">
           <div className="flex flex-col">
