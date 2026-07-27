@@ -2,50 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
 import type { CartItem, Product } from './types';
 
-const RESERVATION_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+const RESERVATION_DURATION = 999999 * 60 * 1000; // Rezervasyon sistemini devre dışı bırak
 
-// Function to return products to stock when reservation expires
+// Function to return products to stock when reservation expired - DEVRE DIŞI
 async function returnProductsToStock(items: CartItem[]) {
-  for (const item of items) {
-    const targetId = item.product?.id || (item as any).productId || (item as any).id;
-    const buyQuantity = item.quantity || 1;
-
-    if (targetId) {
-      try {
-        // Get current stock
-        const { data: prod, error: fetchErr } = await supabase
-          .from('products')
-          .select('stock')
-          .eq('id', targetId)
-          .single();
-
-        if (fetchErr || !prod) {
-          console.error('❌ Ürün bulunamadı veya çekilemedi:', fetchErr?.message);
-          continue;
-        }
-
-        const currentStock = Number(prod.stock || 0);
-        const newStock = currentStock + buyQuantity;
-
-        // Update stock
-        const { error: updateErr } = await supabase
-          .from('products')
-          .update({ 
-            stock: newStock,
-            is_active: newStock > 0 
-          })
-          .eq('id', targetId);
-
-        if (updateErr) {
-          console.error('❌ Stok güncelleme hatası:', updateErr.message);
-        } else {
-          console.log(`✅ Stok başarıyla geri yüklendi! Ürün ID: ${targetId} | Eski Stok: ${currentStock} -> Yeni Stok: ${newStock}`);
-        }
-      } catch (err) {
-        console.error('❌ Stok geri yükleme hatası:', err);
-      }
-    }
-  }
+  return;
 }
 
 export function useCart() {

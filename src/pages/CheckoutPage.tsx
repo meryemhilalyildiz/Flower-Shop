@@ -383,47 +383,7 @@ const handleApplyCoupon = async () => {
         }
       }
   
-      // 🌸 6. Anında Stok Düşme İşlemi (Güvenli & Detaylı Loglu)
-      for (const item of items) {
-        const targetId = item.product?.id || (item as any).productId || (item as any).id;
-        const buyQuantity = item.quantity || 1;
-
-        console.log('🔍 Stok düşülecek ürün aranıyor. ID:', targetId, 'Adet:', buyQuantity);
-
-        if (targetId) {
-          const { data: prod, error: fetchErr } = await supabase
-            .from('products')
-            .select('stock')
-            .eq('id', targetId)
-            .single();
-
-          if (fetchErr) {
-            console.error('❌ Ürün bulunamadı veya çekilemedi:', fetchErr.message);
-            continue;
-          }
-
-          if (prod) {
-            const currentStock = Number(prod.stock || 0);
-            const newStock = Math.max(0, currentStock - buyQuantity);
-
-            const { error: updateErr } = await supabase
-              .from('products')
-              .update({ 
-                stock: newStock,
-                is_active: newStock > 0 
-              })
-              .eq('id', targetId);
-
-            if (updateErr) {
-              console.error('❌ Stok güncelleme hatası:', updateErr.message);
-            } else {
-              console.log(`✅ Stok başarıyla düşüldü! Ürün ID: ${targetId} | Eski Stok: ${currentStock} -> Yeni Stok: ${newStock}`);
-            }
-          }
-        }
-      }
-
-      // 7. Başarılı sayfasına yönlendir
+      // 6. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);

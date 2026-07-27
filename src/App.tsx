@@ -144,34 +144,31 @@ function App() {
           console.error('ORDER_ITEMS HATASI:', itemsError);
         }
   
-        // 🌸 4. STOK DÜŞÜRME İŞLEMİ (Eksiksiz & Temiz Blok) 🌸
+        // 🌸 4. STOK DÜŞÜRME İŞLEMİ (Sadece ID ile) 🌸
         for (const item of orderData.items) {
           try {
-            const productName = item.product.name;
             const productId = String(item.product.id);
             const buyQty = item.quantity || 1;
-  
-            // A) İsmi 'aa' olan veya ID'si eşleşen ürünü veritabanından çekiyoruz
+
+            // A) ID ile ürünü veritabanından çekiyoruz
             const { data: dbProduct } = await supabase
               .from('products')
               .select('id, stock')
-              .or(`id.eq.${productId},name.eq.${productName}`)
-              .maybeSingle();
-  
+              .eq('id', productId)
+              .single();
+
             if (dbProduct) {
               const currentStock = Number(dbProduct.stock || 0);
               const newStock = Math.max(0, currentStock - buyQty);
-  
+
               // B) Stoğu güncelliyoruz
               const { error: updateErr } = await supabase
                 .from('products')
                 .update({ stock: newStock })
                 .eq('id', dbProduct.id);
-  
+
               if (updateErr) {
-                console.error('❌ Stok Güncelleme Hatası:', updateErr.message);
-              } else {
-                console.log(`✅ STOK BAŞARIYLA DÜŞÜLDÜ: ${dbProduct.id} -> Yeni Stok: ${newStock}`);
+                console.error('❌ Stok güncelleme hatası:', updateErr.message);
               }
             }
           } catch (err) {
