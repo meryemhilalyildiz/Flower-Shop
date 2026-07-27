@@ -132,7 +132,6 @@ function App() {
         const itemsToInsert = orderData.items.map((item) => ({
           order_id: orderId,
           product_id: String(item.product.id),
-          product_name: item.product.name,
           quantity: item.quantity,
           unit_price: item.product.price || 0,
         }));

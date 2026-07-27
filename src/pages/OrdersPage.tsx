@@ -75,6 +75,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 ? {
                     id: productId,
                     name: joinedProduct?.name || 'Çiçek Ürünü',
+                    slug: joinedProduct?.slug || productId, // Slug yoksa ID kullan
                     price: joinedProduct?.price ?? item.unit_price,
                     images: productImages,
                   }
@@ -317,7 +318,16 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                     const itemUnitPrice = item.product?.price || item.unit_price || item.price || 0;
 
                     return (
-                      <div key={index} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                      <button
+                        key={index}
+                        onClick={() => {
+                          const slug = item.product?.slug || item.product_id;
+                          if (slug) {
+                            navigate({ name: 'product', slug: slug });
+                          }
+                        }}
+                        className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 w-full text-left hover:bg-pink-50/50 rounded-lg px-2 -mx-2 transition-colors cursor-pointer"
+                      >
                         <div className="flex items-center gap-4">
                           {imageUrl ? (
                             <img
@@ -331,7 +341,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                             </div>
                           )}
                           <div>
-                            <h4 className="font-semibold text-gray-800 text-sm">
+                            <h4 className="font-semibold text-gray-800 text-sm group-hover:text-pink-700 transition-colors">
                               {baseName}
                             </h4>
                             {variantSubtext ? (
@@ -351,8 +361,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                           <p className="text-sm font-semibold text-gray-800">
                             ₺{(itemUnitPrice * item.quantity).toFixed(2)}
                           </p>
+                          <p className="text-xs text-pink-600 mt-1">Ürünü Gör →</p>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
