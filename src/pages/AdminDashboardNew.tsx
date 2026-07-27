@@ -187,8 +187,8 @@ export default function AdminDashboardNew({ navigate }: Props) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-sand-900 truncate">{p.name}</p>
                         <p className="text-xs text-sand-500">
-                          Stok: {p.stock}
-                        </p>
+  Stok: {p.stock ?? p.stock_quantity ?? 0}
+</p>
                       </div>
                       <span className="text-sm font-semibold text-brand-700">
                         ₺{Number(p.price).toLocaleString('tr-TR')}

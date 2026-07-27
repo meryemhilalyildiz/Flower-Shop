@@ -23,8 +23,8 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     paymentMethodText = paymentMethodRaw;
   }
 
-  // 2. Kupon ve İndirim
-  const couponCode = (order as any).couponCode || (order as any).coupon_code || null;
+  // 2. Kupon ve İndirim Tutarı
+  const couponCode = (order as any).applied_coupon_code || (order as any).couponCode || (order as any).coupon_code || null;
   const discountAmount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
 
   // 3. Ara Toplam (Sepetteki ürünlerin toplam fiyatı)
@@ -34,16 +34,21 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     return sum + (price * qty);
   }, 0);
   
-  // 4. Kargo Ücreti
+  // 4. Kargo Ücreti Akıllı Hesaplama
   let deliveryFee = Number(order.deliveryFee || order.delivery_fee || 0);
-  if (deliveryFee === 0 && order.total > subtotal) {
-    deliveryFee = order.total - subtotal;
+  if (deliveryFee === 0 && (order.total + discountAmount) > subtotal) {
+    deliveryFee = (order.total + discountAmount) - subtotal;
   }
 
-  // 5. Ürün Satırları (Olası Tüm İsim Kaynaklarını Tarama + Varyant Ayrıştırması)
+  // 🎯 HESAP DÖKÜMÜ VE MATEMATİKSEL İNDİRİM HESABI
+  const rawSubtotal = subtotal;
+  const rawDelivery = deliveryFee > 0 ? deliveryFee : 300;
+  const calculatedDiscount = (rawSubtotal + rawDelivery) - order.total;
+  const finalDiscount = discountAmount > 0 ? discountAmount : (calculatedDiscount > 0.5 ? calculatedDiscount : 0);
+
+  // 5. Ürün Satırları (Varyant Ayrıştırması Dahil)
   const itemsHtml = order.items
     .map((item: any) => {
-      // 🎯 Birleştirilen Kısım: Tüm olası alan isimlerinden güvenli arama
       const fullName = 
         item.product?.name || 
         item.product_name || 
@@ -124,7 +129,7 @@ export const generateInvoicePDF = (order: OrderInfo) => {
           <div class="info-box">
             <strong>Müşteri & Teslimat Bilgileri:</strong><br/>
             <strong>Alıcı:</strong> ${order.recipientName || 'Belirtilmedi'}<br/>
-            <strong>Telefon:</strong> ${order.recipientPhone || 'Belirtilmedi'}<br/>
+            <strong>Telefon:</strong> ${(order as any).recipientPhone || (order as any).recipient_phone || 'Belirtilmedi'}<br/>
             <strong>Şehir:</strong> ${order.city || 'Belirtilmedi'}<br/>
             <strong>Adres:</strong> ${order.shipping_address || order.address || 'Belirtilmedi'}<br/>
             ${order.tracking_number ? `<strong>Kargo Takip No:</strong> ${order.tracking_number}` : ''}
@@ -155,18 +160,16 @@ export const generateInvoicePDF = (order: OrderInfo) => {
         <table class="summary-table">
           <tr>
             <td>Ürünler Toplamı:</td>
-            <td style="text-align: right; font-weight: 500;">₺${subtotal.toFixed(2)}</td>
+            <td style="text-align: right; font-weight: 500;">₺${rawSubtotal.toFixed(2)}</td>
           </tr>
-          ${deliveryFee > 0 ? `
           <tr>
             <td>🚚 Teslimat / Kargo Ücreti:</td>
-            <td style="text-align: right; font-weight: 500;">₺${deliveryFee.toFixed(2)}</td>
+            <td style="text-align: right; font-weight: 500;">₺${rawDelivery.toFixed(2)}</td>
           </tr>
-          ` : ''}
-          ${discountAmount > 0 ? `
-          <tr style="color: #db2777;">
-            <td>🏷️ Kupon İndirimi (${couponCode || 'Kampanya'}):</td>
-            <td style="text-align: right; font-weight: 500;">-₺${discountAmount.toFixed(2)}</td>
+          ${finalDiscount > 0 ? `
+          <tr style="color: #059669; font-weight: 600; background-color: #ecfdf5;">
+            <td style="padding: 4px 6px;">🎟️ İndirim Kuponu:</td>
+            <td style="text-align: right; padding: 4px 6px;">-₺${finalDiscount.toFixed(2)}</td>
           </tr>
           ` : ''}
           <tr class="grand-total">

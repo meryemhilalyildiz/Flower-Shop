@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
-import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { SlidersHorizontal, ChevronDown, X, RefreshCw } from 'lucide-react';
 import type { Product, Route, Category } from '../types';
 import ProductCard from '../components/ProductCard';
 import Breadcrumbs from '../components/Breadcrumbs';
+import { supabase } from '../supabaseClient';
 
 type Props = {
-  products: Product[];
+  products?: Product[]; // Opsiyonel hale getirdik, DB'den de dolacak
   categories: Category[];
   activeCategorySlug?: string;
   navigate: (r: Route) => void;
@@ -16,23 +17,91 @@ type Props = {
 
 type SortKey = 'featured' | 'price-asc' | 'price-desc' | 'rating';
 
-export default function ShopPage({ products, categories, activeCategorySlug, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
+export default function ShopPage({ 
+  products: initialProducts = [], 
+  categories, 
+  activeCategorySlug, 
+  navigate, 
+  onAddToCart, 
+  isFavorite, 
+  onToggleFavorite 
+}: Props) {
+  const [dbProducts, setDbProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
   const [sort, setSort] = useState<SortKey>('featured');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
   const [showInStock, setShowInStock] = useState(false);
   const [showDiscounted, setShowDiscounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // 🌸 Supabase'den Canlı Ürünleri Çekiyoruz
+  const loadShopProducts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        // Supabase veri yapısını Product arayüzüne eksiksiz eşliyoruz
+        const mappedProducts: Product[] = data.map((p: any) => {
+          const imgUrl = p.image || p.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
+
+          return {
+            id: p.id,
+            name: p.name,
+            slug: p.slug || p.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            description: p.description || '',
+            longDescription: p.description || 'Taze ve özenle hazırlanmış çiçek aranjmanı.',
+            price: Number(p.price || 0),
+            oldPrice: p.original_price ? Number(p.original_price) : undefined,
+            image: imgUrl,
+            images: [imgUrl],
+            categoryId: p.category_id || p.category || 'all',
+            category: p.category_id || p.category || 'all',
+            rating: Number(p.rating || 5.0),
+            reviewCount: Number(p.reviews_count || 0),
+            reviewsCount: Number(p.reviews_count || 0),
+            stock: Number(p.stock ?? p.stock_quantity ?? 0),
+            inStock: Number(p.stock ?? p.stock_quantity ?? 0) > 0,
+            badge: p.is_best_seller ? 'Çok Satan' : (p.is_featured ? 'Öne Çıkan' : undefined),
+            ingredients: [],
+            deliveryInfo: 'Aynı gün teslimat'
+          } as Product;
+        });
+
+        setDbProducts(mappedProducts);
+      }
+    } catch (err) {
+      console.error('Mağaza ürünleri çekilirken hata:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    loadShopProducts();
+  }, []);
+
+  // Prop'tan gelen veya DB'den canlı çekilen ürünleri birleştir
+  const allProducts = dbProducts.length > 0 ? dbProducts : initialProducts;
 
   const activeCategory = activeCategorySlug
     ? categories.find((c) => c.slug === activeCategorySlug)
     : undefined;
 
+  // 🎯 Filtreleme ve Sıralama Mantığı (Orijinal Kod Korundu)
   const filtered = useMemo(() => {
     let list = activeCategory
-      ? products.filter((p) => p.categoryId === activeCategory.id)
-      : [...products];
+      ? allProducts.filter((p) => p.categoryId === activeCategory.id || (p as any).category_id === activeCategory.id || (p as any).category === activeCategory.slug)
+      : [...allProducts];
 
-    if (showInStock) list = list.filter((p) => p.inStock);
+    if (showInStock) list = list.filter((p) => (p.stock !== undefined ? p.stock > 0 : p.inStock));
     if (showDiscounted) list = list.filter((p) => p.oldPrice !== undefined);
     list = list.filter((p) => p.price >= priceRange[0] && p.price <= priceRange[1]);
 
@@ -51,7 +120,7 @@ export default function ShopPage({ products, categories, activeCategorySlug, nav
     }
 
     return list;
-  }, [products, activeCategory, sort, priceRange, showInStock, showDiscounted]);
+  }, [allProducts, activeCategory, sort, priceRange, showInStock, showDiscounted]);
 
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },
@@ -83,17 +152,17 @@ export default function ShopPage({ products, categories, activeCategorySlug, nav
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-6">
         <button
           onClick={() => navigate({ name: 'shop' })}
-          className={`chip whitespace-nowrap ${
+          className={`chip whitespace-nowrap cursor-pointer ${
             !activeCategorySlug ? 'bg-brand-600 text-white' : 'bg-white text-sand-600 border border-sand-200 hover:border-brand-300'
           }`}
         >
-          Tümü
+          Tümü ({allProducts.length})
         </button>
         {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => navigate({ name: 'shop', categorySlug: cat.slug })}
-            className={`chip whitespace-nowrap ${
+            className={`chip whitespace-nowrap cursor-pointer ${
               activeCategorySlug === cat.slug ? 'bg-brand-600 text-white' : 'bg-white text-sand-600 border border-sand-200 hover:border-brand-300'
             }`}
           >
@@ -184,16 +253,21 @@ export default function ShopPage({ products, categories, activeCategorySlug, nav
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-20 text-sand-500 flex flex-col items-center justify-center gap-2">
+              <RefreshCw className="w-8 h-8 animate-spin text-brand-600" />
+              <span>Çiçekler yükleniyor...</span>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-sand-500 text-lg">Bu kriterlere uygun çiçek bulunamadı.</p>
               <button
                 onClick={() => {
-                  setPriceRange([0, 1000]);
+                  setPriceRange([0, 2000]);
                   setShowInStock(false);
                   setShowDiscounted(false);
                 }}
-                className="btn-secondary mt-4"
+                className="btn-secondary mt-4 cursor-pointer"
               >
                 Filtreleri Temizle
               </button>
