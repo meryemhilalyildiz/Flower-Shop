@@ -26,81 +26,86 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
       setLoading(false);
       return;
     }
+// 🌸 Hem order_items hem de doğrudan sipariş verisini detaylı çekiyoruz
+const { data, error } = await supabase
+.from('orders')
+.select(`
+  *,
+  order_items (
+    *,
+    products (*)
+  )
+`)
+.eq('user_id', user.id)
+.order('created_at', { ascending: false });
 
-    // Supabase 'orders' tablosundan siparişleri çek ve 'order_items' ile birleştir
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          *,
-          products (*)
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+if (error) throw error;
 
-    if (error) throw error;
+console.log('🔍 SİPARİŞLER VE İÇİNDEKİ İTEMLAR:', data);
 
-    console.log('🔍 VERİTABANINDAN GELEN SİPARİŞLER:', data);
+if (data) {
+  const mappedOrders: OrderInfo[] = data.map((o: any) => {
+    // 🌸 Ürün listesini her olası alandan topla
+    const rawItems = o.order_items || o.items || o.products || [];
 
-    if (data) {
-      // Supabase veri yapısını OrderInfo tipine güvenli eşleyelim
-      const mappedOrders: OrderInfo[] = data.map((o: any) => {
-        const rawItems = o.order_items || o.items || [];
+    const mappedItems = rawItems.map((item: any) => {
+      const effectivePrice = Number(
+        item.unit_price ?? 
+        item.price ?? 
+        item.products?.price ?? 
+        item.product_price ?? 
+        0
+      );
 
-        const mappedItems = rawItems.map((item: any) => {
-          // 🌸 Fiyatı her olası sütun isminden okuma
-          const effectivePrice = Number(
-            item.unit_price ?? 
-            item.price ?? 
-            item.products?.price ?? 
-            item.product_price ?? 
-            0
-          );
+      const productName = 
+      item.product_name || 
+      item.products?.name || 
+      item.name || 
+      item.title || 
+      'Çiçek Ürünü';
 
-          // 🌸 Ürün resmini her olası yerden yakalama
-          const itemImages = item.products?.images || (item.image ? [item.image] : []);
+      return {
+        id: item.id || item.product_id,
+        quantity: Number(item.quantity || 1),
+        price: effectivePrice,
+        unit_price: effectivePrice,
+        product_name: productName,
+        product: item.products || {
+          name: productName,
+          price: effectivePrice,
+        }
+      };
+    });
+    const phoneNum = o.recipient_phone || o.recipientPhone || o.phone || 'Belirtilmedi';
 
-          return {
-            id: item.id || item.product_id,
-            quantity: Number(item.quantity || 1),
-            price: effectivePrice,
-            unit_price: effectivePrice,
-            product_name: item.product_name || item.products?.name || item.name || 'Çiçek Ürünü',
-            product: item.products || {
-              name: item.product_name || item.name || 'Çiçek Ürünü',
-              price: effectivePrice,
-              images: itemImages
-            }
-          };
-        });
-
-        return {
-          id: String(o.id),
-          createdAt: o.created_at,
-          recipientName: o.recipient_name || 'Belirtilmemiş',
-          city: o.city || '—',
-          shipping_address: o.shipping_address,
-          address: o.shipping_address,
-          total: Number(o.total_amount || o.total || 0),
-          subtotal: Number(o.subtotal || 0),
-          deliveryFee: Number(o.delivery_fee || 0),
-          discountAmount: Number(o.discount_amount || o.discountAmount || 0),
-          status: o.status || 'pending',
-          note: o.note,
-          tracking_number: o.tracking_number,
-          items: mappedItems
-        };
-      });
-
-      setDbOrders(mappedOrders);
-    }
-  } catch (err) {
-    console.error('Siparişler çekilirken hata:', err);
-  } finally {
-    setLoading(false);
-  }
+    return {
+      id: String(o.id),
+      createdAt: o.created_at,
+      recipientName: o.recipient_name || o.recipientName || 'Belirtilmedi',
+      recipientPhone: phoneNum,
+      recipient_phone: phoneNum,
+      city: o.city || o.province || 'Belirtilmedi',
+      shipping_address: o.shipping_address || o.address || 'Belirtilmedi',
+      address: o.shipping_address || o.address || 'Belirtilmedi',
+      total: Number(o.total_amount || o.total || 0),
+      subtotal: Number(o.subtotal || 0),
+      deliveryFee: Number(o.delivery_fee || o.deliveryFee || 0),
+      discountAmount: Number(o.discount_amount || o.discountAmount || 0),
+      status: o.status || 'pending',
+      note: o.note,
+      tracking_number: o.tracking_number,
+      // 🌸 DİKKAT: Ürünleri hem items hem order_items içerisine atıyoruz ki fatura servisi kesin bulsun!
+      items: mappedItems,
+      order_items: mappedItems
+    };
+  });
+  setDbOrders(mappedOrders);
+}
+} catch (err) {
+console.error('Siparişler çekilirken hata:', err);
+} finally {
+setLoading(false);
+}
 };
 
   useEffect(() => {
@@ -210,11 +215,11 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">ALICI & ŞEHİR</p>
-                  <p className="text-sm font-semibold text-gray-700">
-                    {order.recipientName} ({order.city})
-                  </p>
-                </div>
+  <p className="text-xs text-gray-500 font-medium">ALICI & ŞEHİR / İLÇE</p>
+  <p className="text-sm font-semibold text-gray-700">
+    {order.recipientName} ({order.city})
+  </p>
+</div>
 
                 <div>
                   <p className="text-xs text-gray-500 font-medium">TOPLAM TUTAR</p>
@@ -429,6 +434,24 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
       </button>
     </div>
   )}
+  {/* 🌸 GÜNCELLENMİŞ FATURA BUTONU */}
+<button
+  type="button"
+  onClick={() => {
+    // Faturaya gönderilmeden önce items dizisinin dolu olduğundan emin olunur
+    const invoiceData = {
+      ...order,
+      items: (order.items && order.items.length > 0) 
+        ? order.items 
+        : ((order as any).order_items || [])
+    };
+    generateInvoicePDF(invoiceData);
+  }}
+  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors cursor-pointer"
+>
+  <Download className="w-3.5 h-3.5" />
+  Fatura
+</button>
 </div>
 
                 

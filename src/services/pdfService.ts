@@ -7,49 +7,49 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     return;
   }
 
-  // 1. Ödeme Yöntemi & Taksit Hesaplama
-  const paymentMethodRaw = (order as any).paymentMethod || (order as any).payment_method || 'Kapıda Ödeme (Kredi Kartı / Nakit)';
+  // 🌸 1. Müşteri & Teslimat Bilgileri
+  const recipientName = order.recipientName || (order as any).recipient_name || 'Belirtilmedi';
+  
+  const recipientPhone = 
+    (order as any).recipientPhone || 
+    (order as any).recipient_phone || 
+    (order as any).phone || 
+    (order as any).recipient_telephone ||
+    'Belirtilmedi';
+
+  const locationCity = order.city || (order as any).province || (order as any).district || 'Belirtilmedi';
+  const fullAddress = order.shipping_address || order.address || (order as any).shippingAddress || 'Belirtilmedi';
+
+  // 🌸 2. Ödeme Yöntemi & Taksit
+  const paymentMethodRaw = (order as any).paymentMethod || (order as any).payment_method || 'Online Kredi / Banka Kartı (Tek Çekim)';
   const installmentCount = (order as any).installment || (order as any).installments || 1;
   
-  let paymentMethodText = 'Kapıda Ödeme (Kredi Kartı / Nakit)';
+  let paymentMethodText = 'Online Kredi / Banka Kartı (Tek Çekim)';
 
-  if (paymentMethodRaw.toLowerCase().includes('iban') || paymentMethodRaw.toLowerCase().includes('eft') || paymentMethodRaw.toLowerCase().includes('havale')) {
-    paymentMethodText = 'Banka Havalesi / IBAN';
-  } else if (paymentMethodRaw.toLowerCase().includes('online') || paymentMethodRaw.toLowerCase().includes('card') || paymentMethodRaw.toLowerCase().includes('kart')) {
-    paymentMethodText = installmentCount > 1 
-      ? `Online Kredi Kartı (${installmentCount} Taksit)` 
-      : 'Online Kredi / Banka Kartı (Tek Çekim)';
-  } else if (typeof paymentMethodRaw === 'string' && paymentMethodRaw.trim() !== '') {
-    paymentMethodText = paymentMethodRaw;
+  if (typeof paymentMethodRaw === 'string') {
+    const lower = paymentMethodRaw.toLowerCase();
+    if (lower.includes('iban') || lower.includes('eft') || lower.includes('havale')) {
+      paymentMethodText = 'Banka Havalesi / IBAN';
+    } else if (lower.includes('online') || lower.includes('card') || lower.includes('kart')) {
+      paymentMethodText = installmentCount > 1 
+        ? `Online Kredi Kartı (${installmentCount} Taksit)` 
+        : 'Online Kredi / Banka Kartı (Tek Çekim)';
+    } else if (paymentMethodRaw.trim() !== '') {
+      paymentMethodText = paymentMethodRaw;
+    }
   }
 
-  // 2. Kupon Kodu Okuma
   const couponCode = (order as any).applied_coupon_code || (order as any).couponCode || (order as any).coupon_code || null;
-  const rawDiscount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
 
-  // 🌸 3. Akıllı Ara Toplam (Subtotal) Hesabı (0 TL düşmesini engeller)
-  const itemsList = order.items || (order as any).order_items || [];
-  let calculatedSubtotal = itemsList.reduce((sum: number, item: any) => {
-    const price = Number(item.price || item.unit_price || item.product?.price || 0);
-    const qty = Number(item.quantity || 1);
-    return sum + (price * qty);
-  }, 0);
-
-  if (calculatedSubtotal === 0 && Number(order.subtotal || 0) > 0) {
-    calculatedSubtotal = Number(order.subtotal);
-  }
-
-  // 🌸 4. Akıllı Kargo & Tutar Hesabı
+  // 🌸 3. Tutar Hesaplamaları (Önce tanımlıyoruz ki ürün tablosunda rawSubtotal kullanılabilsin)
   const totalAmount = Number(order.total || (order as any).total_amount || 0);
   let deliveryFee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
   const discountAmount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
 
-  // Kargo DB'de 0 ise standart varsayılan kargo tutarını (300 TL) al
   if (deliveryFee === 0 && totalAmount > 0) {
     deliveryFee = 300;
   }
 
-  // 🌸 5. Gerçek Ürünler Toplamı (Subtotal) Hesabı
   let rawSubtotal = Number(order.subtotal || 0);
   if (rawSubtotal <= 0 || rawSubtotal >= totalAmount) {
     rawSubtotal = totalAmount - deliveryFee + discountAmount;
@@ -59,50 +59,87 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     ? Math.round((discountAmount / rawSubtotal) * 100) 
     : 0;
 
+  // 🌸 4. Ürün Satırlarını Oluşturma (Artık rawSubtotal üstte tanımlı!)
+  const rawItems = 
+    order.items || 
+    (order as any).order_items || 
+    (order as any).orderItems || 
+    [];
 
-  // 6. Ürün Satırları HTML
-  const itemsHtml = itemsList
-    .map((item: any) => {
-      const fullName = 
-        item.product?.name || 
-        item.product_name || 
-        item.name || 
-        item.title || 
-        'Çiçek Ürünü';
+  const itemsList = Array.isArray(rawItems) && rawItems.length > 0 ? rawItems : [];
 
-      const qty = Number(item.quantity || 1);
-      const price = Number(item.price || item.unit_price || item.product?.price || 0);
-      const total = price * qty;
+  let itemsHtml = '';
 
-      let baseName = fullName;
-      let variantSubtext = '';
+  if (itemsList.length > 0) {
+    itemsHtml = itemsList
+      .map((item: any) => {
+        const fullName = 
+          item.product_name || 
+          item.product?.name || 
+          item.name || 
+          item.title || 
+          'Çiçek Ürünü';
 
-      if (fullName.includes('(') && fullName.includes(')')) {
-        const parts = fullName.split('(');
-        baseName = parts[0].trim();
-        variantSubtext = parts[1].replace(')', '').trim();
-      }
+        const qty = Number(item.quantity || item.qty || 1);
 
-      return `
-        <tr>
-          <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
-            <div style="font-weight: bold; color: #333; font-size: 14px;">${baseName}</div>
-            ${
-              variantSubtext
-                ? `<div style="font-size: 11px; color: #db2777; margin-top: 4px; font-weight: 600; display: inline-block;">
-                    ✨ Ek Özellik / Varyant: ${variantSubtext}
-                   </div>`
-                : '<div style="font-size: 11px; color: #888; margin-top: 2px;">Standart Boyut</div>'
-            }
-          </td>
-          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center;">${qty} Adet</td>
-          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${price.toFixed(2)}</td>
-          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">₺${total.toFixed(2)}</td>
-        </tr>
-      `;
-    })
-    .join('');
+        let price = Number(
+          item.price ?? 
+          item.unit_price ?? 
+          item.product?.price ?? 
+          item.product_price ?? 
+          0
+        );
 
+        if (price === 0 && rawSubtotal > 0) {
+          price = rawSubtotal / itemsList.length;
+        }
+
+        const total = price * qty;
+
+        let baseName = fullName;
+        let variantSubtext = '';
+
+        if (fullName.includes('(') && fullName.includes(')')) {
+          const parts = fullName.split('(');
+          baseName = parts[0].trim();
+          variantSubtext = parts[1].replace(')', '').trim();
+        }
+
+        return `
+          <tr>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
+              <div style="font-weight: bold; color: #333; font-size: 14px;">${baseName}</div>
+              ${
+                variantSubtext
+                  ? `<div style="font-size: 11px; color: #db2777; margin-top: 4px; font-weight: 600; display: inline-block;">
+                      ✨ Varyant / Detay: ${variantSubtext}
+                     </div>`
+                  : '<div style="font-size: 11px; color: #888; margin-top: 2px;">Standart Boyut</div>'
+              }
+            </td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500;">${qty} Adet</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${price.toFixed(2)}</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827;">₺${total.toFixed(2)}</td>
+          </tr>
+        `;
+      })
+      .join('');
+  } else {
+    // Fallback: Ürün çekilemediyse bile fiyat bilgisiyle basılır
+    itemsHtml = `
+      <tr>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
+          <div style="font-weight: bold; color: #333; font-size: 14px;">Özel Tasarım Çiçek Aranjmanı</div>
+          <div style="font-size: 11px; color: #888; margin-top: 2px;">Taze Cicek Siparis Urunu</div>
+        </td>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500;">1 Adet</td>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${rawSubtotal.toFixed(2)}</td>
+        <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827;">₺${rawSubtotal.toFixed(2)}</td>
+      </tr>
+    `;
+  }
+
+  // 🌸 5. HTML Şablon Çıktısı
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -142,10 +179,10 @@ export const generateInvoicePDF = (order: OrderInfo) => {
         <div class="info">
           <div class="info-box">
             <strong>Müşteri & Teslimat Bilgileri:</strong><br/>
-            <strong>Alıcı:</strong> ${order.recipientName || 'Belirtilmedi'}<br/>
-            <strong>Telefon:</strong> ${(order as any).recipientPhone || (order as any).recipient_phone || 'Belirtilmedi'}<br/>
-            <strong>Şehir:</strong> ${order.city || 'Belirtilmedi'}<br/>
-            <strong>Adres:</strong> ${order.shipping_address || order.address || 'Belirtilmedi'}<br/>
+            <strong>Alıcı:</strong> ${recipientName}<br/>
+            <strong>Telefon:</strong> ${recipientPhone}<br/>
+            <strong>Şehir / İlçe:</strong> ${locationCity}<br/>
+            <strong>Adres:</strong> ${fullAddress}<br/>
             ${order.tracking_number ? `<strong>Kargo Takip No:</strong> ${order.tracking_number}` : ''}
           </div>
           <div class="info-box" style="text-align: right;">
