@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Plus, Trash2, Ticket, RefreshCw, Calendar, Users } from 'lucide-react';
+import { Plus, Trash2, Ticket, RefreshCw, Calendar, Users, Edit3 } from 'lucide-react';
 
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
 
   // Form State'leri
   const [code, setCode] = useState('');
@@ -36,36 +37,70 @@ export default function AdminCouponsPage() {
       return;
     }
 
-    const defaultExpiry = new Date();
-    defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
+    if (editingCoupon) {
+      // Güncelleme modu
+      const { error } = await supabase
+        .from('coupons')
+        .update({
+          code: code.toUpperCase().trim(),
+          discount_type: discountType,
+          discount_amount: Number(discountValue),
+          min_order_amount: Number(minOrder) || 0,
+          usage_limit: Number(maxUses),
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+        })
+        .eq('id', editingCoupon.id);
 
-    const defaultExpiry = new Date();
-    defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
-
-    // 🎯 Veritabanındaki sütun adlarına (discount_value ve expires_at) tam uyumlu insert
-    const { error } = await supabase.from('coupons').insert([
-      {
-        code: code.toUpperCase().trim(),
-        discount_type: discountType,
-        discount_amount: Number(discountValue),
-        min_order_amount: Number(minOrder) || 0,
-        usage_limit: Number(maxUses),
-        used_count: 0,
-        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-        is_active: true,
-      },
-    ]);
-
-    if (error) {
-      alert('Kupon eklenirken hata: ' + error.message);
+      if (error) {
+        alert('Kupon güncellenirken hata: ' + error.message);
+      } else {
+        alert('✅ Kupon başarıyla güncellendi!');
+        resetForm();
+        fetchCoupons();
+      }
     } else {
-      alert('🎉 Kupon başarıyla oluşturuldu!');
-      setCode('');
-      setDiscountValue('');
-      setMaxUses('10');
-      setExpiresAt('');
-      fetchCoupons();
+      // Yeni kupon oluşturma modu
+      const { error } = await supabase.from('coupons').insert([
+        {
+          code: code.toUpperCase().trim(),
+          discount_type: discountType,
+          discount_amount: Number(discountValue),
+          min_order_amount: Number(minOrder) || 0,
+          usage_limit: Number(maxUses),
+          used_count: 0,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          is_active: true,
+        },
+      ]);
+
+      if (error) {
+        alert('Kupon eklenirken hata: ' + error.message);
+      } else {
+        alert('🎉 Kupon başarıyla oluşturuldu!');
+        resetForm();
+        fetchCoupons();
+      }
     }
+  };
+
+  const handleEditCoupon = (coupon: any) => {
+    setEditingCoupon(coupon);
+    setCode(coupon.code);
+    setDiscountType(coupon.discount_type);
+    setDiscountValue((coupon.discount_amount ?? coupon.discount_value)?.toString() || '');
+    setMinOrder(coupon.min_order_amount?.toString() || '0');
+    setMaxUses((coupon.usage_limit ?? coupon.max_uses)?.toString() || '10');
+    setExpiresAt(coupon.expires_at ? new Date(coupon.expires_at).toISOString().split('T')[0] : '');
+  };
+
+  const resetForm = () => {
+    setEditingCoupon(null);
+    setCode('');
+    setDiscountType('fixed');
+    setDiscountValue('');
+    setMinOrder('0');
+    setMaxUses('10');
+    setExpiresAt('');
   };
 
   const handleDeleteCoupon = async (id: string) => {
@@ -93,9 +128,20 @@ export default function AdminCouponsPage() {
 
       {/* 🎟️ Yeni Kupon Oluşturma Formu */}
       <form onSubmit={handleCreateCoupon} className="bg-white p-6 rounded-2xl border border-sand-200 shadow-xs space-y-4">
-        <h2 className="text-base font-bold text-sand-800 flex items-center gap-2">
-          <Ticket className="w-5 h-5 text-brand-600" /> Yeni Kupon Ekle
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-sand-800 flex items-center gap-2">
+            <Ticket className="w-5 h-5 text-brand-600" /> {editingCoupon ? 'Kuponu Düzenle' : 'Yeni Kupon Ekle'}
+          </h2>
+          {editingCoupon && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="text-sm text-sand-600 hover:text-sand-800 font-semibold"
+            >
+              İptal
+            </button>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div>
@@ -242,13 +288,22 @@ export default function AdminCouponsPage() {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteCoupon(c.id)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                      title="Kuponu Sil"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleEditCoupon(c)}
+                        className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer"
+                        title="Kuponu Düzenle"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCoupon(c.id)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Kuponu Sil"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

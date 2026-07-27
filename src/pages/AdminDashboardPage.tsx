@@ -28,8 +28,6 @@ export function AdminDashboard() {
     price: '',
     stock: '',
     image: '',
-    stock: '',
-    image: '',
     category_id: '',
     description: '',
     freshness_score: 10,
@@ -180,9 +178,9 @@ export function AdminDashboard() {
         }
 
         await addProduct({
-          id: `p_${Date.now()}`,
           id: crypto.randomUUID(),
-          name: newProduct.name,slug: newProduct.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '-'), // 👈 'aa' için slug: 'aa' olur
+          name: newProduct.name,
+          slug: null, // Trigger otomatik oluşturacak
           price: parseFloat(newProduct.price),
           stock: parseInt(newProduct.stock),
           image: newProduct.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',

@@ -7,8 +7,6 @@ import {
   getFeaturedProducts,
   getDiscountedProducts,
   getProductBySlug,
-  mockProducts,
-  mockCategories,
 } from './data';
 import { fetchCategoriesFromSupabase, fetchProductsFromSupabase } from './services/supabaseData';
 import type { Product, OrderInfo } from './types';
@@ -46,7 +44,7 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [orders, setOrders] = useState<Record<string, OrderInfo>>({});
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState(mockCategories);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,21 +55,12 @@ function App() {
           fetchCategoriesFromSupabase(),
         ]);
 
-        if (supabaseProducts.length > 0) {
-          setProducts(supabaseProducts);
-        } else {
-          setProducts(mockProducts);
-        }
-
-        if (supabaseCategories.length > 0) {
-          setCategories(supabaseCategories);
-        } else {
-          setCategories(mockCategories);
-        }
+        setProducts(supabaseProducts || []);
+        setCategories(supabaseCategories || []);
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
-        setProducts(mockProducts);
-        setCategories(mockCategories);
+        setProducts([]);
+        setCategories([]);
       } finally {
         setLoading(false);
       }
@@ -331,18 +320,9 @@ function App() {
           />
         );
       case 'product': {
-        const product = getProductBySlug(route.slug, products);
-        if (!product) {
-          return (
-            <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-              <h1 className="font-display text-2xl font-bold text-sand-900">Ürün bulunamadı</h1>
-              <button onClick={() => navigate({ name: 'shop' })} className="btn-primary mt-6">Mağazaya Dön</button>
-            </div>
-          );
-        }
         return (
           <ProductPage
-            product={product}
+            productSlug={route.slug}
             products={products}
             categories={categories}
             navigate={navigate}

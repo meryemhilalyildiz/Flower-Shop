@@ -55,9 +55,9 @@ export default function ProductPage({
           .from('products')
           .select('*')
           .or(`slug.eq.${productSlug},id.eq.${productSlug}`)
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
 
         if (data) {
           const imgUrl = data.image || data.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';

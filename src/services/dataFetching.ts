@@ -1,7 +1,6 @@
 import { apiService } from './api';
 import { transformApiProducts, transformApiCategories, transformApiDistricts } from './dataAdapter';
 import type { Category, Product } from '../types';
-import { mockProducts, mockCategories } from '../data';
 
 // Cache for data
 let productsCache: Product[] | null = null;
@@ -16,10 +15,10 @@ export async function fetchProducts(): Promise<Product[]> {
       productsCache = transformApiProducts(apiProducts);
       return productsCache;
     }
-    return mockProducts;
+    return [];
   } catch (error) {
-    console.warn('API bağlantısı sağlanamadı, Mock Ürünler yükleniyor:', error);
-    return mockProducts; // Sunucu kapalıysa çökme, mock veriyi dön!
+    console.warn('API bağlantısı sağlanamadı:', error);
+    return [];
   }
 }
 
@@ -31,10 +30,10 @@ export async function fetchCategories(): Promise<Category[]> {
       categoriesCache = transformApiCategories(apiCategories);
       return categoriesCache;
     }
-    return mockCategories;
+    return [];
   } catch (error) {
-    console.warn('API bağlantısı sağlanamadı, Mock Kategoriler yükleniyor:', error);
-    return mockCategories; // Sunucu kapalıysa çökme, mock veriyi dön!
+    console.warn('API bağlantısı sağlanamadı:', error);
+    return [];
   }
 }
 

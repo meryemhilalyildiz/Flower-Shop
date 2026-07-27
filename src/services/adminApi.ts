@@ -108,7 +108,11 @@ export async function fetchAllCategories() {
 
 // Kategori ekle
 export async function addCategory(name: string, slug: string, image?: string) {
-  const insertData: Record<string, any> = { name, slug };
+  const insertData: Record<string, any> = { 
+    id: crypto.randomUUID(),
+    name, 
+    slug 
+  };
   if (image) insertData.image = image;
   const { error } = await supabase.from('categories').insert(insertData);
   if (error) throw error;
