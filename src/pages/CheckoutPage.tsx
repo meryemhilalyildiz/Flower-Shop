@@ -423,6 +423,9 @@ const handleApplyCoupon = async () => {
         }
       }
 
+      // 🌸 Adresi kaydet (checkbox işaretliyse)
+      await handleSaveAddress();
+
       // 7. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
@@ -430,6 +433,46 @@ const handleApplyCoupon = async () => {
       alert('Sipariş verilirken bir hata oluştu.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // 🌸 Kayıtlı Adresi Veritabanına Kaydetme
+  const handleSaveAddress = async () => {
+    if (!saveForNextTime || !addressTitle.trim()) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('saved_addresses')
+        .insert({
+          user_id: user.id,
+          title: addressTitle.trim(),
+          recipient_name: form.recipientName,
+          recipient_phone: form.recipientPhone,
+          address: form.address,
+          district: form.city,
+        });
+
+      if (error) {
+        console.error('Adres kaydedilirken hata:', error);
+      } else {
+        // Kaydedilen adresi listeye ekle
+        const newAddress: SavedAddress = {
+          id: crypto.randomUUID(),
+          title: addressTitle.trim(),
+          recipient_name: form.recipientName,
+          recipient_phone: form.recipientPhone,
+          address: form.address,
+          district: form.city,
+        };
+        setSavedAddresses([...savedAddresses, newAddress]);
+        setAddressTitle('');
+        setSaveForNextTime(false);
+      }
+    } catch (err) {
+      console.error('Adres kaydetme hatası:', err);
     }
   };
 
