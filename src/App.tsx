@@ -124,9 +124,9 @@ function App() {
           city: orderData.city || '',
           delivery_date: orderData.deliveryDate || '',
           note: orderData.note || '',
-          subtotal: orderData.subtotal || orderData.total,
-          delivery_fee: orderData.deliveryFee || 0,
           total_amount: orderData.total,
+          discount_amount: orderData.discountAmount || 0,
+          applied_coupon_code: orderData.couponCode || null,
           status: 'pending',
         })
         .select()
@@ -139,12 +139,11 @@ function App() {
 
       const orderId = insertedOrder.id.toString();
 
-      // 2. order_items tablosuna tam varyantlı ismi yazıyoruz! ✨
+      // 2. order_items tablosuna satırları yazıyoruz
       if (orderData.items && orderData.items.length > 0) {
         const itemsToInsert = orderData.items.map((item) => ({
           order_id: orderId,
           product_id: String(item.product.id),
-          product_name: item.product.name, // 👈 Sepetteki tam isim buraya gidiyor
           quantity: item.quantity,
           unit_price: item.product.price || 0,
         }));
@@ -179,7 +178,6 @@ function App() {
 
       if (!user) return;
 
-      // 🌸 Supabase sorgusuna product_name, subtotal ve delivery_fee eklendi!
       const { data: fetchedOrders, error } = await supabase
         .from('orders')
         .select(`
@@ -187,8 +185,7 @@ function App() {
           created_at,
           delivery_date,
           status,
-          subtotal,
-          delivery_fee,
+          discount_amount,
           total_amount,
           shipping_address,
           city,
@@ -199,7 +196,6 @@ function App() {
           order_items (
             id,
             product_id,
-            product_name,
             quantity,
             unit_price
           )
@@ -221,8 +217,8 @@ function App() {
             createdAt: ord.created_at,
             deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
-            subtotal: ord.subtotal || undefined,
-            deliveryFee: ord.delivery_fee || undefined,
+            subtotal: ord.total_amount != null ? ord.total_amount + (ord.discount_amount || 0) : undefined,
+            deliveryFee: undefined,
             total: ord.total_amount,
             address: ord.shipping_address,
             city: ord.city,

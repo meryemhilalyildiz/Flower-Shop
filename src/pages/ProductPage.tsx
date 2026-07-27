@@ -5,6 +5,7 @@ import { getCategoryById, products as allProducts } from '../data';
 import Breadcrumbs from '../components/Breadcrumbs';
 import ProductCard from '../components/ProductCard';
 import ReviewSection from '../components/ReviewSection';
+import WikiCareSection from '../components/WikiCareSection';
 
 type Props = {
   product: Product;
@@ -211,6 +212,9 @@ export default function ProductPage({ product, products, categories, navigate, o
           </ul>
         </div>
       </div>
+
+      {/* Bakım Rehberi (Botanik Wiki) */}
+      <WikiCareSection productId={product.id} />
 
       {/* Review Section */}
       <ReviewSection product={product} />

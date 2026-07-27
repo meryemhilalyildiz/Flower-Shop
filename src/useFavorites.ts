@@ -123,6 +123,13 @@ export function useFavorites() {
 
       if (error && error.code !== '23505') {
         console.warn('Supabase favori kaydı başarısız:', error.message);
+        // 🌸 Gerçekten kaydedilemediyse arayüz yalan söylemesin: geri al.
+        setFavorites((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+        return false;
       }
     }
 

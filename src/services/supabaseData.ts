@@ -217,3 +217,71 @@ export async function decreaseProductStock(productId: string, quantity: number) 
     console.error('Stok güncellenirken hata oluştu:', updateError);
   }
 }
+
+// =====================================================================
+// 🌿 Botanik Wiki — bir bakım rehberi kartı birden fazla ürüne,
+// bir ürün de birden fazla karta sahip olabilir (çoktan-çoğa).
+// =====================================================================
+
+export type WikiEntry = {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  created_at: string;
+};
+
+/** Bir ürüne atanmış tüm bakım rehberi kartlarını getirir (ürün sayfasında gösterim için). */
+export async function fetchWikiEntriesForProduct(productId: string): Promise<WikiEntry[]> {
+  const { data, error } = await supabase
+    .from('product_wiki_entries')
+    .select('wiki_entries (id, title, content, category, tags, created_at)')
+    .eq('product_id', productId);
+
+  if (error) {
+    console.error('Ürüne ait bakım rehberi kartları alınamadı:', error);
+    return [];
+  }
+
+  const rows = (data || []) as unknown as { wiki_entries: WikiEntry }[];
+  return rows.map((row) => row.wiki_entries).filter(Boolean);
+}
+
+/** Bir wiki kartına şu an hangi ürünlerin atanmış olduğunu getirir (admin düzenleme formunu doldurmak için). */
+export async function fetchProductIdsForWikiEntry(wikiEntryId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('product_wiki_entries')
+    .select('product_id')
+    .eq('wiki_entry_id', wikiEntryId);
+
+  if (error) {
+    console.error('Karta atanmış ürünler alınamadı:', error);
+    return [];
+  }
+
+  return (data || []).map((row) => row.product_id);
+}
+
+/** Bir wiki kartının ürün atamalarını verilen listeyle değiştirir (eski atamalar silinip yenileri yazılır). */
+export async function setWikiEntryProducts(wikiEntryId: string, productIds: string[]) {
+  const { error: deleteError } = await supabase
+    .from('product_wiki_entries')
+    .delete()
+    .eq('wiki_entry_id', wikiEntryId);
+
+  if (deleteError) {
+    console.error('Eski ürün atamaları silinemedi:', deleteError);
+    return;
+  }
+
+  if (productIds.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from('product_wiki_entries')
+    .insert(productIds.map((product_id) => ({ wiki_entry_id: wikiEntryId, product_id })));
+
+  if (insertError) {
+    console.error('Yeni ürün atamaları kaydedilemedi:', insertError);
+  }
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit3, Trash2, Save, RefreshCw, BookOpen, Leaf, Droplets, Sun, Thermometer } from 'lucide-react';
+import { Plus, Edit3, Trash2, Save, RefreshCw, BookOpen, Leaf, Droplets, Sun, Thermometer, X, Search } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { fetchProductIdsForWikiEntry, setWikiEntryProducts } from '../services/supabaseData';
 
 interface WikiEntry {
   id: string;
@@ -8,22 +9,29 @@ interface WikiEntry {
   content: string;
   category: string;
   tags: string[];
-  related_product_id?: string;
   created_at: string;
+}
+
+interface SimpleProduct {
+  id: string;
+  name: string;
+  image: string;
 }
 
 export default function AdminWikiPage() {
   const [entries, setEntries] = useState<WikiEntry[]>([]);
+  const [products, setProducts] = useState<SimpleProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WikiEntry | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [productSearch, setProductSearch] = useState('');
 
   const [newEntry, setNewEntry] = useState({
     title: '',
     content: '',
     category: 'bakim',
     tags: '',
-    related_product_id: ''
   });
 
   const categories = [
@@ -60,20 +68,29 @@ export default function AdminWikiPage() {
     }
   };
 
+  const loadProducts = async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, image')
+      .order('name');
+
+    if (!error) setProducts(data || []);
+  };
+
   useEffect(() => {
     loadEntries();
+    loadProducts();
   }, []);
 
   const handleAddEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('wiki_entries').insert({
+      const { data, error } = await supabase.from('wiki_entries').insert({
         title: newEntry.title,
         content: newEntry.content,
         category: newEntry.category,
         tags: newEntry.tags.split(',').map(t => t.trim()).filter(t => t),
-        related_product_id: newEntry.related_product_id || null
-      });
+      }).select('id').single();
       
       if (error) {
         if (error.code === 'PGRST205') {
@@ -82,10 +99,15 @@ export default function AdminWikiPage() {
         }
         throw error;
       }
+
+      if (data && selectedProductIds.length > 0) {
+        await setWikiEntryProducts(data.id, selectedProductIds);
+      }
       
       alert('Wiki girişi başarıyla eklendi!');
       setShowAddModal(false);
-      setNewEntry({ title: '', content: '', category: 'bakim', tags: '', related_product_id: '' });
+      setNewEntry({ title: '', content: '', category: 'bakim', tags: '' });
+      setSelectedProductIds([]);
       loadEntries();
     } catch (err) {
       alert('Ekleme sırasında hata oluştu.');
@@ -96,13 +118,29 @@ export default function AdminWikiPage() {
     try {
       const { error } = await supabase.from('wiki_entries').update(updates).eq('id', id);
       if (error) throw error;
+
+      await setWikiEntryProducts(id, selectedProductIds);
       
       setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
       setEditingEntry(null);
+      setSelectedProductIds([]);
       alert('Wiki girişi güncellendi!');
     } catch (err) {
       alert('Güncelleme başarısız.');
     }
+  };
+
+  const openEditModal = async (entry: WikiEntry) => {
+    setEditingEntry(entry);
+    setProductSearch('');
+    const assignedIds = await fetchProductIdsForWikiEntry(entry.id);
+    setSelectedProductIds(assignedIds);
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
   };
 
   const handleDeleteEntry = async (id: string) => {
@@ -168,7 +206,7 @@ export default function AdminWikiPage() {
                 </div>
                 <div className="flex gap-1">
                   <button
-                    onClick={() => setEditingEntry(entry)}
+                    onClick={() => openEditModal(entry)}
                     className="p-1.5 text-sand-400 hover:text-sand-700 hover:bg-sand-100 rounded-lg"
                   >
                     <Edit3 className="w-4 h-4" />
@@ -209,8 +247,8 @@ export default function AdminWikiPage() {
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-sand-400 hover:text-sand-700">
-              <Trash2 className="w-6 h-6" />
+            <button onClick={() => { setShowAddModal(false); setSelectedProductIds([]); setProductSearch(''); }} className="absolute top-4 right-4 text-sand-400 hover:text-sand-700">
+              <X className="w-6 h-6" />
             </button>
             <h3 className="text-xl font-bold font-display text-sand-900 mb-4">Yeni Wiki Girişi</h3>
 
@@ -266,18 +304,165 @@ export default function AdminWikiPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-sand-700">İlişkili Ürün ID (Opsiyonel)</label>
-                <input
-                  type="text"
-                  value={newEntry.related_product_id}
-                  onChange={(e) => setNewEntry({ ...newEntry, related_product_id: e.target.value })}
-                  placeholder="Ürün UUID"
-                  className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-brand-500 outline-none"
-                />
+                <label className="text-xs font-semibold text-sand-700 block mb-2">
+                  Hangi ürünlere atansın? ({selectedProductIds.length} seçili)
+                </label>
+                <div className="relative mb-2">
+                  <Search className="w-4 h-4 text-sand-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Ürün ara..."
+                    className="w-full pl-9 pr-3 py-2 border border-sand-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+                <div className="border border-sand-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-sand-100">
+                  {products
+                    .filter((p) => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+                    .map((p) => (
+                      <label key={p.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-sand-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.includes(p.id)}
+                          onChange={() => toggleProductSelection(p.id)}
+                          className="w-4 h-4 accent-brand-600"
+                        />
+                        {p.image && (
+                          <img src={p.image} alt={p.name} className="w-8 h-8 rounded-lg object-cover" />
+                        )}
+                        <span className="text-sand-800">{p.name}</span>
+                      </label>
+                    ))}
+                  {products.length === 0 && (
+                    <p className="px-3 py-4 text-sm text-sand-400 text-center">Ürün bulunamadı.</p>
+                  )}
+                </div>
               </div>
 
               <button type="submit" className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl">
                 Wiki Girişini Kaydet
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingEntry && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => { setEditingEntry(null); setSelectedProductIds([]); setProductSearch(''); }}
+              className="absolute top-4 right-4 text-sand-400 hover:text-sand-700"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <h3 className="text-xl font-bold font-display text-sand-900 mb-4">Wiki Girişini Düzenle</h3>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!editingEntry) return;
+                handleUpdateEntry(editingEntry.id, {
+                  title: editingEntry.title,
+                  content: editingEntry.content,
+                  category: editingEntry.category,
+                  tags: editingEntry.tags,
+                });
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs font-semibold text-sand-700">Başlık</label>
+                <input
+                  type="text"
+                  required
+                  value={editingEntry.title}
+                  onChange={(e) => setEditingEntry({ ...editingEntry, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-brand-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-sand-700">Kategori</label>
+                <select
+                  required
+                  value={editingEntry.category}
+                  onChange={(e) => setEditingEntry({ ...editingEntry, category: e.target.value })}
+                  className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-brand-500 outline-none"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-sand-700">İçerik</label>
+                <textarea
+                  required
+                  value={editingEntry.content}
+                  onChange={(e) => setEditingEntry({ ...editingEntry, content: e.target.value })}
+                  className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-brand-500 outline-none h-32"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-sand-700">Etiketler (virgülle ayırın)</label>
+                <input
+                  type="text"
+                  value={editingEntry.tags?.join(', ') || ''}
+                  onChange={(e) =>
+                    setEditingEntry({
+                      ...editingEntry,
+                      tags: e.target.value.split(',').map((t) => t.trim()).filter((t) => t),
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-sand-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-brand-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-sand-700 block mb-2">
+                  Hangi ürünlere atansın? ({selectedProductIds.length} seçili)
+                </label>
+                <div className="relative mb-2">
+                  <Search className="w-4 h-4 text-sand-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Ürün ara..."
+                    className="w-full pl-9 pr-3 py-2 border border-sand-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+                <div className="border border-sand-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-sand-100">
+                  {products
+                    .filter((p) => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+                    .map((p) => (
+                      <label key={p.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-sand-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.includes(p.id)}
+                          onChange={() => toggleProductSelection(p.id)}
+                          className="w-4 h-4 accent-brand-600"
+                        />
+                        {p.image && (
+                          <img src={p.image} alt={p.name} className="w-8 h-8 rounded-lg object-cover" />
+                        )}
+                        <span className="text-sand-800">{p.name}</span>
+                      </label>
+                    ))}
+                  {products.length === 0 && (
+                    <p className="px-3 py-4 text-sm text-sand-400 text-center">Ürün bulunamadı.</p>
+                  )}
+                </div>
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                <Save className="w-4 h-4" /> Değişiklikleri Kaydet
               </button>
             </form>
           </div>
