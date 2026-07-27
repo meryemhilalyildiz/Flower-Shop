@@ -36,6 +36,7 @@ export default function AdminCouponsPage() {
       return;
     }
 
+    // 🎯 Veritabanındaki sütun adlarına (discount_value ve expires_at) tam uyumlu insert
     const { error } = await supabase.from('coupons').insert([
       {
         code: code.toUpperCase().trim(),
@@ -44,7 +45,7 @@ export default function AdminCouponsPage() {
         min_order_amount: Number(minOrder) || 0,
         usage_limit: Number(maxUses),
         used_count: 0,
-        valid_until: expiresAt ? new Date(expiresAt).toISOString() : null,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         is_active: true,
       },
     ]);
@@ -188,7 +189,7 @@ export default function AdminCouponsPage() {
               const usageLimit = c.usage_limit ?? c.max_uses ?? 0;
               const usedCount = c.used_count ?? 0;
               const remainingUses = Math.max(0, usageLimit - usedCount);
-              const validUntil = c.valid_until ?? c.expires_at;
+              const validUntil = c.expires_at ?? c.valid_until;
               const isExpired = validUntil && new Date(validUntil) < new Date();
 
               return (

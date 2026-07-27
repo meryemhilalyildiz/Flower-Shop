@@ -1,4 +1,4 @@
-import { Home, Package, ShoppingBag, FolderTree, LogOut, Flower2, Truck, BookOpen, Star, Ticket } from 'lucide-react';
+import { Home, Package, ShoppingBag, FolderTree, LogOut, Flower2, Truck, BookOpen, Star } from 'lucide-react';
 
 interface Props {
   currentPage: string;
@@ -15,7 +15,6 @@ const menuItems = [
   { id: 'admin-shipping', label: 'Kargo Yönetimi', icon: Truck },
   { id: 'admin-wiki', label: 'Botanik Wiki', icon: BookOpen },
   { id: 'admin-reviews', label: 'Yorumlar', icon: Star },
-  { id: 'admin-coupons', label: 'Kupon Yönetimi', icon: Ticket },
 ];
 
 export default function AdminSidebar({ currentPage, navigate, onSignOut, onClose }: Props) {
@@ -44,11 +43,7 @@ export default function AdminSidebar({ currentPage, navigate, onSignOut, onClose
             <button
               key={item.id}
               onClick={() => {
-                if (item.id === 'admin-coupons') {
-                  window.location.hash = '#/admin/kuponlar';
-                } else {
-                  navigate({ name: item.id as any });
-                }
+                navigate({ name: item.id as any });
                 onClose?.();
               }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${

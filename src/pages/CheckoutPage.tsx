@@ -293,19 +293,30 @@ const handleApplyCoupon = async () => {
         discountAmount: discountAmount,
       });
 
-      // 🎟️ 4. KUPON KULLANIM SAYISINI ARTIRMA (Varsa kullanılan kuponun used_count'ını +1 yapıyoruz)
-      if (appliedCoupon) {
-        const { error: couponErr } = await supabase
-          .from('coupons')
-          .update({ used_count: (appliedCoupon.used_count || 0) + 1 })
-          .eq('id', appliedCoupon.id);
+      // 🎟️ 4. KUPON KULLANIM SAYISINI ARTIRMA
+if (appliedCoupon && (appliedCoupon.id || appliedCoupon.code)) {
+  // 1. Önce veritabanından kuponun en güncel used_count bilgisini alalım
+  const query = supabase.from('coupons').select('id, used_count');
+  const { data: latestCoupon } = appliedCoupon.id 
+    ? await query.eq('id', appliedCoupon.id).single()
+    : await query.eq('code', appliedCoupon.code).single();
 
-        if (couponErr) {
-          console.error('KUPON SAYACI GÜNCELLENEMEDİ:', couponErr);
-        } else {
-          console.log(`Kupon kullanımı güncellendi: ${appliedCoupon.code} -> ${appliedCoupon.used_count + 1}`);
-        }
-      }
+  if (latestCoupon) {
+    const nextCount = (latestCoupon.used_count || 0) + 1;
+
+    // 2. Güncel used_count değerini 1 artırarak kaydedelim
+    const { error: updateErr } = await supabase
+      .from('coupons')
+      .update({ used_count: nextCount })
+      .eq('id', latestCoupon.id);
+
+    if (updateErr) {
+      console.error('❌ KUPON UPDATE HATASI:', updateErr.message);
+    } else {
+      console.log(`✅ KUPON SAYACI BAŞARIYLA GÜNCELLENDİ: ${nextCount}`);
+    }
+  }
+}
 
       // 🌸 5. Anında Stok Düşme İşlemi
       for (const item of items) {
