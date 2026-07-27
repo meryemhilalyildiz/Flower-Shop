@@ -18,7 +18,8 @@ const PAGE_TITLES: Record<string, string> = {
   'admin-shipping': 'Kargo Yönetimi',
   'admin-wiki': 'Botanik Wiki',
   'admin-reviews': 'Yorumlar',
-  'admin-coupons': 'Kupon Yönetimi', // 👈 EKLENECEK SATIR
+  'admin-coupons': 'Kupon Yönetimi',
+  'admin-editor': 'Düzenleme',
 };
 
 export default function AdminLayout({ children, currentPage, navigate }: Props) {

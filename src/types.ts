@@ -88,7 +88,8 @@ export type Route =
   | { name: 'admin-shipping' }
   | { name: 'admin-wiki' }
   | { name: 'admin-reviews' }
-  | { name: 'admin-coupons' } // 👈 Bu satırın olduğundan emin ol
+  | { name: 'admin-coupons' }
+  | { name: 'admin-editor' }
   | { name: 'shop'; categorySlug?: string }
   | { name: 'product'; slug: string }
   | { name: 'cart' }

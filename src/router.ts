@@ -29,6 +29,7 @@ function parseHash(): Route {
     if (parts[1] === 'wiki') return { name: 'admin-wiki' };
     if (parts[1] === 'yorumlar') return { name: 'admin-reviews' };
     if (parts[1] === 'kuponlar') return { name: 'admin-coupons' };
+    if (parts[1] === 'duzenleme') return { name: 'admin-editor' };
   }
   return { name: 'home' };
 }
@@ -75,6 +76,8 @@ export function routeToHash(route: Route): string {
       return '#/admin/yorumlar';
     case 'admin-coupons':
       return '#/admin/kuponlar';
+    case 'admin-editor':
+      return '#/admin/duzenleme';
     default:
       return '#/';
   }

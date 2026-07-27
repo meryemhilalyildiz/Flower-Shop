@@ -47,6 +47,12 @@
   .text-balance {
     text-wrap: balance;
   }
+  .admin-editable-container {
+    @apply relative;
+  }
+  .admin-editable-container.editing {
+    @apply outline-2 outline-dashed outline-pink-300 outline-offset-4 rounded-lg;
+  }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
