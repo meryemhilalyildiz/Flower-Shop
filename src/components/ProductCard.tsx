@@ -1,4 +1,4 @@
-import { Plus, Heart } from 'lucide-react';
+import { Plus, Heart, Star } from 'lucide-react';
 import type { Product } from '../types';
 import { routeToHash } from '../router';
 
@@ -96,6 +96,24 @@ const isOutOfStock = product.stock !== undefined && product.stock !== null
               <span className="text-xs text-sand-400 line-through">{product.oldPrice} TL</span>
             )}
             <span className="text-lg font-bold text-brand-700">{product.price} TL</span>
+            {/* ⭐ Yorum Puanı Gösterimi */}
+            <div className="flex items-center gap-1 mt-1">
+              <div className="flex items-center">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Star
+                    key={i}
+                    className={`w-3 h-3 ${
+                      i <= Math.round(product.rating || 0)
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-sand-200'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-xs text-sand-500">
+                {product.rating || 0} {product.reviewCount ? `(${product.reviewCount})` : '(0)'}
+              </span>
+            </div>
           </div>
 
           {/* 🛒 SEPETE EKLE VEYA STOK YOK BUTONU */}

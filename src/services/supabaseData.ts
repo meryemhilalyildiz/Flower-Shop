@@ -124,16 +124,23 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
     return [];
   }
 
+  console.log('🔍 Review Stats from DB:', reviewStats);
+
   return (data || []).map((item: any) => {
     const stats = reviewStats.get(item.id);
+    const rating = stats ? stats.rating : 0;
+    const reviewCount = stats ? stats.reviewCount : 0;
+    
+    console.log(`🔍 Product ${item.id}: rating=${rating}, reviewCount=${reviewCount}`);
+    
     return {
       id: item.id,
       name: item.name,
       description: item.description,
       price: Number(item.price),
       oldPrice: item.original_price ? Number(item.original_price) : undefined,
-      rating: stats ? stats.rating : 0,
-      reviewCount: stats ? stats.reviewCount : 0,
+      rating: rating,
+      reviewCount: reviewCount,
       categoryId: item.category_id,
 
       // 🌸 STOK ALANLARI (Tükendi sorununu çözen yer)
