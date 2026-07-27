@@ -3,6 +3,7 @@ import type { CartItem, Product } from './types';
 
 const STORAGE_KEY = 'cicekci-cart';
 const RESERVATION_KEY = 'cicekci-cart-reservation';
+const COUPON_KEY = 'cicekci-cart-coupon';
 const RESERVATION_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 export function useCart() {
@@ -31,6 +32,8 @@ export function useCart() {
   });
 
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
@@ -45,6 +48,32 @@ export function useCart() {
       localStorage.removeItem(RESERVATION_KEY);
     }
   }, [items]);
+
+  // Load coupon from localStorage on mount
+  useEffect(() => {
+    try {
+      const storedCoupon = localStorage.getItem(COUPON_KEY);
+      if (storedCoupon) {
+        const couponData = JSON.parse(storedCoupon);
+        setAppliedCoupon(couponData.coupon);
+        setDiscountAmount(couponData.discountAmount || 0);
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }, []);
+
+  // Save coupon to localStorage when it changes
+  useEffect(() => {
+    if (appliedCoupon) {
+      localStorage.setItem(COUPON_KEY, JSON.stringify({
+        coupon: appliedCoupon,
+        discountAmount
+      }));
+    } else {
+      localStorage.removeItem(COUPON_KEY);
+    }
+  }, [appliedCoupon, discountAmount]);
 
   // 5-minute countdown timer
   useEffect(() => {
@@ -102,6 +131,18 @@ export function useCart() {
   const clearCart = useCallback(() => {
     setItems([]);
     localStorage.removeItem(RESERVATION_KEY);
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
+  }, []);
+
+  const applyCoupon = useCallback((coupon: any, discount: number) => {
+    setAppliedCoupon(coupon);
+    setDiscountAmount(discount);
+  }, []);
+
+  const removeCoupon = useCallback(() => {
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
   }, []);
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -123,5 +164,9 @@ export function useCart() {
     deliveryFee,
     total,
     timeRemaining,
+    appliedCoupon,
+    discountAmount,
+    applyCoupon,
+    removeCoupon,
   };
 }

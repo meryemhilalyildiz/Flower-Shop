@@ -20,6 +20,10 @@ type Props = {
   total: number;
   navigate: (r: Route) => void;
   onPlaceOrder: (order: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>) => Promise<string>;
+  appliedCoupon: any;
+  discountAmount: number;
+  onApplyCoupon: (coupon: any, discount: number) => void;
+  onRemoveCoupon: () => void;
 };
 
 type FormState = {
@@ -45,7 +49,7 @@ type SavedAddress = {
   district: string;
 };
 
-export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }: Props) {
+export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, appliedCoupon, discountAmount, onApplyCoupon, onRemoveCoupon }: Props) {
   const [form, setForm] = useState<FormState>({
     recipientName: '',
     recipientPhone: '',
@@ -79,8 +83,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
   const [submitting, setSubmitting] = useState(false);
 
   const [couponInput, setCouponInput] = useState('');
-const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-const [discountAmount, setDiscountAmount] = useState(0);
 
 const handleApplyCoupon = async () => {
   if (!couponInput.trim()) return;
@@ -165,8 +167,7 @@ const handleApplyCoupon = async () => {
     // Sepet tutarından fazla indirim olamaz
     calculatedDiscount = Math.min(currentSubtotal, calculatedDiscount);
 
-    setAppliedCoupon(data);
-    setDiscountAmount(calculatedDiscount);
+    onApplyCoupon(data, calculatedDiscount);
 
     alert(`🎉 Kupon başarıyla uygulandı! İndirim: ₺${calculatedDiscount.toFixed(2)}`);
   } catch (err: any) {
@@ -806,8 +807,17 @@ const handleApplyCoupon = async () => {
       </div>
 
       {appliedCoupon && (
-        <div className="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-          🎉 '{appliedCoupon.code}' kuponu uygulandı (-{discountAmount} TL)
+        <div className="mt-2 flex items-center justify-between">
+          <div className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+            🎉 '{appliedCoupon.code}' kuponu uygulandı (-{discountAmount} TL)
+          </div>
+          <button
+            type="button"
+            onClick={onRemoveCoupon}
+            className="text-xs text-red-600 hover:text-red-700 font-semibold cursor-pointer"
+          >
+            Kaldır
+          </button>
         </div>
       )}
     </div>

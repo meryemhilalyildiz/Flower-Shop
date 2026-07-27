@@ -343,6 +343,10 @@ function App() {
             navigate={navigate}
             onUpdateQuantity={cart.updateQuantity}
             onRemove={cart.removeItem}
+            appliedCoupon={cart.appliedCoupon}
+            discountAmount={cart.discountAmount}
+            onApplyCoupon={cart.applyCoupon}
+            onRemoveCoupon={cart.removeCoupon}
           />
         );
       case 'checkout':
@@ -354,6 +358,10 @@ function App() {
             total={cart.total}
             navigate={navigate}
             onPlaceOrder={handlePlaceOrder}
+            appliedCoupon={cart.appliedCoupon}
+            discountAmount={cart.discountAmount}
+            onApplyCoupon={cart.applyCoupon}
+            onRemoveCoupon={cart.removeCoupon}
           />
         );
       case 'order-success': {
