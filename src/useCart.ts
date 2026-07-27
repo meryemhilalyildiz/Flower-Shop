@@ -145,6 +145,11 @@ export function useCart() {
           setItems([]);
           return;
         }
+        
+        // Set the initial time remaining based on existing reservation
+        const elapsed = now - reservationTime;
+        const remaining = Math.max(0, RESERVATION_DURATION - elapsed);
+        setTimeRemaining(remaining);
       }
 
       setItems(JSON.parse(stored) as CartItem[]);
@@ -205,21 +210,28 @@ export function useCart() {
     }
   }, [appliedCoupon, discountAmount, userId]);
 
-  // 15-minute countdown timer
+  // 15-minute countdown timer - continues even when user logs out
   useEffect(() => {
-    const keys = getStorageKeys();
-    if (!keys) {
-      setTimeRemaining(null);
-      return;
-    }
+    let interval: ReturnType<typeof setInterval>;
+    
+    const checkReservation = () => {
+      // Use lastUserId to track the cart reservation even when user is logged out
+      const effectiveUserId = userId || lastUserId;
+      if (!effectiveUserId) {
+        setTimeRemaining(null);
+        return;
+      }
 
-    const reservationStr = localStorage.getItem(keys.RESERVATION_KEY);
-    if (!reservationStr) {
-      setTimeRemaining(null);
-      return;
-    }
+      const STORAGE_KEY = `cicekci-cart-${effectiveUserId}`;
+      const RESERVATION_KEY = `cicekci-cart-reservation-${effectiveUserId}`;
+      const COUPON_KEY = `cicekci-cart-coupon-${effectiveUserId}`;
 
-    const interval = setInterval(() => {
+      const reservationStr = localStorage.getItem(RESERVATION_KEY);
+      if (!reservationStr) {
+        setTimeRemaining(null);
+        return;
+      }
+
       const reservationTime = parseInt(reservationStr, 10);
       const now = Date.now();
       const elapsed = now - reservationTime;
@@ -227,25 +239,36 @@ export function useCart() {
 
       if (remaining === 0) {
         // Time expired, return products to stock and clear cart
-        const stored = localStorage.getItem(keys.STORAGE_KEY);
+        const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const cartItems = JSON.parse(stored) as CartItem[];
           returnProductsToStock(cartItems);
         }
         
         setItems([]);
-        localStorage.removeItem(keys.STORAGE_KEY);
-        localStorage.removeItem(keys.RESERVATION_KEY);
-        localStorage.removeItem(keys.COUPON_KEY);
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(RESERVATION_KEY);
+        localStorage.removeItem(COUPON_KEY);
         setTimeRemaining(null);
-        clearInterval(interval);
+        if (interval) clearInterval(interval);
       } else {
-        setTimeRemaining(remaining);
+        // Only update timeRemaining if user is logged in (to show in UI)
+        if (userId) {
+          setTimeRemaining(remaining);
+        }
       }
-    }, 1000); // Update every second
+    };
 
-    return () => clearInterval(interval);
-  }, [userId, items.length]);
+    // Initial check
+    checkReservation();
+
+    // Set up interval - runs continuously regardless of auth state
+    interval = setInterval(checkReservation, 1000);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [lastUserId]);
 
   const addItem = useCallback((product: Product, quantity: number = 1) => {
     setItems((prev) => {
