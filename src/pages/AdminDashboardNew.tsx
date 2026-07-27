@@ -139,15 +139,24 @@ export default function AdminDashboardNew({ navigate }: Props) {
                         <p className="text-sm text-sand-800 truncate">
                           {o.recipient_name || '—'}
                         </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">
-                          ₺{Number(o.total_amount).toLocaleString('tr-TR')}
-                        </p>
-                        <StatusBadge status={o.status || 'pending'} />
-                      </div>
-                    </li>
-                  ))}
+                        {/* 🌸 İptal Sebebi Varsa İsmin Altında Minik Kırmızı Kutuda Gösterir */}
+      {o.status === 'cancelled' && (o.cancel_reason || o.cancelReason) && (
+        <p className="text-xs text-red-600 bg-red-50 p-1 rounded mt-1 border border-red-100">
+          ❌ <strong>İptal Nedeni:</strong> {o.cancel_reason || o.cancelReason}
+        </p>
+      )}
+    </div>
+
+    <div className="text-right">
+      <p className="text-sm font-semibold">
+        ₺{Number(o.total_amount).toLocaleString('tr-TR')}
+      </p>
+
+      {/* 🌸 Orijinal StatusBadge'in Kalıyor */}
+      <StatusBadge status={o.status || 'pending'} />
+    </div>
+  </li>
+))}
                 </ul>
               ) : (
                 <p className="text-sm text-sand-500 py-6 text-center">Henüz sipariş yok.</p>
