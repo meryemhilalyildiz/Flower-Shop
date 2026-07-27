@@ -183,7 +183,15 @@ export default function AdminOrdersPageNew() {
                     <span className="font-mono text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-200">
                       #{order.id.slice(0, 8)}
                     </span>
+
+                    {/* 🌸 İptal veya Mevcut Durum Rozeti */}
+                  {order.status === 'cancelled' ? (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
+                      ❌ İptal Edildi (Müşteri)
+                    </span>
+                  ) : (
                     <StatusBadge status={order.status || 'pending'} />
+                  )}
                     <span className="text-xs text-sand-500">
                       {new Date(order.created_at).toLocaleString('tr-TR')}
                     </span>
@@ -217,30 +225,42 @@ export default function AdminOrdersPageNew() {
                   </div>
 
                   {/* 🚨 İPTAL TALEBİ UYARI VE YÖNETİM KUTUSU */}
-                  {order.status === 'İptal Talebi Alındı' && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
-                      <p className="text-xs text-red-700 font-medium flex items-center gap-1">
-                        <AlertTriangle className="w-4 h-4 text-red-600" />
-                        <strong>İptal Nedeni:</strong> {order.cancel_reason || 'Belirtilmedi'}
-                      </p>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          onClick={() => handleUpdateStatus(order.id, 'İptal Edildi')}
-                          disabled={updatingId === order.id}
-                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
-                        >
-                          İptali Onayla
-                        </button>
-                        <button
-                          onClick={() => handleUpdateStatus(order.id, 'Hazırlanıyor')}
-                          disabled={updatingId === order.id}
-                          className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-medium transition-all cursor-pointer"
-                        >
-                          Talebi Reddet
-                        </button>
+                {order.status === 'İptal Talebi Alındı' && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
+                    <p className="text-xs text-red-700 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-4 h-4 text-red-600" />
+                      <strong>İptal Nedeni:</strong> {order.cancel_reason || 'Belirtilmedi'}
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => handleUpdateStatus(order.id, 'cancelled')}
+                        disabled={updatingId === order.id}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+                      >
+                        İptali Onayla
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(order.id, 'pending')}
+                        disabled={updatingId === order.id}
+                        className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                      >
+                        Talebi Reddet
+                      </button>
                       </div>
                     </div>
                   )}
+
+                  {/* 🌸 İPTAL EDİLMİŞ SİPARİŞ İÇİN MÜŞTERİ İPTAL NEDENİ KUTUSU */}
+                {(order.status === 'cancelled' || order.cancel_reason) && order.status !== 'İptal Talebi Alındı' && (
+                  <div className="p-3 bg-red-50 rounded-xl border border-red-100 text-xs text-red-900 space-y-1">
+                    <p className="font-bold flex items-center gap-1 text-red-700">
+                      ❌ Müşteri İptal Nedeni:
+                    </p>
+                    <p className="text-red-800 font-medium">
+                      {order.cancel_reason || (order as any).cancelReason || 'Neden belirtilmedi.'}
+                    </p>
+                  </div>
+                )}
 
                   {order.order_items && order.order_items.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-sand-100">
