@@ -29,7 +29,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
         return;
       }
 
-      // Supabase 'orders' tablosundan siparişleri çek ve 'order_items' ile birleştir
+      // 🌸 Hem order_items hem de doğrudan sipariş verisini detaylı çekiyoruz
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -44,46 +44,64 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
 
       if (error) throw error;
 
+      console.log('🔍 SİPARİŞLER VE İÇİNDEKİ İTEMLAR:', data);
+
       if (data) {
-        // Supabase veri yapısını OrderInfo tipine eşleyelim
-        const mappedOrders: OrderInfo[] = data.map((o: any) => ({
-          id: o.id,
-          createdAt: o.created_at,
-          recipientName: o.recipient_name || 'Belirtilmemiş',
-          city: o.city || '—',
-          shipping_address: o.shipping_address,
-          address: o.shipping_address,
-          total: Number(o.total_amount || 0),
-          subtotal: Number(o.subtotal || 0),
-          deliveryFee: Number(o.delivery_fee || 0),
-          discountAmount: Number(o.discount_amount || o.discountAmount || 0),
-          status: o.status || 'pending',
-          note: o.note,
-          tracking_number: o.tracking_number,
-          items: (o.order_items || []).map((item: any) => {
-            const joinedProduct = item.products;
-            const productId = joinedProduct?.id || item.product_id;
-            const productImages = joinedProduct?.images
-              ?? (joinedProduct?.image ? [joinedProduct.image] : []);
+        const mappedOrders: OrderInfo[] = data.map((o: any) => {
+          // 🌸 Ürün listesini her olası alandan topla
+          const rawItems = o.order_items || o.items || o.products || [];
+
+          const mappedItems = rawItems.map((item: any) => {
+            const effectivePrice = Number(
+              item.unit_price ??
+              item.price ??
+              item.products?.price ??
+              item.product_price ??
+              0
+            );
+
+            const productName =
+              item.product_name ||
+              item.products?.name ||
+              item.name ||
+              item.title ||
+              'Çiçek Ürünü';
 
             return {
-              id: item.id,
-              quantity: item.quantity,
-              price: item.unit_price,
-              product_id: productId,
-              product: productId
-                ? {
-                    id: productId,
-                    name: joinedProduct?.name || 'Çiçek Ürünü',
-                    slug: joinedProduct?.slug || productId, // Slug yoksa ID kullan
-                    price: joinedProduct?.price ?? item.unit_price,
-                    images: productImages,
-                  }
-                : null,
+              id: item.id || item.product_id,
+              quantity: Number(item.quantity || 1),
+              price: effectivePrice,
+              unit_price: effectivePrice,
+              product_name: productName,
+              product: item.products || {
+                name: productName,
+                price: effectivePrice,
+              }
             };
-          })
-        }));
+          });
+          const phoneNum = o.recipient_phone || o.recipientPhone || o.phone || 'Belirtilmedi';
 
+          return {
+            id: String(o.id),
+            createdAt: o.created_at,
+            recipientName: o.recipient_name || o.recipientName || 'Belirtilmedi',
+            recipientPhone: phoneNum,
+            recipient_phone: phoneNum,
+            city: o.city || o.province || 'Belirtilmedi',
+            shipping_address: o.shipping_address || o.address || 'Belirtilmedi',
+            address: o.shipping_address || o.address || 'Belirtilmedi',
+            total: Number(o.total_amount || o.total || 0),
+            subtotal: Number(o.subtotal || 0),
+            deliveryFee: Number(o.delivery_fee || o.deliveryFee || 0),
+            discountAmount: Number(o.discount_amount || o.discountAmount || 0),
+            status: o.status || 'pending',
+            note: o.note,
+            tracking_number: o.tracking_number,
+            // 🌸 DİKKAT: Ürünleri hem items hem order_items içerisine atıyoruz ki fatura servisi kesin bulsun!
+            items: mappedItems,
+            order_items: mappedItems
+          };
+        });
         setDbOrders(mappedOrders);
       }
     } catch (err) {
@@ -98,8 +116,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
   }, []);
 
   // Prop'tan gelen veya DB'den çekilen siparişleri harmanla
-  const orderList = dbOrders.length > 0 
-    ? dbOrders 
+  const orderList = dbOrders.length > 0
+    ? dbOrders
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // 🌸 Sipariş İptal Talebi Fonksiyonu
@@ -201,14 +219,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
           const canCancel = order.status === 'pending' || order.status === 'Hazırlanıyor' || order.status === 'processing';
 
           // Sipariş Hesaplama Değerleri
-          const calculatedSubtotal = order.subtotal || order.items.reduce((sum: number, item: any) => {
-            const price = item.product?.price || item.unit_price || item.price || 0;
-            const qty = item.quantity || 1;
-            return sum + (price * qty);
-          }, 0);
-
-          const discount = order.discountAmount || (order as any).discount_amount || 0;
-
+          const currentSubtotal = Number(order?.subtotal || 0);
+          const calculatedSubtotal = currentSubtotal > 0
+            ? currentSubtotal
+            : (order.items || []).reduce((sum: number, item: any) => {
+                const price = Number(item.price || item.unit_price || item.product?.price || 0);
+                const qty = Number(item.quantity || 1);
+                return sum + (price * qty);
+              }, 0);
           return (
             <div
               key={order.id}
@@ -230,7 +248,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">ALICI & ŞEHİR</p>
+                  <p className="text-xs text-gray-500 font-medium">ALICI & ŞEHİR / İLÇE</p>
                   <p className="text-sm font-semibold text-gray-700">
                     {order.recipientName} ({order.city})
                   </p>
@@ -254,7 +272,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                     {order.status || 'Hazırlanıyor'}
                   </span>
 
-                  {/* 💬 WhatsApp Destek Butonu */}
+                  {/* 💬 WhatsApp Destek Buttonu */}
                   <button
                     onClick={() => openWhatsApp(order)}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-emerald-200"
@@ -266,11 +284,19 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
 
                   {/* 📄 Fatura İndir Butonu */}
                   <button
-                    onClick={() => generateInvoicePDF(order)}
-                    className="flex items-center gap-1 px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-full text-xs font-semibold transition-all cursor-pointer border border-pink-200"
-                    title="Fatura İndir"
+                    onClick={() => {
+                      // Faturaya gönderilmeden önce items dizisinin dolu olduğundan emin olunur
+                      const invoiceData = {
+                        ...order,
+                        items: (order.items && order.items.length > 0)
+                          ? order.items
+                          : ((order as any).order_items || [])
+                      };
+                      generateInvoicePDF(invoiceData);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors cursor-pointer"
                   >
-                    <Download className="w-3 h-3" />
+                    <Download className="w-3.5 h-3.5" />
                     Fatura
                   </button>
 
@@ -284,7 +310,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                     </button>
                   )}
 
-                  {/* 🌸 Yorum Yap Butonu (Teslim Edildiyse) */}
+                  {/* 🌸 Yorum Yap Buttonu (Teslim Edildiyse) */}
                   {isDelivered && (
                     <button
                       onClick={() => handleReviewOrder(order)}
@@ -368,90 +394,99 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                   })}
                 </div>
 
-{/* 🧾 Sipariş Tutar Detayları */}
-<div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
-  <div className="flex justify-between gap-4 text-sm text-gray-600 mb-1">
-    <span>Ürünler Toplamı:</span>
-    <span className="font-semibold text-gray-800">
-      ₺{((order.subtotal || order.items.reduce((sum: number, item: any) => {
-        const price = item.product?.price || item.unit_price || item.price || 0;
-        const qty = item.quantity || 1;
-        return sum + (price * qty);
-      }, 0)) || 0).toFixed(2)}
-    </span>
-  </div>
+                {/* 🧾 Sipariş Tutar Detayları */}
+                <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
+                  {(() => {
+                    // 🌸 1. Değişkenleri Çekme
+                    const tot = Number(order.total ?? (order as any).total_amount ?? 0);
+                    const recordedDiscount = Number(order.discountAmount ?? (order as any).discount_amount ?? 0);
+                    let fee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
 
-  {/* 🎟️ KUPON İNDİRİMİ SATIRI (Matematiksel Fark Hesabı) */}
-  {(() => {
-    const sub = order.subtotal || order.items.reduce((sum: number, item: any) => sum + ((item.product?.price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0);
-    const fee = order.deliveryFee || order.delivery_fee || 300;
-    const calcDiscount = (sub + fee) - order.total;
+                    // 🌸 2. Kargo DB'de 0 ise akıllı kargo varsayımı (300 TL)
+                    if (fee === 0 && tot > 0) {
+                      fee = 300; // Varsayılan kargo ücreti
+                    }
 
-    if (calcDiscount > 0.5) {
-      return (
-        <div className="flex justify-between gap-4 text-sm text-emerald-600 mb-1 font-semibold">
-          <span>🎟️ Kupon İndirimi:</span>
-          <span>-₺{calcDiscount.toFixed(2)}</span>
-        </div>
-      );
-    }
-    return null;
-  })()}
+                    // 🌸 3. Gerçek Net Ürün Tutarı (Subtotal)
+                    let rawSubtotal = Number(order.subtotal || 0);
+                    if (rawSubtotal <= 0 || rawSubtotal >= tot) {
+                      rawSubtotal = tot - fee + recordedDiscount;
+                    }
 
-  {(order.deliveryFee || order.delivery_fee || 0) > 0 && (
-    <div className="flex justify-between gap-4 text-sm text-gray-600 mb-1">
-      <span>🚚 Kargo / Teslimat:</span>
-      <span className="font-semibold text-gray-800">
-        ₺{(order.deliveryFee || order.delivery_fee || 0).toFixed(2)}
-      </span>
-    </div>
-  )}
+                    // 🌸 4. Gerçek İndirim Yüzdesi (%10)
+                    const discountRate = rawSubtotal > 0 && recordedDiscount > 0
+                      ? Math.round((recordedDiscount / rawSubtotal) * 100)
+                      : 0;
 
-  <div className="flex justify-between gap-4 pt-1.5 border-t border-gray-200 text-sm font-bold text-pink-600">
-    <span>Genel Toplam:</span>
-    <span>₺{order.total.toFixed(2)}</span>
-  </div>
-</div>
+                    return (
+                      <div className="space-y-1.5 text-sm">
+                        {/* Ürünler Toplamı (290 TL) */}
+                        <div className="flex justify-between text-gray-600">
+                          <span>Ürünler Toplamı:</span>
+                          <span className="font-semibold text-gray-800">₺{rawSubtotal.toFixed(2)}</span>
+                        </div>
 
-{/* Adres, Not ve Kargo Takip Bilgisi */}
-<div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-gray-600 bg-gray-50/80 p-3.5 rounded-xl">
-  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-    <div>
-      <span className="font-semibold text-gray-700">📍 Teslimat Adresi:</span>{' '}
-      {order.shipping_address || order.address || 'Belirtilmemiş'}
-    </div>
-    {order.note && (
-      <div>
-        <span className="font-semibold text-gray-700">📝 Sipariş Notu:</span>{' '}
-        {order.note}
-      </div>
-    )}
-  </div>
+                        {/* 🎟️ Kupon İndirimi (%10 -> -29 TL) */}
+                        {recordedDiscount > 0 && (
+                          <div className="flex justify-between text-emerald-600 font-semibold">
+                            <span>🎟️ Kupon İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</span>
+                            <span>-₺{recordedDiscount.toFixed(2)}</span>
+                          </div>
+                        )}
 
-  {/* 🚚 KARGO TAKİP NUMARASI */}
-  {order.tracking_number && (
-    <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
-      <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
-      <span className="font-mono font-bold text-xs text-blue-800">
-        {order.tracking_number}
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          if (order.tracking_number) {
-            navigator.clipboard.writeText(order.tracking_number);
-            alert('Kargo takip numarası kopyalandı! 📋');
-          }
-        }}
-        className="ml-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
-      >
-        Kopyala
-      </button>
-    </div>
-  )}
-</div>
+                        {/* 🚚 Kargo / Teslimat Ücreti (300 TL) */}
+                        <div className="flex justify-between text-gray-600">
+                          <span>🚚 Kargo / Teslimat Ücreti:</span>
+                          <span className="font-semibold text-gray-800">₺{fee.toFixed(2)}</span>
+                        </div>
 
-                
+                        {/* Genel Toplam (561 TL) */}
+                        <div className="flex justify-between pt-2 border-t border-gray-200 text-base font-bold text-pink-600">
+                          <span>Genel Toplam:</span>
+                          <span>₺{tot.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Adres, Not ve Kargo Takip Bilgisi */}
+                <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-gray-600 bg-gray-50/80 p-3.5 rounded-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+                    <div>
+                      <span className="font-semibold text-gray-700">📍 Teslimat Adresi:</span>{' '}
+                      {order.shipping_address || order.address || 'Belirtilmemiş'}
+                    </div>
+                    {order.note && (
+                      <div>
+                        <span className="font-semibold text-gray-700">📝 Sipariş Notu:</span>{' '}
+                        {order.note}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 🚚 KARGO TAKİP NUMARASI */}
+                  {order.tracking_number && (
+                    <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
+                      <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
+                      <span className="font-mono font-bold text-xs text-blue-800">
+                        {order.tracking_number}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (order.tracking_number) {
+                            navigator.clipboard.writeText(order.tracking_number);
+                            alert('Kargo takip numarası kopyalandı! 📋');
+                          }
+                        }}
+                        className="ml-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
+                      >
+                        Kopyala
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );

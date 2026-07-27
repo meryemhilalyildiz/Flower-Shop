@@ -20,6 +20,10 @@ type Props = {
   total: number;
   navigate: (r: Route) => void;
   onPlaceOrder: (order: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>) => Promise<string>;
+  appliedCoupon: any;
+  discountAmount: number;
+  onApplyCoupon: (coupon: any, discount: number) => void;
+  onRemoveCoupon: () => void;
 };
 
 type FormState = {
@@ -45,7 +49,7 @@ type SavedAddress = {
   district: string;
 };
 
-export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }: Props) {
+export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, appliedCoupon, discountAmount, onApplyCoupon, onRemoveCoupon }: Props) {
   const [form, setForm] = useState<FormState>({
     recipientName: '',
     recipientPhone: '',
@@ -79,8 +83,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder }
   const [submitting, setSubmitting] = useState(false);
 
   const [couponInput, setCouponInput] = useState('');
-const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-const [discountAmount, setDiscountAmount] = useState(0);
 
 const handleApplyCoupon = async () => {
   if (!couponInput.trim()) return;
@@ -165,8 +167,7 @@ const handleApplyCoupon = async () => {
     // Sepet tutarından fazla indirim olamaz
     calculatedDiscount = Math.min(currentSubtotal, calculatedDiscount);
 
-    setAppliedCoupon(data);
-    setDiscountAmount(calculatedDiscount);
+    onApplyCoupon(data, calculatedDiscount);
 
     alert(`🎉 Kupon başarıyla uygulandı! İndirim: ₺${calculatedDiscount.toFixed(2)}`);
   } catch (err: any) {
@@ -308,24 +309,38 @@ const handleApplyCoupon = async () => {
       // Kupon indirimli son toplam hesabı
       const finalTotal = Math.max(0, dynamicTotal - discountAmount);
   
-      // 🌸 2. Siparişi veritabanına/state'e gönderirken Varyantlı İsimleri Koruma
+      // 🌸 2. Şehir & İlçe Bilgisini "İl / İlçe" Şeklinde Birlestirme
+      const selectedCityObj = typeof CITIES_DATA !== 'undefined' 
+        ? CITIES_DATA.find((c: any) => c.id === selectedCityId) 
+        : null;
+      const cityName = selectedCityObj ? selectedCityObj.name : '';
+      const districtName = form.city; // Formdaki ilçe adı
+
+      // Ekranda ve Faturada "Edirne / Süloğlu" şeklinde görünmesi için:
+      const fullLocation = cityName ? `${cityName} / ${districtName}` : districtName;
+
+      // 🌸 3. Siparişi veritabanına/state'e gönderirken Varyantlı İsimleri ve Birim Fiyatı Koruma
       const orderItems = items.map((item) => {
-        const fullProductName = item.product.name || 'Çiçek Ürünü';
-  
+        const fullProductName = item.product?.name || 'Çiçek Ürünü';
+        const itemPrice = Number(item.product?.price || 0);
+
         return {
           ...item,
+          product_id: item.product?.id || (item as any).productId || (item as any).id,
           product: {
             ...item.product,
             name: fullProductName,
+            price: itemPrice,
           },
           product_name: fullProductName,
           title: fullProductName,
-          quantity: item.quantity,
-          price: item.product.price,
+          quantity: item.quantity || 1,
+          price: itemPrice,
+          unit_price: itemPrice, // 🌸 Fatura ve Siparişlerim için Kritik!
         };
       });
   
-      // 3. Sipariş oluşturma (Kupon bilgileri dahil)
+      // 🌸 4. Sipariş Oluşturma (İl/İlçe ve Kargo Tutarları Eksiksiz)
       const orderId = await onPlaceOrder({
         items: orderItems,
         subtotal: subtotalAmount,
@@ -333,16 +348,19 @@ const handleApplyCoupon = async () => {
         delivery_fee: calculatedDeliveryFee,
         total: finalTotal,
         recipientName: form.recipientName,
+        recipient_name: form.recipientName, // 🌸 DB snake_case desteği
         recipientPhone: form.recipientPhone,
+        recipient_phone: form.recipientPhone, // 🌸 Telefonun "Belirtilmedi" çıkmasını önler
         address: form.address,
-        city: form.city,
+        shipping_address: form.address,
+        city: fullLocation,
         deliveryDate: form.deliveryDate,
         note: form.note,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         discountAmount: discountAmount,
-      });
+      } as any);
   
-      // 🎟️ 4. KUPON KULLANIM SAYISINI ARTIRMA
+      // 🎟️ 5. KUPON KULLANIM SAYISINI ARTIRMA
       if (appliedCoupon && (appliedCoupon.id || appliedCoupon.code)) {
         const query = supabase.from('coupons').select('id, used_count');
         const { data: latestCoupon } = appliedCoupon.id 
@@ -365,7 +383,47 @@ const handleApplyCoupon = async () => {
         }
       }
   
-      // 5. Başarılı sayfasına yönlendir
+      // 🌸 6. Anında Stok Düşme İşlemi (Güvenli & Detaylı Loglu)
+      for (const item of items) {
+        const targetId = item.product?.id || (item as any).productId || (item as any).id;
+        const buyQuantity = item.quantity || 1;
+
+        console.log('🔍 Stok düşülecek ürün aranıyor. ID:', targetId, 'Adet:', buyQuantity);
+
+        if (targetId) {
+          const { data: prod, error: fetchErr } = await supabase
+            .from('products')
+            .select('stock')
+            .eq('id', targetId)
+            .single();
+
+          if (fetchErr) {
+            console.error('❌ Ürün bulunamadı veya çekilemedi:', fetchErr.message);
+            continue;
+          }
+
+          if (prod) {
+            const currentStock = Number(prod.stock || 0);
+            const newStock = Math.max(0, currentStock - buyQuantity);
+
+            const { error: updateErr } = await supabase
+              .from('products')
+              .update({ 
+                stock: newStock,
+                is_active: newStock > 0 
+              })
+              .eq('id', targetId);
+
+            if (updateErr) {
+              console.error('❌ Stok güncelleme hatası:', updateErr.message);
+            } else {
+              console.log(`✅ Stok başarıyla düşüldü! Ürün ID: ${targetId} | Eski Stok: ${currentStock} -> Yeni Stok: ${newStock}`);
+            }
+          }
+        }
+      }
+
+      // 7. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);
@@ -764,8 +822,17 @@ const handleApplyCoupon = async () => {
       </div>
 
       {appliedCoupon && (
-        <div className="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-          🎉 '{appliedCoupon.code}' kuponu uygulandı (-{discountAmount} TL)
+        <div className="mt-2 flex items-center justify-between">
+          <div className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+            🎉 '{appliedCoupon.code}' kuponu uygulandı (-{discountAmount} TL)
+          </div>
+          <button
+            type="button"
+            onClick={onRemoveCoupon}
+            className="text-xs text-red-600 hover:text-red-700 font-semibold cursor-pointer"
+          >
+            Kaldır
+          </button>
         </div>
       )}
     </div>
