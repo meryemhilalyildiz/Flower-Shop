@@ -130,25 +130,41 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // 🌸 Sipariş İptal Talebi Fonksiyonu
-  const handleCancelOrder = async (orderId: string) => {
-    const reason = prompt('Siparişi iptal etme nedeninizi kısaca belirtin:');
-    if (reason === null) return;
-
+  const handleCancelOrder = async (orderId: string, reason: string) => {
     try {
-      const { error } = await supabase
+      console.log('🔄 İptal gönderiliyor... ID:', orderId, 'Neden:', reason);
+  
+      // 1. Supabase Update
+      const { data, error } = await supabase
         .from('orders')
-        .update({
-          status: 'İptal Talebi Alındı',
-          cancel_reason: reason || 'Müşteri tarafından iptal talebi oluşturuldu.',
+        .update({ 
+          status: 'cancelled', 
+          cancel_reason: reason 
         })
-        .eq('id', orderId);
-
-      if (error) throw error;
-
-      alert('İptal talebiniz admin onayına gönderildi.');
-      fetchUserOrders();
+        .eq('id', orderId)
+        .select();
+  
+      if (error) {
+        console.error('❌ SUPABASE UPDATE HATASI:', error);
+        alert('İptal veritabanına işlenemedi (Yetki Hatası): ' + error.message);
+        return;
+      }
+  
+      console.log('✅ Supabase Güncellendi:', data);
+  
+      // 2. Local State Güncelleme
+      setDbOrders((prevOrders) =>
+        prevOrders.map((o) =>
+          String(o.id) === String(orderId) 
+            ? { ...o, status: 'cancelled', cancel_reason: reason } 
+            : o
+        )
+      );
+  
+      alert('Siparişiniz başarıyla iptal edildi!');
     } catch (err: any) {
-      alert('İptal talebi oluşturulurken hata: ' + err.message);
+      console.error('❌ Beklenmeyen hata:', err);
+      alert('Hata oluştu: ' + (err.message || ''));
     }
   };
 
@@ -269,17 +285,22 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                      isDelivered
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : isCancelled
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {order.status || 'Hazırlanıyor'}
-                  </span>
+                  {/* 🌸 Sipariş Durum Rozeti */}
+<span
+  className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
+    isDelivered || order.status === 'delivered'
+      ? 'bg-emerald-100 text-emerald-800'
+      : isCancelled || order.status === 'cancelled'
+      ? 'bg-red-100 text-red-800 border border-red-200'
+      : 'bg-amber-100 text-amber-800'
+  }`}
+>
+  {isCancelled || order.status === 'cancelled'
+    ? '❌ İptal Edildi'
+    : isDelivered || order.status === 'delivered'
+    ? '✅ Teslim Edildi'
+    : (order.status || 'pending')}
+</span>
 
                   {/* 💬 WhatsApp Destek Buttonu */}
                   <button
@@ -308,16 +329,23 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                     <Download className="w-3.5 h-3.5" />
                     Fatura
                   </button>
-
-                  {/* 🚫 Sipariş İptal Et Butonu */}
-                  {canCancel && (
-                    <button
-                      onClick={() => handleCancelOrder(order.id)}
-                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-full text-xs font-semibold transition-colors cursor-pointer border border-red-200"
-                    >
-                      🚫 İptal Et
-                    </button>
-                  )}
+{/* 🚫 Sipariş İptal Et Butonu */}
+{canCancel && (
+  <button
+    type="button"
+    onClick={() => {
+      const reason = window.prompt('Lütfen siparişinizi iptal etme nedeninizi yazınız:');
+      if (reason && reason.trim() !== '') {
+        handleCancelOrder(order.id, reason.trim());
+      } else if (reason !== null) {
+        alert('İptal işlemi için bir neden belirtmelisiniz.');
+      }
+    }}
+    className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+  >
+    🚫 İptal Et
+  </button>
+)}
 
                   {/* 🌸 Yorum Yap Buttonu (Teslim Edildiyse) */}
                   {isDelivered && (
