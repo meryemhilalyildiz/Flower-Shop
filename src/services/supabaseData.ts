@@ -110,39 +110,46 @@ export async function fetchCategoriesFromSupabase(): Promise<Category[]> {
 }
 
 // 🌸 Supabase'den ürünleri çek (is_active filtresi kaldırıldı, tüm ürünler çekiliyor)
+// ⭐ Yıldız puanları gerçek yorumlardan (reviews tablosu) hesaplanır, mock data yok!
 export async function fetchProductsFromSupabase(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('id, name, description, price, original_price, rating, reviews_count, category_id, stock, image, is_best_seller, is_featured, freshness_score, vase_life_days')
+  const [{ data, error }, reviewStats] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, description, price, original_price, category_id, stock, image, is_best_seller, is_featured, freshness_score, vase_life_days'),
+    fetchAllProductReviewStats(),
+  ]);
 
   if (error) {
     console.error('Supabase ürün çekme hatası:', error);
     return [];
   }
 
-  return (data || []).map((item: any) => ({
-    id: item.id,
-    name: item.name,
-    description: item.description,
-    price: Number(item.price),
-    oldPrice: item.original_price ? Number(item.original_price) : undefined,
-    rating: item.rating ? Number(item.rating) : 5,
-    reviewCount: item.reviews_count || 0,
-    categoryId: item.category_id,
+  return (data || []).map((item: any) => {
+    const stats = reviewStats.get(item.id);
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      price: Number(item.price),
+      oldPrice: item.original_price ? Number(item.original_price) : undefined,
+      rating: stats ? stats.rating : 0,
+      reviewCount: stats ? stats.reviewCount : 0,
+      categoryId: item.category_id,
 
-    // 🌸 STOK ALANLARI (Tükendi sorununu çözen yer)
-    stock: item.stock !== undefined && item.stock !== null ? Number(item.stock) : 10,
-    inStock: item.stock !== undefined && item.stock !== null ? Number(item.stock) > 0 : true,
+      // 🌸 STOK ALANLARI (Tükendi sorununu çözen yer)
+      stock: item.stock !== undefined && item.stock !== null ? Number(item.stock) : 10,
+      inStock: item.stock !== undefined && item.stock !== null ? Number(item.stock) > 0 : true,
 
-    // 🎯 TYPESCRIPT EKSİK OLAN ALANLAR (Hatanı çözen yer)
-    longDescription: item.description || '',
-    ingredients: [],
-    deliveryInfo: 'Aynı gün teslimat seçeneği ile kapınızda.',
+      // 🎯 TYPESCRIPT EKSİK OLAN ALANLAR (Hatanı çözen yer)
+      longDescription: item.description || '',
+      ingredients: [],
+      deliveryInfo: 'Aynı gün teslimat seçeneği ile kapınızda.',
 
-    images: [item.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=800&q=80'],
-    slug: item.id.toString(),
-    badge: item.is_best_seller ? 'Çok Satan' : undefined,
-  }));
+      images: [item.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&w=800&q=80'],
+      slug: item.id.toString(),
+      badge: item.is_best_seller ? 'Çok Satan' : undefined,
+    };
+  });
 }
 
 // 🌸 Kategoriye göre ürünleri çek (is_active filtresi kaldırıldı)

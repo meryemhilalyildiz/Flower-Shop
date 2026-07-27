@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { OrderInfo, Route } from '../types';
-import { Star, Download, MessageCircle, RefreshCw } from 'lucide-react';
+import { OrderInfo, Route, Product } from '../types';
+import { Star, Download, MessageCircle, RefreshCw, X } from 'lucide-react';
 import { supabase } from "../supabaseClient";
 import { generateInvoicePDF } from "../services/pdfService";
 import { openWhatsApp } from "../services/whatsappService";
+import ReviewModal from '../components/ReviewModal';
 
 interface OrdersPageProps {
   orders?: Record<string, OrderInfo>;
@@ -14,6 +15,8 @@ interface OrdersPageProps {
 export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, navigate, onNavigateToShop }) => {
   const [dbOrders, setDbOrders] = useState<OrderInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
+  const [reviewProductSelection, setReviewProductSelection] = useState<{ order: OrderInfo; products: Product[] } | null>(null);
 
   // 🔄 Supabase'den kullanıcının canlı siparişlerini çekme
   const fetchUserOrders = async () => {
@@ -41,33 +44,57 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
 
       if (error) throw error;
 
+      console.log('🔍 VERİTABANINDAN GELEN SİPARİŞLER:', data);
+
       if (data) {
-        // Supabase veri yapısını OrderInfo tipine eşleyelim
-        const mappedOrders: OrderInfo[] = data.map((o: any) => ({
-          id: o.id,
-          createdAt: o.created_at,
-          recipientName: o.recipient_name || 'Belirtilmemiş',
-          city: o.city || '—',
-          shipping_address: o.shipping_address,
-          address: o.shipping_address,
-          total: Number(o.total_amount || 0),
-          subtotal: Number(o.subtotal || 0),
-          deliveryFee: Number(o.delivery_fee || 0),
-          discountAmount: Number(o.discount_amount || o.discountAmount || 0),
-          status: o.status || 'pending',
-          note: o.note,
-          tracking_number: o.tracking_number,
-          items: (o.order_items || []).map((item: any) => ({
-            id: item.id,
-            quantity: item.quantity,
-            price: item.unit_price,
-            product: item.products || {
-              name: 'Çiçek Ürünü',
-              price: item.unit_price,
-              images: []
-            }
-          }))
-        }));
+        // Supabase veri yapısını OrderInfo tipine güvenli eşleyelim
+        const mappedOrders: OrderInfo[] = data.map((o: any) => {
+          const rawItems = o.order_items || o.items || [];
+
+          const mappedItems = rawItems.map((item: any) => {
+            // 🌸 Fiyatı her olası sütun isminden okuma
+            const effectivePrice = Number(
+              item.unit_price ??
+              item.price ??
+              item.products?.price ??
+              item.product_price ??
+              0
+            );
+
+            // 🌸 Ürün resmini her olası yerden yakalama
+            const itemImages = item.products?.images || (item.image ? [item.image] : []);
+
+            return {
+              id: item.id || item.product_id,
+              quantity: Number(item.quantity || 1),
+              price: effectivePrice,
+              unit_price: effectivePrice,
+              product_name: item.product_name || item.products?.name || item.name || 'Çiçek Ürünü',
+              product: item.products || {
+                name: item.product_name || item.name || 'Çiçek Ürünü',
+                price: effectivePrice,
+                images: itemImages
+              }
+            };
+          });
+
+          return {
+            id: String(o.id),
+            createdAt: o.created_at,
+            recipientName: o.recipient_name || 'Belirtilmemiş',
+            city: o.city || '—',
+            shipping_address: o.shipping_address,
+            address: o.shipping_address,
+            total: Number(o.total_amount || o.total || 0),
+            subtotal: Number(o.subtotal || 0),
+            deliveryFee: Number(o.delivery_fee || 0),
+            discountAmount: Number(o.discount_amount || o.discountAmount || 0),
+            status: o.status || 'pending',
+            note: o.note,
+            tracking_number: o.tracking_number,
+            items: mappedItems
+          };
+        });
 
         setDbOrders(mappedOrders);
       }
@@ -83,8 +110,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
   }, []);
 
   // Prop'tan gelen veya DB'den çekilen siparişleri harmanla
-  const orderList = dbOrders.length > 0 
-    ? dbOrders 
+  const orderList = dbOrders.length > 0
+    ? dbOrders
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // 🌸 Sipariş İptal Talebi Fonksiyonu
@@ -107,6 +134,36 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
       fetchUserOrders();
     } catch (err: any) {
       alert('İptal talebi oluşturulurken hata: ' + err.message);
+    }
+  };
+
+  // 🌸 Siparişin teslim edilmiş ürünlerinden yorum yap
+  const handleReviewOrder = (order: OrderInfo) => {
+    const deliveredProducts = order.items
+      .map((item: any) => {
+        const productId = item.product?.id || item.product_id;
+        if (!productId) return null;
+
+        const baseProduct = item.product || {};
+        return {
+          id: productId,
+          name: baseProduct.name || item.product_name || 'Çiçek Ürünü',
+          price: baseProduct.price ?? item.price ?? item.unit_price ?? 0,
+          images: baseProduct.images
+            ?? (baseProduct.image ? [baseProduct.image] : []),
+        } as Product;
+      })
+      .filter((product): product is Product => product !== null);
+
+    if (deliveredProducts.length === 0) {
+      alert('Bu siparişteki ürün bilgisi bulunamadı. Lütfen destek ile iletişime geçin.');
+      return;
+    }
+
+    if (deliveredProducts.length === 1) {
+      setReviewProduct(deliveredProducts[0]);
+    } else {
+      setReviewProductSelection({ order, products: deliveredProducts });
     }
   };
 
@@ -156,14 +213,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
           const canCancel = order.status === 'pending' || order.status === 'Hazırlanıyor' || order.status === 'processing';
 
           // Sipariş Hesaplama Değerleri
-          const calculatedSubtotal = order.subtotal || order.items.reduce((sum: number, item: any) => {
-            const price = item.product?.price || item.unit_price || item.price || 0;
-            const qty = item.quantity || 1;
-            return sum + (price * qty);
-          }, 0);
-
-          const discount = order.discountAmount || (order as any).discount_amount || 0;
-
+          const currentSubtotal = Number(order?.subtotal || 0);
+          const calculatedSubtotal = currentSubtotal > 0
+            ? currentSubtotal
+            : (order.items || []).reduce((sum: number, item: any) => {
+                const price = Number(item.price || item.unit_price || item.product?.price || 0);
+                const qty = Number(item.quantity || 1);
+                return sum + (price * qty);
+              }, 0);
           return (
             <div
               key={order.id}
@@ -238,6 +295,17 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                       🚫 İptal Et
                     </button>
                   )}
+
+                  {/* 🌸 Yorum Yap Butonu (Teslim Edildiyse) */}
+                  {isDelivered && (
+                    <button
+                      onClick={() => handleReviewOrder(order)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
+                    >
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      Yorum Yap
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -292,19 +360,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                           </div>
                         </div>
 
-                        <div className="text-right flex flex-col items-end gap-2">
+                        <div className="text-right">
                           <p className="text-sm font-semibold text-gray-800">
                             ₺{(itemUnitPrice * item.quantity).toFixed(2)}
                           </p>
-                          {isDelivered && item.product?.slug && (
-                            <button
-                              onClick={() => navigate({ name: 'product', slug: item.product.slug })}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
-                            >
-                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                              Yorum Yap
-                            </button>
-                          )}
                         </div>
                       </div>
                     );
@@ -313,47 +372,58 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
 
 {/* 🧾 Sipariş Tutar Detayları */}
 <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
-  <div className="flex justify-between gap-4 text-sm text-gray-600 mb-1">
-    <span>Ürünler Toplamı:</span>
-    <span className="font-semibold text-gray-800">
-      ₺{((order.subtotal || order.items.reduce((sum: number, item: any) => {
-        const price = item.product?.price || item.unit_price || item.price || 0;
-        const qty = item.quantity || 1;
-        return sum + (price * qty);
-      }, 0)) || 0).toFixed(2)}
-    </span>
-  </div>
-
-  {/* 🎟️ KUPON İNDİRİMİ SATIRI (Matematiksel Fark Hesabı) */}
   {(() => {
-    const sub = order.subtotal || order.items.reduce((sum: number, item: any) => sum + ((item.product?.price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0);
-    const fee = order.deliveryFee || order.delivery_fee || 300;
-    const calcDiscount = (sub + fee) - order.total;
+    // 🌸 1. Değişkenleri Çekme
+    const tot = Number(order.total ?? (order as any).total_amount ?? 0);
+    const recordedDiscount = Number(order.discountAmount ?? (order as any).discount_amount ?? 0);
+    let fee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
 
-    if (calcDiscount > 0.5) {
-      return (
-        <div className="flex justify-between gap-4 text-sm text-emerald-600 mb-1 font-semibold">
-          <span>🎟️ Kupon İndirimi:</span>
-          <span>-₺{calcDiscount.toFixed(2)}</span>
-        </div>
-      );
+    // 🌸 2. Kargo DB'de 0 ise akıllı kargo varsayımı (300 TL)
+    if (fee === 0 && tot > 0) {
+      fee = 300; // Varsayılan kargo ücreti
     }
-    return null;
+
+    // 🌸 3. Gerçek Net Ürün Tutarı (Subtotal)
+    let rawSubtotal = Number(order.subtotal || 0);
+    if (rawSubtotal <= 0 || rawSubtotal >= tot) {
+      rawSubtotal = tot - fee + recordedDiscount;
+    }
+
+    // 🌸 4. Gerçek İndirim Yüzdesi (%10)
+    const discountRate = rawSubtotal > 0 && recordedDiscount > 0
+      ? Math.round((recordedDiscount / rawSubtotal) * 100)
+      : 0;
+
+    return (
+      <div className="space-y-1.5 text-sm">
+        {/* Ürünler Toplamı (290 TL) */}
+        <div className="flex justify-between text-gray-600">
+          <span>Ürünler Toplamı:</span>
+          <span className="font-semibold text-gray-800">₺{rawSubtotal.toFixed(2)}</span>
+        </div>
+
+        {/* 🎟️ Kupon İndirimi (%10 -> -29 TL) */}
+        {recordedDiscount > 0 && (
+          <div className="flex justify-between text-emerald-600 font-semibold">
+            <span>🎟️ Kupon İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</span>
+            <span>-₺{recordedDiscount.toFixed(2)}</span>
+          </div>
+        )}
+
+        {/* 🚚 Kargo / Teslimat Ücreti (300 TL) */}
+        <div className="flex justify-between text-gray-600">
+          <span>🚚 Kargo / Teslimat Ücreti:</span>
+          <span className="font-semibold text-gray-800">₺{fee.toFixed(2)}</span>
+        </div>
+
+        {/* Genel Toplam (561 TL) */}
+        <div className="flex justify-between pt-2 border-t border-gray-200 text-base font-bold text-pink-600">
+          <span>Genel Toplam:</span>
+          <span>₺{tot.toFixed(2)}</span>
+        </div>
+      </div>
+    );
   })()}
-
-  {(order.deliveryFee || order.delivery_fee || 0) > 0 && (
-    <div className="flex justify-between gap-4 text-sm text-gray-600 mb-1">
-      <span>🚚 Kargo / Teslimat:</span>
-      <span className="font-semibold text-gray-800">
-        ₺{(order.deliveryFee || order.delivery_fee || 0).toFixed(2)}
-      </span>
-    </div>
-  )}
-
-  <div className="flex justify-between gap-4 pt-1.5 border-t border-gray-200 text-sm font-bold text-pink-600">
-    <span>Genel Toplam:</span>
-    <span>₺{order.total.toFixed(2)}</span>
-  </div>
 </div>
 
 {/* Adres, Not ve Kargo Takip Bilgisi */}
@@ -394,12 +464,60 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
   )}
 </div>
 
-                
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* 🌸 Ürün Seçimi Modalı (Birden fazla ürün varsa) */}
+      {reviewProductSelection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-sand-200">
+              <h2 className="text-xl font-bold text-sand-900">Yorum Yapılacak Ürünü Seçin</h2>
+              <button
+                onClick={() => setReviewProductSelection(null)}
+                className="w-8 h-8 rounded-full bg-sand-100 hover:bg-sand-200 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4 text-sand-600" />
+              </button>
+            </div>
+            <div className="p-6">
+              {reviewProductSelection.products.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => {
+                    setReviewProduct(product);
+                    setReviewProductSelection(null);
+                  }}
+                  className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-sand-50 transition-colors text-left"
+                >
+                  {product.images?.[0] ? (
+                    <img src={product.images[0]} alt={product.name} className="w-12 h-12 object-cover rounded-xl" />
+                  ) : (
+                    <div className="w-12 h-12 bg-pink-50 rounded-xl flex items-center justify-center text-pink-400">🌸</div>
+                  )}
+                  <span className="font-medium text-sand-800">{product.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌸 Ürün Değerlendirme Modalı */}
+      {reviewProduct && (
+        <ReviewModal
+          product={reviewProduct}
+          isOpen={true}
+          onClose={() => setReviewProduct(null)}
+          onReviewSubmitted={() => {
+            // Yorum gönderildikten sonra siparişleri yenile
+            fetchUserOrders();
+          }}
+        />
+      )}
     </div>
   );
 };

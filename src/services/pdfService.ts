@@ -23,31 +23,45 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     paymentMethodText = paymentMethodRaw;
   }
 
-  // 2. Kupon ve İndirim Tutarı
+  // 2. Kupon Kodu Okuma
   const couponCode = (order as any).applied_coupon_code || (order as any).couponCode || (order as any).coupon_code || null;
-  const discountAmount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
+  const rawDiscount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
 
-  // 3. Ara Toplam (Sepetteki ürünlerin toplam fiyatı)
-  const subtotal = order.subtotal || order.items.reduce((sum, item: any) => {
-    const price = item.product?.price || item.unit_price || item.price || 0;
-    const qty = item.quantity || 1;
+  // 🌸 3. Akıllı Ara Toplam (Subtotal) Hesabı (0 TL düşmesini engeller)
+  const itemsList = order.items || (order as any).order_items || [];
+  let calculatedSubtotal = itemsList.reduce((sum: number, item: any) => {
+    const price = Number(item.price || item.unit_price || item.product?.price || 0);
+    const qty = Number(item.quantity || 1);
     return sum + (price * qty);
   }, 0);
-  
-  // 4. Kargo Ücreti Akıllı Hesaplama
-  let deliveryFee = Number(order.deliveryFee || order.delivery_fee || 0);
-  if (deliveryFee === 0 && (order.total + discountAmount) > subtotal) {
-    deliveryFee = (order.total + discountAmount) - subtotal;
+
+  if (calculatedSubtotal === 0 && Number(order.subtotal || 0) > 0) {
+    calculatedSubtotal = Number(order.subtotal);
   }
 
-  // 🎯 HESAP DÖKÜMÜ VE MATEMATİKSEL İNDİRİM HESABI
-  const rawSubtotal = subtotal;
-  const rawDelivery = deliveryFee > 0 ? deliveryFee : 300;
-  const calculatedDiscount = (rawSubtotal + rawDelivery) - order.total;
-  const finalDiscount = discountAmount > 0 ? discountAmount : (calculatedDiscount > 0.5 ? calculatedDiscount : 0);
+  // 🌸 4. Akıllı Kargo & Tutar Hesabı
+  const totalAmount = Number(order.total || (order as any).total_amount || 0);
+  let deliveryFee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
+  const discountAmount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
 
-  // 5. Ürün Satırları (Varyant Ayrıştırması Dahil)
-  const itemsHtml = order.items
+  // Kargo DB'de 0 ise standart varsayılan kargo tutarını (300 TL) al
+  if (deliveryFee === 0 && totalAmount > 0) {
+    deliveryFee = 300;
+  }
+
+  // 🌸 5. Gerçek Ürünler Toplamı (Subtotal) Hesabı
+  let rawSubtotal = Number(order.subtotal || 0);
+  if (rawSubtotal <= 0 || rawSubtotal >= totalAmount) {
+    rawSubtotal = totalAmount - deliveryFee + discountAmount;
+  }
+
+  const discountPercentage = rawSubtotal > 0 && discountAmount > 0 
+    ? Math.round((discountAmount / rawSubtotal) * 100) 
+    : 0;
+
+
+  // 6. Ürün Satırları HTML
+  const itemsHtml = itemsList
     .map((item: any) => {
       const fullName = 
         item.product?.name || 
@@ -56,8 +70,8 @@ export const generateInvoicePDF = (order: OrderInfo) => {
         item.title || 
         'Çiçek Ürünü';
 
-      const qty = item.quantity || 1;
-      const price = item.product?.price || item.unit_price || item.price || 0;
+      const qty = Number(item.quantity || 1);
+      const price = Number(item.price || item.unit_price || item.product?.price || 0);
       const total = price * qty;
 
       let baseName = fullName;
@@ -93,7 +107,7 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Fatura - INV-${order.id.slice(0, 8).toUpperCase()}</title>
+        <title>Fatura - INV-${String(order.id).slice(0, 8).toUpperCase()}</title>
         <style>
           body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 30px; color: #333; }
           .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #db2777; padding-bottom: 15px; }
@@ -103,7 +117,7 @@ export const generateInvoicePDF = (order: OrderInfo) => {
           table { width: 100%; border-collapse: collapse; margin-top: 25px; font-size: 13px; }
           th { background-color: #f9fafb; padding: 10px; text-align: left; border-bottom: 2px solid #eee; }
           
-          .summary-table { margin-left: auto; width: 320px; margin-top: 20px; font-size: 13px; line-height: 1.8; }
+          .summary-table { margin-left: auto; width: 340px; margin-top: 20px; font-size: 13px; line-height: 1.8; }
           .summary-table td { padding: 4px 0; }
           .grand-total { font-size: 16px; font-weight: bold; color: #db2777; border-top: 2px solid #db2777; padding-top: 8px; }
           .coupon-badge { background-color: #fdf2f8; color: #db2777; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
@@ -119,7 +133,7 @@ export const generateInvoicePDF = (order: OrderInfo) => {
             <div style="font-size: 12px; color: #666;">Sipariş Faturası & Bilgi Fişi</div>
           </div>
           <div style="text-align: right; font-size: 12px; color: #555;">
-            <div><strong>Fatura No:</strong> INV-${order.id.slice(0, 8).toUpperCase()}</div>
+            <div><strong>Fatura No:</strong> INV-${String(order.id).slice(0, 8).toUpperCase()}</div>
             <div><strong>Tarih:</strong> ${new Date(order.createdAt).toLocaleDateString('tr-TR')}</div>
             <div><strong>Durum:</strong> ${order.status || 'Hazırlanıyor'}</div>
           </div>
@@ -164,17 +178,17 @@ export const generateInvoicePDF = (order: OrderInfo) => {
           </tr>
           <tr>
             <td>🚚 Teslimat / Kargo Ücreti:</td>
-            <td style="text-align: right; font-weight: 500;">₺${rawDelivery.toFixed(2)}</td>
+            <td style="text-align: right; font-weight: 500;">₺${deliveryFee.toFixed(2)}</td>
           </tr>
-          ${finalDiscount > 0 ? `
+          ${discountAmount > 0 ? `
           <tr style="color: #059669; font-weight: 600; background-color: #ecfdf5;">
-            <td style="padding: 4px 6px;">🎟️ İndirim Kuponu:</td>
-            <td style="text-align: right; padding: 4px 6px;">-₺${finalDiscount.toFixed(2)}</td>
+            <td style="padding: 4px 6px;">🎟️ İndirim Kuponu ${discountPercentage > 0 ? `(%${discountPercentage})` : ''}:</td>
+            <td style="text-align: right; padding: 4px 6px;">-₺${discountAmount.toFixed(2)}</td>
           </tr>
           ` : ''}
           <tr class="grand-total">
             <td>Genel Toplam:</td>
-            <td style="text-align: right;">₺${order.total.toFixed(2)}</td>
+            <td style="text-align: right;">₺${totalAmount.toFixed(2)}</td>
           </tr>
         </table>
 

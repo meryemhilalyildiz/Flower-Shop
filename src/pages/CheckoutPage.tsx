@@ -329,10 +329,10 @@ const handleApplyCoupon = async () => {
       // 3. Sipariş oluşturma (Kupon bilgileri dahil)
       const orderId = await onPlaceOrder({
         items: orderItems,
-        subtotal: subtotalAmount,
-        deliveryFee: calculatedDeliveryFee,
-        delivery_fee: calculatedDeliveryFee,
-        total: finalTotal,
+        subtotal: subtotalAmount, // 290 TL
+        deliveryFee: calculatedDeliveryFee, // 300 TL
+        delivery_fee: calculatedDeliveryFee, // 300 TL (DB snake_case için)
+        total: finalTotal, // 561 TL
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
         address: form.address,
@@ -340,7 +340,7 @@ const handleApplyCoupon = async () => {
         deliveryDate: form.deliveryDate,
         note: form.note,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-        discountAmount: discountAmount,
+        discountAmount: discountAmount, // 29 TL
       });
   
       // 🎟️ 4. KUPON KULLANIM SAYISINI ARTIRMA
