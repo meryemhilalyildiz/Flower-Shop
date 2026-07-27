@@ -154,7 +154,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
             }`}>
               <Clock className={`w-5 h-5 flex-shrink-0 ${isTimeRunningLow ? 'text-red-600' : 'text-amber-600'}`} />
               <p className={`text-sm font-semibold ${isTimeRunningLow ? 'text-red-700' : 'text-amber-700'}`}>
-                Sipariş verme süresi: <span className="font-bold">{formatTimeRemaining(timeRemaining)}</span> | Sepete eklediğiniz ürünler 5 dakika sonra silinecek
+                Sipariş verme süresi: <span className="font-bold">{formatTimeRemaining(timeRemaining)}</span> | Sepete eklediğiniz ürünler 15 dakika sonra silinecek
               </p>
             </div>
           )}
