@@ -7,8 +7,6 @@ import {
   getFeaturedProducts,
   getDiscountedProducts,
   getProductBySlug,
-  mockProducts,
-  mockCategories,
 } from './data';
 import { fetchCategoriesFromSupabase, fetchProductsFromSupabase } from './services/supabaseData';
 import type { Product, OrderInfo } from './types';
@@ -46,7 +44,7 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [orders, setOrders] = useState<Record<string, OrderInfo>>({});
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState(mockCategories);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,21 +55,12 @@ function App() {
           fetchCategoriesFromSupabase(),
         ]);
 
-        if (supabaseProducts.length > 0) {
-          setProducts(supabaseProducts);
-        } else {
-          setProducts(mockProducts);
-        }
-
-        if (supabaseCategories.length > 0) {
-          setCategories(supabaseCategories);
-        } else {
-          setCategories(mockCategories);
-        }
+        setProducts(supabaseProducts || []);
+        setCategories(supabaseCategories || []);
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
-        setProducts(mockProducts);
-        setCategories(mockCategories);
+        setProducts([]);
+        setCategories([]);
       } finally {
         setLoading(false);
       }
@@ -123,9 +112,9 @@ function App() {
           city: orderData.city || '',
           delivery_date: orderData.deliveryDate || '',
           note: orderData.note || '',
-          subtotal: orderData.subtotal || orderData.total,
-          delivery_fee: orderData.deliveryFee || 0,
           total_amount: orderData.total,
+          discount_amount: orderData.discountAmount || 0,
+          applied_coupon_code: orderData.couponCode || null,
           status: 'pending',
         })
         .select()
@@ -213,7 +202,6 @@ function App() {
 
       if (!user) return;
 
-      // 🌸 Supabase sorgusuna product_name, subtotal ve delivery_fee eklendi!
       const { data: fetchedOrders, error } = await supabase
         .from('orders')
         .select(`
@@ -221,8 +209,7 @@ function App() {
           created_at,
           delivery_date,
           status,
-          subtotal,
-          delivery_fee,
+          discount_amount,
           total_amount,
           shipping_address,
           city,
@@ -233,7 +220,6 @@ function App() {
           order_items (
             id,
             product_id,
-            product_name,
             quantity,
             unit_price
           )
@@ -255,8 +241,8 @@ function App() {
             createdAt: ord.created_at,
             deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
-            subtotal: ord.subtotal || undefined,
-            deliveryFee: ord.delivery_fee || undefined,
+            subtotal: ord.total_amount != null ? ord.total_amount + (ord.discount_amount || 0) : undefined,
+            deliveryFee: undefined,
             total: ord.total_amount,
             address: ord.shipping_address,
             city: ord.city,
@@ -334,18 +320,9 @@ function App() {
           />
         );
       case 'product': {
-        const product = getProductBySlug(route.slug, products);
-        if (!product) {
-          return (
-            <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-              <h1 className="font-display text-2xl font-bold text-sand-900">Ürün bulunamadı</h1>
-              <button onClick={() => navigate({ name: 'shop' })} className="btn-primary mt-6">Mağazaya Dön</button>
-            </div>
-          );
-        }
         return (
           <ProductPage
-            product={product}
+            productSlug={route.slug}
             products={products}
             categories={categories}
             navigate={navigate}

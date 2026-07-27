@@ -35,8 +35,8 @@ export async function fetchDashboardStats() {
   const [orders, pending, products, lowStock] = await Promise.all([
     supabase.from('orders').select('id', { count: 'exact', head: true }),
     supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('products').select('id', { count: 'exact', head: true }).lt('stock_quantity', 5),
+    supabase.from('products').select('id', { count: 'exact', head: true }).gt('stock', 0),
+    supabase.from('products').select('id', { count: 'exact', head: true }).lt('stock', 5),
   ]);
   
   return {
@@ -108,7 +108,11 @@ export async function fetchAllCategories() {
 
 // Kategori ekle
 export async function addCategory(name: string, slug: string, image?: string) {
-  const insertData: Record<string, any> = { name, slug };
+  const insertData: Record<string, any> = { 
+    id: crypto.randomUUID(),
+    name, 
+    slug 
+  };
   if (image) insertData.image = image;
   const { error } = await supabase.from('categories').insert(insertData);
   if (error) throw error;

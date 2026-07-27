@@ -6,6 +6,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import ProductCard from '../components/ProductCard';
 import ReviewSection from '../components/ReviewSection';
 import { supabase } from '../supabaseClient';
+import WikiCareSection from '../components/WikiCareSection';
 
 type Props = {
   product?: Product;
@@ -54,9 +55,9 @@ export default function ProductPage({
           .from('products')
           .select('*')
           .or(`slug.eq.${productSlug},id.eq.${productSlug}`)
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
 
         if (data) {
           const imgUrl = data.image || data.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
@@ -313,6 +314,9 @@ export default function ProductPage({
           </ul>
         </div>
       </div>
+
+      {/* Bakım Rehberi (Botanik Wiki) */}
+      <WikiCareSection productId={product.id} />
 
       {/* Review Section */}
       <ReviewSection product={product} />

@@ -99,7 +99,7 @@ const handleApplyCoupon = async () => {
     }
 
     // 🛑 Kullanım Limiti Kontrolü
-    if (data.used_count >= data.max_uses) {
+    if (data.used_count >= data.usage_limit) {
       alert('Bu kuponun kullanım limiti dolmuştur.');
       return;
     }
@@ -112,9 +112,9 @@ const handleApplyCoupon = async () => {
 
     let calculatedDiscount = 0;
     if (data.discount_type === 'percentage') {
-      calculatedDiscount = (subtotal * data.discount_value) / 100;
+      calculatedDiscount = (subtotal * data.discount_amount) / 100;
     } else {
-      calculatedDiscount = data.discount_value;
+      calculatedDiscount = data.discount_amount;
     }
 
     setAppliedCoupon(data);

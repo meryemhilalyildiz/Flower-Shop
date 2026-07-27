@@ -27,9 +27,12 @@ const isOutOfStock = product.stock !== undefined && product.stock !== null
     ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
     : 0;
 
+  // Slug kontrolü - eğer slug yoksa id'yi kullan
+  const productSlug = product.slug || product.id;
+
   return (
     <div className={`card group hover:shadow-soft hover:-translate-y-1 transition-all duration-300 ${isOutOfStock ? 'opacity-85' : ''}`}>
-      <a href={routeToHash({ name: 'product', slug: product.slug })} className="block relative overflow-hidden">
+      <a href={routeToHash({ name: 'product', slug: productSlug })} className="block relative overflow-hidden">
         <div className="aspect-[4/5] overflow-hidden bg-sand-100 relative">
           <img
             src={product.images[0]}
@@ -80,7 +83,7 @@ const isOutOfStock = product.stock !== undefined && product.stock !== null
       </a>
 
       <div className="p-4">
-        <a href={routeToHash({ name: 'product', slug: product.slug })}>
+        <a href={routeToHash({ name: 'product', slug: productSlug })}>
           <h3 className="font-semibold text-sand-800 group-hover:text-brand-600 transition-colors line-clamp-1">
             {product.name}
           </h3>

@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, Clock, Package, AlertTriangle, Plus, ArrowRight, RefreshCw, Ticket } from 'lucide-react';
+import { ShoppingBag, Clock, Package, AlertTriangle, Plus, ArrowRight, RefreshCw } from 'lucide-react';
 import { fetchDashboardStats, fetchRecentOrders, fetchRecentProducts } from '../services/adminApi';
 import StatCard from '../components/admin/StatCard';
 import StatusBadge from '../components/admin/StatusBadge';
-import AdminCouponsPage from './AdminCouponsPage';
+import AdminReviewsPage from './AdminReviewsPage';
 
 interface Props {
   navigate: (route: any) => void;
 }
 
 export default function AdminDashboardNew({ navigate }: Props) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'coupons'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'reviews'>('overview');
   const [stats, setStats] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [recentProducts, setRecentProducts] = useState<any[]>([]);
@@ -54,20 +54,20 @@ export default function AdminDashboardNew({ navigate }: Props) {
           📊 Genel Bakış & İstatistikler
         </button>
         <button
-          onClick={() => setActiveTab('coupons')}
+          onClick={() => setActiveTab('reviews')}
           className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === 'coupons'
+            activeTab === 'reviews'
               ? 'bg-brand-600 text-white shadow-xs'
               : 'bg-white text-sand-700 hover:bg-sand-100 border border-sand-200'
           }`}
         >
-          <Ticket className="w-4 h-4" /> Kupon Yönetimi
+          💬 Yorum Yönetimi
         </button>
       </div>
 
       {/* 🔴 İÇERİK SEÇİMİ */}
-      {activeTab === 'coupons' ? (
-        <AdminCouponsPage />
+      {activeTab === 'reviews' ? (
+        <AdminReviewsPage />
       ) : (
         <>
           {/* Stats Cards */}
@@ -173,9 +173,9 @@ export default function AdminDashboardNew({ navigate }: Props) {
                 <ul className="divide-y divide-sand-100">
                   {recentProducts.map((p: any) => (
                     <li key={p.id} className="py-3 flex items-center gap-3">
-                      {p.image_url ? (
+                      {p.image ? (
                         <img
-                          src={p.image_url}
+                          src={p.image}
                           alt={p.name}
                           className="h-12 w-12 rounded-xl object-cover bg-sand-100"
                         />
