@@ -253,16 +253,16 @@ const handleApplyCoupon = async () => {
         const qty = item.quantity || 1;
         return sum + (price * qty);
       }, 0);
-
+  
       const calculatedDeliveryFee = dynamicTotal > subtotalAmount ? dynamicTotal - subtotalAmount : 0;
-
+  
       // Kupon indirimli son toplam hesabı
       const finalTotal = Math.max(0, dynamicTotal - discountAmount);
-
+  
       // 🌸 2. Siparişi veritabanına/state'e gönderirken Varyantlı İsimleri Koruma
       const orderItems = items.map((item) => {
         const fullProductName = item.product.name || 'Çiçek Ürünü';
-
+  
         return {
           ...item,
           product: {
@@ -275,7 +275,7 @@ const handleApplyCoupon = async () => {
           price: item.product.price,
         };
       });
-
+  
       // 3. Sipariş oluşturma (Kupon bilgileri dahil)
       const orderId = await onPlaceOrder({
         items: orderItems,
@@ -292,64 +292,72 @@ const handleApplyCoupon = async () => {
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         discountAmount: discountAmount,
       });
-
+  
       // 🎟️ 4. KUPON KULLANIM SAYISINI ARTIRMA
-if (appliedCoupon && (appliedCoupon.id || appliedCoupon.code)) {
-  // 1. Önce veritabanından kuponun en güncel used_count bilgisini alalım
-  const query = supabase.from('coupons').select('id, used_count');
-  const { data: latestCoupon } = appliedCoupon.id 
-    ? await query.eq('id', appliedCoupon.id).single()
-    : await query.eq('code', appliedCoupon.code).single();
-
-  if (latestCoupon) {
-    const nextCount = (latestCoupon.used_count || 0) + 1;
-
-    // 2. Güncel used_count değerini 1 artırarak kaydedelim
-    const { error: updateErr } = await supabase
-      .from('coupons')
-      .update({ used_count: nextCount })
-      .eq('id', latestCoupon.id);
-
-    if (updateErr) {
-      console.error('❌ KUPON UPDATE HATASI:', updateErr.message);
-    } else {
-      console.log(`✅ KUPON SAYACI BAŞARIYLA GÜNCELLENDİ: ${nextCount}`);
-    }
-  }
-}
-
-      // 🌸 5. Anında Stok Düşme İşlemi
-      for (const item of items) {
-        const targetId = item.product.id;
-
-        if (targetId) {
-          const { data: prod } = await supabase
-            .from('products')
-            .select('stock_quantity')
-            .eq('id', targetId)
-            .single();
-
-          if (prod) {
-            const currentStock = prod.stock_quantity ?? 0;
-            const newStock = Math.max(0, currentStock - item.quantity);
-
-            const { error: updateErr } = await supabase
-              .from('products')
-              .update({ 
-                stock_quantity: newStock,
-                is_active: newStock > 0 
-              })
-              .eq('id', targetId);
-
-            if (updateErr) {
-              console.error('Stok düşme RLS/DB Hatası:', updateErr);
-            } else {
-              console.log(`Stok başarıyla düşüldü: ${targetId} -> Yeni Stok: ${newStock}`);
-            }
+      if (appliedCoupon && (appliedCoupon.id || appliedCoupon.code)) {
+        const query = supabase.from('coupons').select('id, used_count');
+        const { data: latestCoupon } = appliedCoupon.id 
+          ? await query.eq('id', appliedCoupon.id).single()
+          : await query.eq('code', appliedCoupon.code).single();
+  
+        if (latestCoupon) {
+          const nextCount = (latestCoupon.used_count || 0) + 1;
+  
+          const { error: updateErr } = await supabase
+            .from('coupons')
+            .update({ used_count: nextCount })
+            .eq('id', latestCoupon.id);
+  
+          if (updateErr) {
+            console.error('❌ KUPON UPDATE HATASI:', updateErr.message);
+          } else {
+            console.log(`✅ KUPON SAYACI BAŞARIYLA GÜNCELLENDİ: ${nextCount}`);
           }
         }
       }
+  
+     // 🌸 5. Anında Stok Düşme İşlemi (Güvenli & Detaylı Loglu)
+    for (const item of items) {
+      // Hem item.product.id hem de item.id/item.productId kontrol ediliyor:
+      const targetId = item.product?.id || (item as any).productId || (item as any).id;
+      const buyQuantity = item.quantity || 1;
 
+      console.log('🔍 Stok düşülecek ürün aranıyor. ID:', targetId, 'Adet:', buyQuantity);
+
+      if (targetId) {
+        // 1. Güncel stoğu çek
+        const { data: prod, error: fetchErr } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', targetId)
+          .single();
+
+        if (fetchErr) {
+          console.error('❌ Ürün bulunamadı veya çekilemedi:', fetchErr.message);
+          continue;
+        }
+
+        if (prod) {
+          const currentStock = Number(prod.stock || 0);
+          const newStock = Math.max(0, currentStock - buyQuantity);
+
+          // 2. Stoğu güncelle
+          const { error: updateErr } = await supabase
+            .from('products')
+            .update({ 
+              stock: newStock,
+              is_active: newStock > 0 
+            })
+            .eq('id', targetId);
+
+          if (updateErr) {
+            console.error('❌ Stok güncelleme hatası (Muhtemelen RLS yetkisi eksik):', updateErr.message);
+          } else {
+            console.log(`✅ Stok başarıyla düşüldü! Ürün ID: ${targetId} | Eski Stok: ${currentStock} -> Yeni Stok: ${newStock}`);
+          }
+        }
+      }
+    }
       // 6. Başarılı sayfasına yönlendir
       navigate({ name: 'order-success', orderId });
     } catch (error) {

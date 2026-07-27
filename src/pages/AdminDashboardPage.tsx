@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Package, Plus, Trash2, Edit3, ShoppingBag, RefreshCw, Save, X, Upload } from 'lucide-react';
+import { Package, Plus, Trash2, Edit3, ShoppingBag, RefreshCw, X, Upload } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { addProduct, updateProduct, deleteProduct, fetchAllProducts, fetchAllCategories } from '../services/adminApi';
+import { addProduct, updateProduct, deleteProduct, fetchAllProducts, fetchAllCategories, slugify } from '../services/adminApi';
 
 export function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([]);
@@ -13,16 +13,25 @@ export function AdminDashboard() {
   const [uploadMessage, setUploadMessage] = useState('');
   const [isEditingMode, setIsEditingMode] = useState(false);
 
-  // Yeni Ürün Form State'i
-  const [newProduct, setNewProduct] = useState({
+  // 🌸 1. State'in Başlangıç Değerleri (Veritabanı sütunlarıyla %100 uyumlu):
+  const [newProduct, setNewProduct] = useState<{
+    name: string;
+    price: string;
+    stock: string;
+    image: string;
+    category_id: string;
+    description: string;
+    freshness_score: number;
+    vase_life_days: number;
+  }>({
     name: '',
     price: '',
-    stock_quantity: '',
-    image_url: '',
+    stock: '',
+    image: '',
     category_id: '',
     description: '',
     freshness_score: 10,
-    vase_life_days: 7
+    vase_life_days: 7,
   });
 
   // Ürünleri Çek
@@ -90,12 +99,12 @@ export function AdminDashboard() {
         throw new Error('Yüklenen görselin public URLsi alınamadı.');
       }
 
-      setNewProduct((prev) => ({ ...prev, image_url: uploadedUrl }));
+      setNewProduct((prev) => ({ ...prev, image: uploadedUrl }));
       setUploadMessage('Görsel yüklendi.');
     } catch (error) {
       console.error('Resim yüklenirken hata oluştu:', error);
       const fallbackImage = 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
-      setNewProduct((prev) => ({ ...prev, image_url: fallbackImage }));
+      setNewProduct((prev) => ({ ...prev, image: fallbackImage }));
       setUploadMessage(error instanceof Error ? error.message : 'Görsel yüklenemedi.');
     } finally {
       setUploadingImage(false);
@@ -106,8 +115,8 @@ export function AdminDashboard() {
     setNewProduct({
       name: '',
       price: '',
-      stock_quantity: '',
-      image_url: '',
+      stock: '',
+      image: '',
       category_id: '',
       description: '',
       freshness_score: 10,
@@ -129,8 +138,8 @@ export function AdminDashboard() {
     setNewProduct({
       name: product.name || '',
       price: product.price?.toString() || '',
-      stock_quantity: product.stock_quantity?.toString() || '',
-      image_url: product.image_url || '',
+      stock: (product.stock ?? product.stock_quantity ?? '').toString(),
+      image: product.image || product.image_url || '',
       category_id: product.category_id || '',
       description: product.description || '',
       freshness_score: product.freshness_score ?? 10,
@@ -148,12 +157,10 @@ export function AdminDashboard() {
         await updateProduct(editingProduct.id, {
           name: newProduct.name,
           price: parseFloat(newProduct.price),
-          stock_quantity: parseInt(newProduct.stock_quantity),
-          image_url: newProduct.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
+          stock: parseInt(newProduct.stock),
+          image: newProduct.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
           category_id: newProduct.category_id,
           description: newProduct.description,
-          freshness_score: newProduct.freshness_score,
-          vase_life_days: newProduct.vase_life_days,
         });
         alert('Ürün başarıyla güncellendi!');
       } else {
@@ -165,21 +172,24 @@ export function AdminDashboard() {
           alert('Lütfen geçerli bir fiyat girin.');
           return;
         }
-        if (!newProduct.stock_quantity || parseInt(newProduct.stock_quantity) < 0) {
+        if (!newProduct.stock || parseInt(newProduct.stock) < 0) {
           alert('Lütfen geçerli bir stok miktarı girin.');
           return;
         }
 
         await addProduct({
-          name: newProduct.name,
+          id: `p_${Date.now()}`,
+          name: newProduct.name,slug: newProduct.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '-'), // 👈 'aa' için slug: 'aa' olur
           price: parseFloat(newProduct.price),
-          stock_quantity: parseInt(newProduct.stock_quantity),
-          image_url: newProduct.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
+          stock: parseInt(newProduct.stock),
+          image: newProduct.image || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800',
           category_id: newProduct.category_id,
-          description: newProduct.description,
-          freshness_score: newProduct.freshness_score,
-          vase_life_days: newProduct.vase_life_days,
-          is_active: true,
+          description: newProduct.description || 'Taze çiçek aranjmanı',
+          rating: 5.0,
+          reviews_count: 0,
+          is_best_seller: false,
+          is_featured: true,
+          is_active: true
         });
         alert('Yeni çiçek başarıyla eklendi!');
       }
@@ -194,18 +204,6 @@ export function AdminDashboard() {
           ? `Güncelleme hatası: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}`
           : `Ekleme hatası: ${err instanceof Error ? err.message : 'Bilinmeyen hata'}`
       );
-    }
-  };
-
-  // Fiyat/Stok Hızlı Güncelleme
-  const handleUpdateProduct = async (id: string, updates: any) => {
-    try {
-      await updateProduct(id, updates);
-      setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-      setEditingProduct(null);
-      alert('Ürün güncellendi!');
-    } catch (err) {
-      alert('Güncelleme başarısız.');
     }
   };
 
@@ -250,7 +248,7 @@ export function AdminDashboard() {
             <ShoppingBag className="w-4 h-4" /> Siparişleri Kontrol Et
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={openAddModal}
             className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Yeni Çiçek Ekle
@@ -258,7 +256,7 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Ürün Listesi ve Stok/Fiyat Yönetim Tablosu */}
+      {/* Ürün Listesi Tablosu */}
       <div className="bg-white rounded-3xl border border-sand-200 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-sand-900 font-display flex items-center gap-2">
@@ -283,47 +281,52 @@ export function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-sand-100 text-sm">
-              {products.map((p) => (
-                <tr key={p.id} className="hover:bg-sand-50/50 transition-all">
-                  <td className="p-3">
-                    <img
-                      src={p.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800'}
-                      alt={p.name}
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
-                      }}
-                      className="w-12 h-12 object-cover rounded-xl border border-sand-200"
-                    />
-                  </td>
-                  <td className="p-3 font-semibold text-sand-900">{p.name}</td>
-                  <td className="p-3 text-sand-600 text-xs">{p.category || 'Çiçekler'}</td>
-                  
-                  <td className="p-3 font-bold text-rose-800">₺{p.price}</td>
-                  <td className="p-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.stock_quantity > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                      {p.stock_quantity || 0} Adet Stok
-                    </span>
-                  </td>
+              {products.map((p) => {
+                const stockVal = p.stock ?? p.stock_quantity ?? 0;
+                const imgVal = p.image || p.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
 
-                  <td className="p-3 text-right space-x-2">
-                    <button
-                      onClick={() => openEditModal(p)}
-                      className="p-2 bg-sand-100 text-sand-700 rounded-lg hover:bg-sand-200 transition-all cursor-pointer"
-                      title="Düzenle"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
+                return (
+                  <tr key={p.id} className="hover:bg-sand-50/50 transition-all">
+                    <td className="p-3">
+                      <img
+                        src={imgVal}
+                        alt={p.name}
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
+                        }}
+                        className="w-12 h-12 object-cover rounded-xl border border-sand-200"
+                      />
+                    </td>
+                    <td className="p-3 font-semibold text-sand-900">{p.name}</td>
+                    <td className="p-3 text-sand-600 text-xs">{p.category_id || p.category || 'Çiçekler'}</td>
+                    
+                    <td className="p-3 font-bold text-rose-800">₺{p.price}</td>
+                    <td className="p-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${stockVal > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                        {stockVal} Adet Stok
+                      </span>
+                    </td>
 
-                    <button
-                      onClick={() => handleDeleteProduct(p.id)}
-                      className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
-                      title="Sil"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="p-3 text-right space-x-2">
+                      <button
+                        onClick={() => openEditModal(p)}
+                        className="p-2 bg-sand-100 text-sand-700 rounded-lg hover:bg-sand-200 transition-all cursor-pointer"
+                        title="Düzenle"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteProduct(p.id)}
+                        className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                        title="Sil"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -384,16 +387,16 @@ export function AdminDashboard() {
                     required
                     min="0"
                     step="1"
-                    value={newProduct.stock_quantity}
-                    onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value })}
+                    value={newProduct.stock}
+                    onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
                     placeholder="25"
                     className={`w-full px-3 py-2 border rounded-xl text-sm mt-1 focus:ring-2 focus:ring-rose-500 outline-none ${
-                      newProduct.stock_quantity && parseInt(newProduct.stock_quantity) >= 0
+                      newProduct.stock && parseInt(newProduct.stock) >= 0
                         ? 'border-sand-300'
                         : 'border-red-500 bg-red-50'
                     }`}
                   />
-                  {newProduct.stock_quantity && parseInt(newProduct.stock_quantity) < 0 && (
+                  {newProduct.stock && parseInt(newProduct.stock) < 0 && (
                     <p className="text-xs text-red-600 mt-1">Stok negatif olamaz</p>
                   )}
                 </div>
@@ -422,12 +425,12 @@ export function AdminDashboard() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-sand-700">Görsel</label>
+                <label className="text-xs font-semibold text-sand-700">Görsel URL / Yükle</label>
                 <div className="flex gap-2 mt-1">
                   <input
                     type="url"
-                    value={newProduct.image_url}
-                    onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
+                    value={newProduct.image}
+                    onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
                     placeholder="https://images.unsplash.com/..."
                     className="flex-1 px-3 py-2 border border-sand-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 outline-none"
                   />

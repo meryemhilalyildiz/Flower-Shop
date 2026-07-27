@@ -109,15 +109,14 @@ function App() {
     async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
       // 1. Kullanıcı oturumunu al
       const { data: { user } } = await supabase.auth.getUser();
-
-      // 1. orders tablosuna kargo ve ara toplam ile kayıt
-      // 🎯 İŞTE KRİTİK NOKTA: Sadece oturum açmış GERÇEK kullanıcı id'si gönder, yoksa null ver!
+  
+      // 2. orders tablosuna kayıt
       const validUserId = user?.id ? user.id : null;
-
+  
       const { data: insertedOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: validUserId, // Foreign Key hatasını önleyen güvenli kullanım
+          user_id: validUserId,
           recipient_name: orderData.recipientName || 'Alıcı Adı Belirtilmedi',
           recipient_phone: orderData.recipientPhone || '',
           shipping_address: orderData.address || 'Adres Belirtilmedi',
@@ -131,43 +130,78 @@ function App() {
         })
         .select()
         .single();
-
+  
       if (orderError) {
         alert(`❌ ORDERS HATASI:\n${orderError.message}`);
         throw orderError;
       }
-
+  
       const orderId = insertedOrder.id.toString();
-
-      // 2. order_items tablosuna tam varyantlı ismi yazıyoruz! ✨
+  
+      // 3. order_items tablosuna kayıt
       if (orderData.items && orderData.items.length > 0) {
         const itemsToInsert = orderData.items.map((item) => ({
           order_id: orderId,
           product_id: String(item.product.id),
-          product_name: item.product.name, // 👈 Sepetteki tam isim buraya gidiyor
+          product_name: item.product.name,
           quantity: item.quantity,
           unit_price: item.product.price || 0,
         }));
-
+  
         const { error: itemsError } = await supabase
           .from('order_items')
           .insert(itemsToInsert);
-
+  
         if (itemsError) {
           console.error('ORDER_ITEMS HATASI:', itemsError);
         }
+  
+        // 🌸 4. STOK DÜŞÜRME İŞLEMİ (Eksiksiz & Temiz Blok) 🌸
+        for (const item of orderData.items) {
+          try {
+            const productName = item.product.name;
+            const productId = String(item.product.id);
+            const buyQty = item.quantity || 1;
+  
+            // A) İsmi 'aa' olan veya ID'si eşleşen ürünü veritabanından çekiyoruz
+            const { data: dbProduct } = await supabase
+              .from('products')
+              .select('id, stock')
+              .or(`id.eq.${productId},name.eq.${productName}`)
+              .maybeSingle();
+  
+            if (dbProduct) {
+              const currentStock = Number(dbProduct.stock || 0);
+              const newStock = Math.max(0, currentStock - buyQty);
+  
+              // B) Stoğu güncelliyoruz
+              const { error: updateErr } = await supabase
+                .from('products')
+                .update({ stock: newStock })
+                .eq('id', dbProduct.id);
+  
+              if (updateErr) {
+                console.error('❌ Stok Güncelleme Hatası:', updateErr.message);
+              } else {
+                console.log(`✅ STOK BAŞARIYLA DÜŞÜLDÜ: ${dbProduct.id} -> Yeni Stok: ${newStock}`);
+              }
+            }
+          } catch (err) {
+            console.error('Stok düşme hatası:', err);
+          }
+        }
       }
-
+  
       const order: OrderInfo = {
         ...orderData,
         id: orderId,
         createdAt: insertedOrder.created_at || new Date().toISOString(),
         status: 'Hazırlanıyor',
       };
-
+  
       setOrders((prev) => ({ ...prev, [orderId]: order }));
       cart.clearCart();
-
+  
       return orderId;
     },
     [cart],

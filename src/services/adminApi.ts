@@ -144,6 +144,8 @@ export async function uploadCategoryImage(file: File): Promise<string> {
   return publicUrl;
 }
 
+
+
 // =====================================================================
 // 🌸 KULLANICI YORUM YAPMA YETKİSİ KONTROLÜ
 // =====================================================================
@@ -179,19 +181,17 @@ export async function checkUserCanReview(productId: string, userId: string): Pro
   }
 }
 
-// Ürün ekle
+// Ürün işlemleri
 export async function addProduct(productData: any) {
   const { error } = await supabase.from('products').insert(productData);
   if (error) throw error;
 }
 
-// Ürün güncelle
 export async function updateProduct(id: string, updates: any) {
   const { error } = await supabase.from('products').update(updates).eq('id', id);
   if (error) throw error;
 }
 
-// Ürün sil
 export async function deleteProduct(id: string) {
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) throw error;
@@ -204,14 +204,8 @@ export async function fetchAllOrders() {
     .select('*, order_items (*)')
     .order('created_at', { ascending: false });
   
-  console.log('fetchAllOrders - data:', data);
-  console.log('fetchAllOrders - error:', error);
-  
   if (error) {
-    if (error.code === 'PGRST205') {
-      console.log('Orders tablosu henüz oluşturulmadı');
-      return [];
-    }
+    if (error.code === 'PGRST205') return [];
     throw error;
   }
   return data ?? [];
