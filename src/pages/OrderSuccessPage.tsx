@@ -76,10 +76,10 @@ export default function OrderSuccessPage({ order, navigate }: Props) {
         <h2 className="font-display text-xl font-bold text-sand-900 mb-4">Sipariş Detayları</h2>
 
         <div className="space-y-3 mb-4">
-          {order.items.map((item) => (
+          {order.items?.map((item: any) => (
             <div key={item.product.id} className="flex gap-3 text-sm">
               <div className="w-14 h-14 rounded-lg overflow-hidden bg-sand-100 flex-shrink-0">
-                <img src={item.product.images[0]} alt="" className="w-full h-full object-cover" />
+                <img src={item.product.images?.[0] || ''} alt="" className="w-full h-full object-cover" />
               </div>
               <div className="flex-1">
                 <p className="font-medium text-sand-800">{item.product.name}</p>

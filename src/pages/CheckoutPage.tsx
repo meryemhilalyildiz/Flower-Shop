@@ -34,10 +34,6 @@ type FormState = {
   deliveryDate: string;
   note: string;
   senderName: string;
-  cardNumber: string;
-  cardName: string;
-  cardExpiry: string;
-  cardCvv: string;
 };
 
 type SavedAddress = {
@@ -58,10 +54,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, 
     deliveryDate: '',
     note: '',
     senderName: '',
-    cardNumber: '',
-    cardName: '',
-    cardExpiry: '',
-    cardCvv: '',
   });
 
   // 🌸 Kayıtlı Adres / Alıcı State'leri
@@ -276,10 +268,6 @@ const handleApplyCoupon = async () => {
     if (!form.address.trim()) newErrors.address = 'Adres gerekli';
     if (!form.city.trim()) newErrors.city = 'İlçe seçimi gerekli';
     if (!form.deliveryDate) newErrors.deliveryDate = 'Teslimat tarihi gerekli';
-    if (!form.cardNumber.trim() || form.cardNumber.replace(/\s/g, '').length < 16) newErrors.cardNumber = 'Geçerli kart numarası girin';
-    if (!form.cardName.trim()) newErrors.cardName = 'Kart üzerindeki isim gerekli';
-    if (!form.cardExpiry.trim()) newErrors.cardExpiry = 'Son kullanma tarihi gerekli';
-    if (!form.cardCvv.trim() || form.cardCvv.length < 3) newErrors.cardCvv = 'CVV gerekli';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -287,10 +275,14 @@ const handleApplyCoupon = async () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 1. Form Doğrulama (Validation)
-    if (!validate()) {
-      const firstError = document.querySelector('[data-error="true"]');
-      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 1. Form Doğrulama (Validation - kart bilgileri hariç)
+    if (!form.recipientName.trim() || !form.recipientPhone.trim() || !form.address.trim() || !form.city.trim() || !form.deliveryDate) {
+      alert('Lütfen teslimat bilgilerini doldurun.');
+      return;
+    }
+    
+    if (form.recipientPhone.replace(/\D/g, '').length !== 10 || !form.recipientPhone.replace(/\D/g, '').startsWith('5')) {
+      alert('Geçerli bir Türkiye cep telefonu girin (10 haneli, 5 ile başlayan).');
       return;
     }
     
@@ -306,20 +298,41 @@ const handleApplyCoupon = async () => {
   
       const calculatedDeliveryFee = dynamicTotal > subtotalAmount ? dynamicTotal - subtotalAmount : 0;
   
-      // Kupon indirimli son toplam hesabı
+      // Kupon indirimli son toplam hesabı (kuruş cinsinden)
       const finalTotal = Math.max(0, dynamicTotal - discountAmount);
+      const finalTotalKurus = Math.round(finalTotal * 100);
   
       // 🌸 2. Şehir & İlçe Bilgisini "İl / İlçe" Şeklinde Birlestirme
       const selectedCityObj = typeof CITIES_DATA !== 'undefined' 
         ? CITIES_DATA.find((c: any) => c.id === selectedCityId) 
         : null;
       const cityName = selectedCityObj ? selectedCityObj.name : '';
-      const districtName = form.city; // Formdaki ilçe adı
+      const districtName = form.city;
 
-      // Ekranda ve Faturada "Edirne / Süloğlu" şeklinde görünmesi için:
       const fullLocation = cityName ? `${cityName} / ${districtName}` : districtName;
 
-      // 🌸 3. Siparişi veritabanına/state'e gönderirken Varyantlı İsimleri ve Birim Fiyatı Koruma
+      // 🌸 3. Iyzico için buyer ve basketItems hazırla
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const buyer = {
+        id: user?.id || 'guest_' + crypto.randomUUID(),
+        name: form.recipientName,
+        surname: form.recipientName.split(' ').slice(-1).join(' ') || 'Customer',
+        email: user?.email || 'customer@example.com',
+        phone: form.recipientPhone,
+        address: form.address,
+        city: cityName,
+        district: districtName
+      };
+
+      const basketItems = items.map((item) => ({
+        id: item.product?.id || item.id,
+        name: item.product?.name || 'Çiçek Ürünü',
+        price: Math.round((item.product?.price || 0) * 100),
+        quantity: item.quantity || 1
+      }));
+
+      // 🌸 4. Siparişi veritabanına kaydet (pending status ile)
       const orderItems = items.map((item) => {
         const fullProductName = item.product?.name || 'Çiçek Ürünü';
         const itemPrice = Number(item.product?.price || 0);
@@ -336,11 +349,10 @@ const handleApplyCoupon = async () => {
           title: fullProductName,
           quantity: item.quantity || 1,
           price: itemPrice,
-          unit_price: itemPrice, // 🌸 Fatura ve Siparişlerim için Kritik!
+          unit_price: itemPrice,
         };
       });
   
-      // 🌸 4. Sipariş Oluşturma (İl/İlçe ve Kargo Tutarları Eksiksiz)
       const orderId = await onPlaceOrder({
         items: orderItems,
         subtotal: subtotalAmount,
@@ -348,9 +360,9 @@ const handleApplyCoupon = async () => {
         delivery_fee: calculatedDeliveryFee,
         total: finalTotal,
         recipientName: form.recipientName,
-        recipient_name: form.recipientName, // 🌸 DB snake_case desteği
+        recipient_name: form.recipientName,
         recipientPhone: form.recipientPhone,
-        recipient_phone: form.recipientPhone, // 🌸 Telefonun "Belirtilmedi" çıkmasını önler
+        recipient_phone: form.recipientPhone,
         address: form.address,
         shipping_address: form.address,
         city: fullLocation,
@@ -358,39 +370,41 @@ const handleApplyCoupon = async () => {
         note: form.note,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         discountAmount: discountAmount,
+        status: 'pending'
       } as any);
-  
-      // 🎟️ 5. KUPON KULLANIM SAYISINI ARTIRMA
-      if (appliedCoupon && (appliedCoupon.id || appliedCoupon.code)) {
-        const query = supabase.from('coupons').select('id, used_count');
-        const { data: latestCoupon } = appliedCoupon.id 
-          ? await query.eq('id', appliedCoupon.id).single()
-          : await query.eq('code', appliedCoupon.code).single();
-  
-        if (latestCoupon) {
-          const nextCount = (latestCoupon.used_count || 0) + 1;
-  
-          const { error: updateErr } = await supabase
-            .from('coupons')
-            .update({ used_count: nextCount })
-            .eq('id', latestCoupon.id);
-  
-          if (updateErr) {
-            console.error('❌ KUPON UPDATE HATASI:', updateErr.message);
-          } else {
-            console.log(`✅ KUPON SAYACI BAŞARIYLA GÜNCELLENDİ: ${nextCount}`);
-          }
-        }
-      }
   
       // 🌸 Adresi kaydet (checkbox işaretliyse)
       await handleSaveAddress();
 
-      // 7. Başarılı sayfasına yönlendir
-      navigate({ name: 'order-success', orderId });
+      // 🌸 6. Stripe checkout çağrısı
+      const response = await fetch(
+        'https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/create-checkout',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user ? (await supabase.auth.getSession()).data.session?.access_token : ''}`
+          },
+          body: JSON.stringify({
+            price: finalTotalKurus,
+            buyer: buyer,
+            basketItems: basketItems,
+            orderId: orderId
+          })
+        }
+      );
+
+      const checkoutData = await response.json();
+
+      if (!response.ok || checkoutData.error) {
+        throw new Error(checkoutData.error || 'Ödeme başlatılamadı');
+      }
+
+      // 🌸 7. Stripe ödeme sayfasına yönlendir
+      window.location.href = checkoutData.paymentPageUrl;
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);
-      alert('Sipariş verilirken bir hata oluştu.');
+      alert('Ödeme başlatılırken bir hata oluştu: ' + (error as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -434,19 +448,6 @@ const handleApplyCoupon = async () => {
     } catch (err) {
       console.error('Adres kaydetme hatası:', err);
     }
-  };
-
-  
-
-  const formatCardNumber = (val: string) => {
-    const digits = val.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(.{4})/g, '$1 ').trim();
-  };
-
-  const formatExpiry = (val: string) => {
-    const digits = val.replace(/\D/g, '').slice(0, 4);
-    if (digits.length >= 3) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return digits;
   };
 
   const crumbs = [
@@ -722,56 +723,14 @@ const handleApplyCoupon = async () => {
               <h2 className="font-display text-xl font-bold text-sand-900">Ödeme Bilgileri</h2>
             </div>
 
-            <div className="space-y-4">
-              <div data-error={!!errors.cardNumber}>
-                <label className="label">Kart Numarası *</label>
-                <input
-                  type="text"
-                  value={form.cardNumber}
-                  onChange={(e) => update('cardNumber', formatCardNumber(e.target.value))}
-                  className="input"
-                  placeholder="0000 0000 0000 0000"
-                  maxLength={19}
-                />
-                {errors.cardNumber && <p className="text-xs text-red-500 mt-1">{errors.cardNumber}</p>}
+            <div className="bg-brand-50 border border-brand-200 rounded-xl p-4 text-center">
+              <div className="flex items-center justify-center gap-2 text-sm text-brand-700 mb-2">
+                <Lock className="w-4 h-4" />
+                <span className="font-semibold">Güvenli Ödeme</span>
               </div>
-              <div data-error={!!errors.cardName}>
-                <label className="label">Kart Üzerindeki İsim *</label>
-                <input
-                  type="text"
-                  value={form.cardName}
-                  onChange={(e) => update('cardName', e.target.value)}
-                  className="input"
-                  placeholder="AD SOYAD"
-                />
-                {errors.cardName && <p className="text-xs text-red-500 mt-1">{errors.cardName}</p>}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div data-error={!!errors.cardExpiry}>
-                  <label className="label">Son Kullanma *</label>
-                  <input
-                    type="text"
-                    value={form.cardExpiry}
-                    onChange={(e) => update('cardExpiry', formatExpiry(e.target.value))}
-                    className="input"
-                    placeholder="MM/YY"
-                    maxLength={5}
-                  />
-                  {errors.cardExpiry && <p className="text-xs text-red-500 mt-1">{errors.cardExpiry}</p>}
-                </div>
-                <div data-error={!!errors.cardCvv}>
-                  <label className="label">CVV *</label>
-                  <input
-                    type="text"
-                    value={form.cardCvv}
-                    onChange={(e) => update('cardCvv', e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    className="input"
-                    placeholder="123"
-                    maxLength={4}
-                  />
-                  {errors.cardCvv && <p className="text-xs text-red-500 mt-1">{errors.cardCvv}</p>}
-                </div>
-              </div>
+              <p className="text-sm text-sand-600">
+                Ödeme işleminiz Iyzico güvenli altyapısı ile yapılacaktır. Siparişi tamamladığınızda ödeme sayfasına yönlendirileceksiniz.
+              </p>
             </div>
 
             <div className="flex items-center gap-2 mt-4 text-sm text-sand-500">

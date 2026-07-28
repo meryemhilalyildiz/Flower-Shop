@@ -1,0 +1,2 @@
+[functions.get-order-from-session]
+verify_jwt = false
