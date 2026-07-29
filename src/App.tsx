@@ -23,7 +23,7 @@ import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
 import FavoritesPage from './pages/FavoritesPage';
-import AdminOrdersPageNew from './pages/AdminOrdersPageNew';
+import AdminOrdersPage from './pages/AdminOrdersPage';
 import { AdminDashboard } from './pages/AdminDashboardPage';
 import { AdminShippingPage } from './pages/AdminShippingPage';
 import AdminLoginPage from './pages/AdminLoginPage';
@@ -431,7 +431,7 @@ function App() {
       case 'admin-orders':
         return (
           <AdminLayout currentPage="admin-orders" navigate={navigate}>
-            <AdminOrdersPageNew />
+            <AdminOrdersPage />
           </AdminLayout>
         );
 
