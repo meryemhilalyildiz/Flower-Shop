@@ -65,8 +65,15 @@ function App() {
         setLoading(false);
       }
     }
-
+    
     loadData();
+
+    // 🌸 OTURUM DURUMU DEĞİŞTİĞİNDE (ÇIKIŞ YAPILDINDA) ANASAYFAYA YÖNLENDİRME
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        navigate({ name: 'home' });
+      }
+    });
 
     const interval = setInterval(() => {
       fetchProductsFromSupabase()
@@ -78,8 +85,11 @@ function App() {
         .catch((error) => console.error('Ürünler yenilenirken hata:', error));
     }, 10000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      authListener.subscription.unsubscribe(); // 🌸 Dinleyiciyi temizliyoruz
+    };
+  }, [navigate]);
 
   const showToast = useCallback((msg: string) => {
     setToast(null);
