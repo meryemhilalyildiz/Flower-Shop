@@ -1,74 +1,117 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 import type { Route } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { usePageContent } from '../hooks/usePageContent';
 import EditableText from '../components/admin/EditableText';
 import { useAdminEditing } from '../contexts/AdminEditingContext';
+import { supabase } from '../supabaseClient';
 
 type Props = {
   navigate: (r: Route) => void;
 };
 
+interface FAQ {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  sort_order?: number;
+}
+
+const CATEGORIES = [
+  'Teslimat',
+  'Çiçekler & Bakım',
+  'Ödeme & İade',
+  'Hesap & Sipariş',
+];
+
 export default function FaqPage({ navigate }: Props) {
-  const { content, loading } = usePageContent('faq');
+  const { content, loading: contentLoading } = usePageContent('faq');
   const { isEditing, onTextChange } = useAdminEditing();
   const [openId, setOpenId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('Teslimat');
+  
+  // 🌸 Supabase Canlı S.S.S Verileri State'i
+  const [dbFaqs, setDbFaqs] = useState<FAQ[]>([]);
+  const [faqsLoading, setFaqsLoading] = useState(true);
 
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },
     { label: 'S.S.S.' },
   ];
 
-  // Varsayılan kategoriler (veritabanından içerik yüklenemezse)
+  // 🌸 Supabase'den Canlı S.S.S Verilerini Çek
+  useEffect(() => {
+    async function fetchFaqs() {
+      try {
+        setFaqsLoading(true);
+        const { data, error } = await supabase
+          .from('faqs')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+
+        if (!error && data) {
+          setDbFaqs(data);
+        }
+      } catch (err) {
+        console.error('S.S.S çekilirken hata oluştu:', err);
+      } finally {
+        setFaqsLoading(false);
+      }
+    }
+    fetchFaqs();
+  }, []);
+
+  // Yedek varsayılan sorular (Veritabanı boşsa gösterilir)
   const defaultCategories = [
     {
       category: 'Teslimat',
       questions: [
-        { q: 'Siparişim ne zaman teslim edilir?', a: 'Saat 16:00\'dan önce verilen siparişler aynı gün, 16:00\'dan sonra verilen siparişler ertesi gün teslim edilir. Teslimat saatleri 09:00-22:00 arasındadır.' },
-        { q: 'Teslimat ücreti ne kadar?', a: 'Teslimat ücreti 49 TL\'dir.' },
-        { q: 'Türkiye\'nin her yerine teslimat yapıyor musunuz?', a: 'Evet, Türkiye\'nin 81 iline teslimat yapıyoruz. Kırsal bölgelerde teslimat süresi 1-2 gün uzayabilir.' },
-        { q: 'Teslimat saatini seçebilir miyim?', a: 'Sipariş sırasında teslimat tarihini belirtebilirsiniz. Özel saat talepleri için müşteri hizmetlerimizi arayabilirsiniz.' },
+        { id: 'def-1', question: 'Siparişim ne zaman teslim edilir?', answer: 'Saat 16:00\'dan önce verilen siparişler aynı gün, 16:00\'dan sonra verilen siparişler ertesi gün teslim edilir.' },
+        { id: 'def-2', question: 'Teslimat ücreti ne kadar?', answer: 'Teslimat ücreti mesafe ve lokasyona göre dinamik hesaplanmaktadır.' },
+        { id: 'def-3', question: 'Türkiye\'nin her yerine teslimat yapıyor musunuz?', answer: 'Evet, Türkiye\'nin 81 iline teslimat yapıyoruz.' },
       ],
     },
     {
       category: 'Çiçekler & Bakım',
       questions: [
-        { q: 'Çiçeklerim ne kadar süre taze kalır?', a: 'Doğru bakım ile kesme çiçekler 5-7 gün taze kalır. Saksılı bitkiler çok daha uzun ömümlüdür. 7 gün tazelik garantisi sunuyoruz.' },
-        { q: 'Çiçeklerimi nasıl bakım yapmalıyım?', a: 'Vazoyu temiz su ile doldurun, çiçek saplarını 45 derece açıyla kesin ve suyu her 2 günde bir değiştirin. Direkt güneş ışığından uzak tutun.' },
-        { q: 'Çiçekler taze değilse ne yapmalıyım?', a: 'Çiçekleriniz taze değilse, teslimattan itibaren 48 saat içinde bize ulaşın. Ücretsiz değiştirme veya iade sağlıyoruz.' },
-        { q: 'Özel buket siparişi verebilir miyim?', a: 'Evet! Özel günler için kişiselleştirilmiş buketler tasarlıyoruz. İletişim sayfamızdan bize ulaşın, floristlerimiz size yardımcı olsun.' },
+        { id: 'def-4', question: 'Çiçeklerim ne kadar süre taze kalır?', answer: 'Doğru bakım ile kesme çiçekler 5-7 gün taze kalır. 7 gün tazelik garantisi sunuyoruz.' },
+        { id: 'def-5', question: 'Çiçeklerimi nasıl bakım yapmalıyım?', answer: 'Vazoyu temiz su ile doldurun, çiçek saplarını 45 derece açıyla kesin ve suyu her 2 günde bir değiştirin.' },
       ],
     },
     {
       category: 'Ödeme & İade',
       questions: [
-        { q: 'Hangi ödeme yöntemlerini kabul ediyorsunuz?', a: 'Tüm kredi/banka kartları kabul edilmektedir. Ödemeleriniz 256-bit SSL sertifikası ile güvenle işlenir.' },
-        { q: 'İade politikası nedir?', a: 'Çiçek tazelik garantisi kapsamında, teslimattan sonraki 48 saat içinde çiçeklerde sorun tespit ederseniz ücretsiz değiştirme veya iade yapılır.' },
-        { q: 'Fatura alabilir miyim?', a: 'Evet, sipariş sırasında fatura bilgilerinizi girebilirsiniz. Fatura e-posta adresinize PDF olarak gönderilir.' },
-        { q: 'Hediye kartı veya kupon kullanabilir miyim?', a: 'Sipariş ödeme sayfasında indirim kodunuzu girebilirsiniz. Hediye kartları da aynı şekilde kullanılabilir.' },
+        { id: 'def-6', question: 'Hangi ödeme yöntemlerini kabul ediyorsunuz?', answer: 'Tüm kredi/banka kartları kabul edilmektedir.' },
+        { id: 'def-7', question: 'İade politikası nedir?', answer: 'Çiçek tazelik garantisi kapsamında 48 saat içinde ücretsiz değiştirme veya iade yapılır.' },
       ],
     },
     {
       category: 'Hesap & Sipariş',
       questions: [
-        { q: 'Üyelik zorunlu mu?', a: 'Hayır, üye olmadan misafir olarak sipariş verebilirsiniz. Ancak üyelik ile sipariş geçmişinize erişebilir ve daha hızlı sipariş verebilirsiniz.' },
-        { q: 'Siparişimi nasıl takip edebilirim?', a: 'Sipariş onay sayfasından ve size gönderilen e-posta linkinden sipariş durumunuzu takip edebilirsiniz.' },
-        { q: 'Siparişimi iptal edebilir miyim?', a: 'Siparişiniz henüz hazırlanma aşamasındaysa iptal edebilirsiniz. Çiçekler hazırlanmaya başlandıysa iptal mümkün olmayabilir.' },
+        { id: 'def-8', question: 'Üyelik zorunlu mu?', answer: 'Hayır, üye olmadan misafir olarak sipariş verebilirsiniz.' },
+        { id: 'def-9', question: 'Siparişimi nasıl takip edebilirim?', answer: 'Siparişlerim sayfasından sipariş durumunuzu takip edebilirsiniz.' },
       ],
     },
   ];
 
-  const categories = content?.categories || defaultCategories;
+  // Supabase'de veri varsa Supabase verisini süz, yoksa varsayılan verileri kullan
+  const currentFaqs: { id: string; question: string; answer: string }[] = dbFaqs.length > 0
+    ? dbFaqs
+        .filter((f) => f.category === activeCategory)
+        .map((f) => ({ id: f.id, question: f.question, answer: f.answer }))
+    : (defaultCategories.find((c) => c.category === activeCategory)?.questions || []);
+
   const heroTitle = content?.hero_title || 'Sıkça Sorulan Sorular';
   const heroDescription = content?.hero_description || 'Merak ettiğiniz soruların cevaplarını burada bulamadıysanız, bize ulaşmaktan çekinmeyin.';
 
-  if (loading) {
+  if (contentLoading || faqsLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
-        <p className="ml-4 text-gray-600">Yükleniyor...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500"></div>
+        <p className="ml-4 text-sand-600 font-medium">Yükleniyor...</p>
       </div>
     );
   }
@@ -77,6 +120,7 @@ export default function FaqPage({ navigate }: Props) {
 
   return (
     <div className="animate-fade-in">
+      {/* Header Banner */}
       <div className="bg-gradient-to-br from-brand-50 via-sand-50 to-leaf-50">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <Breadcrumbs items={crumbs} />
@@ -109,73 +153,73 @@ export default function FaqPage({ navigate }: Props) {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-12">
         {/* Category tabs */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-8">
-          {categories.map((cat: any) => (
+        <div className="flex justify-center gap-2 overflow-x-auto scrollbar-hide pb-2 mb-8">
+          {CATEGORIES.map((cat) => (
             <button
-              key={cat.category}
-              onClick={() => setActiveCategory(cat.category)}
-              className={`chip whitespace-nowrap ${
-                activeCategory === cat.category ? 'bg-brand-600 text-white' : 'bg-white text-sand-600 border border-sand-200 hover:border-brand-300'
+              key={cat}
+              onClick={() => {
+                setActiveCategory(cat);
+                setOpenId(null);
+              }}
+              className={`chip whitespace-nowrap cursor-pointer transition-all ${
+                activeCategory === cat
+                  ? 'bg-brand-600 text-white shadow-xs'
+                  : 'bg-white text-sand-600 border border-sand-200 hover:border-brand-300'
               }`}
             >
-              {cat.category}
+              {cat}
             </button>
           ))}
         </div>
 
-        {/* FAQs */}
+        {/* FAQs Accordion */}
         <div className="space-y-3">
-          {categories
-            .filter((cat: any) => cat.category === activeCategory)
-            .flatMap((cat: any, catIndex: number) => cat.questions.map((q: any, qIndex: number) => ({ ...q, catIndex, qIndex })))
-            .map((item: any, i: number) => {
-              const id = `${activeCategory}-${i}`;
-              const isOpen = openId === id;
+          {currentFaqs.length === 0 ? (
+            <div className="text-center py-12 bg-sand-50 rounded-2xl border border-sand-200 text-sand-500 text-sm">
+              Bu kategoride henüz yayınlanmış soru bulunmuyor.
+            </div>
+          ) : (
+            currentFaqs.map((item) => {
+              const isOpen = openId === item.id;
               return (
-                <div key={id} className="card overflow-hidden">
+                <div key={item.id} className="card overflow-hidden transition-all duration-200">
                   <button
-                    onClick={() => toggle(id)}
-                    className="w-full flex items-center justify-between gap-4 p-5 text-left"
+                    onClick={() => toggle(item.id)}
+                    className="w-full flex items-center justify-between gap-4 p-5 text-left cursor-pointer"
                   >
-                    <span className="font-semibold text-sand-800">
-                      {isEditing ? (
-                        <EditableText
-                          value={item.q}
-                          onSave={(newValue) => onTextChange(`categories.${item.catIndex}.questions.${item.qIndex}.q`, newValue)}
-                        />
-                      ) : (
-                        item.q
-                      )}
+                    <span className="font-bold text-sand-900 text-base md:text-lg">
+                      {item.question}
                     </span>
-                    <ChevronDown className={`w-5 h-5 text-sand-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`w-5 h-5 text-sand-400 flex-shrink-0 transition-transform duration-200 ${
+                        isOpen ? 'rotate-180 text-brand-600' : ''
+                      }`}
+                    />
                   </button>
-                  <div className={`grid transition-all duration-300 ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                    <div className="overflow-hidden">
-                      <p className="px-5 pb-5 text-sand-600 leading-relaxed">
-                        {isEditing ? (
-                          <EditableText
-                            value={item.a}
-                            onSave={(newValue) => onTextChange(`categories.${item.catIndex}.questions.${item.qIndex}.a`, newValue)}
-                            multiline
-                          />
-                        ) : (
-                          item.a
-                        )}
-                      </p>
+                  {isOpen && (
+                    <div className="px-5 pb-5 text-sand-600 text-sm md:text-base leading-relaxed border-t border-sand-100 pt-3 animate-fade-in">
+                      {item.answer}
                     </div>
-                  </div>
+                  )}
                 </div>
               );
-            })}
+            })
+          )}
         </div>
 
-        {/* CTA */}
-        <div className="text-center mt-12 p-8 rounded-3xl bg-sand-100">
+        {/* CTA (İletişim Yönlendirmesi) */}
+        <div className="text-center mt-12 p-8 rounded-3xl bg-sand-100/70 border border-sand-200">
           <h3 className="font-display text-xl font-bold text-sand-900">Sorunuz cevaplanmadı mı?</h3>
-          <p className="text-sand-600 mt-2">Müşteri hizmetleri ekibimiz size yardımcı olmaktan mutluluk duyar.</p>
-          <button onClick={() => navigate({ name: 'contact' })} className="btn-primary mt-6">
+          <p className="text-sand-600 mt-2 text-sm md:text-base">
+            Müşteri hizmetleri ekibimiz size yardımcı olmaktan mutluluk duyar.
+          </p>
+          <button
+            onClick={() => navigate({ name: 'contact' })}
+            className="btn-primary mt-6 cursor-pointer"
+          >
             İletişime Geç
           </button>
         </div>
