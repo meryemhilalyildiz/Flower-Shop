@@ -5,14 +5,24 @@ import { usePageContent } from '../hooks/usePageContent';
 
 export default function Footer() {
   // 🌸 Hakkımızda sayfasının canlı içeriğini çekiyoruz
-  const { content } = usePageContent('about');
+  const { content: aboutContent } = usePageContent('about');
+  // 🌸 İletişim sayfasının canlı içeriğini çekiyoruz
+  const { content: contactContent } = usePageContent('contact');
 
   // 🌸 Veritabanındaki 'hero_description', 'story' veya 'description' alanlarından hangisi güncellendiyse onu alıyoruz
   const footerDescription = 
-    content?.hero_description || 
-    content?.description || 
-    content?.story || 
+    aboutContent?.hero_description || 
+    aboutContent?.description || 
+    aboutContent?.story || 
     "1998'den beri taze çiçekler ve özel buketler tasarlıyoruz. Sevdiklerinizi en güzel çiçeklerle mutlu ediyoruz.";
+
+  // 🌸 İletişim bilgilerini veritabanından alıyoruz
+  const defaultContactInfo = [
+    { icon: 'MapPin', title: 'Adres', value: 'İstiklal Cd. No:123, Beyoğlu, İstanbul' },
+    { icon: 'Phone', title: 'Telefon', value: '0850 123 45 67' },
+    { icon: 'Mail', title: 'E-posta', value: 'destek@cicekci.com' },
+  ];
+  const contactInfo = contactContent?.contact_info || defaultContactInfo;
   const linkGroups = [
     {
       title: 'Mağaza',
@@ -86,18 +96,17 @@ export default function Footer() {
           <div>
             <h4 className="font-display text-lg font-semibold text-white mb-4">İletişim</h4>
             <ul className="space-y-3 text-sm text-sand-400">
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 text-brand-400 flex-shrink-0" />
-                <span>İstiklal Cd. No:123, Beyoğlu, İstanbul</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-brand-400 flex-shrink-0" />
-                <span>0850 123 45 67</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-brand-400 flex-shrink-0" />
-                <span>destek@cicekci.com</span>
-              </li>
+              {contactInfo.map((info: any) => {
+                const IconComponent = info.icon === 'MapPin' ? MapPin : 
+                                     info.icon === 'Phone' ? Phone : 
+                                     info.icon === 'Mail' ? Mail : MapPin;
+                return (
+                  <li key={info.title} className="flex items-start gap-2">
+                    <IconComponent className="w-4 h-4 mt-0.5 text-brand-400 flex-shrink-0" />
+                    <span>{info.value}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
