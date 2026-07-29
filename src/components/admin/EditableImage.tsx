@@ -88,7 +88,7 @@ export default function EditableImage({ src, alt, onSave, className = '' }: Prop
 
   if (isEditing) {
     return (
-      <div className="relative inline-block">
+      <div className="editable-component relative inline-block">
         <input
           ref={fileInputRef}
           type="file"
@@ -189,7 +189,7 @@ export default function EditableImage({ src, alt, onSave, className = '' }: Prop
   }
 
   return (
-    <div className="relative group inline-block">
+    <div className="editable-component relative group inline-block">
       <img
         src={src}
         alt={alt}
