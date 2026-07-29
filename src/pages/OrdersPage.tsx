@@ -29,7 +29,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
         return;
       }
 
-      // 🌸 Hem order_items hem de doğrudan sipariş verisini detaylı çekiyoruz
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -44,11 +43,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
 
       if (error) throw error;
 
-      console.log('🔍 SİPARİŞLER VE İÇİNDEKİ İTEMLAR:', data);
-
       if (data) {
         const mappedOrders: OrderInfo[] = data.map((o: any) => {
-          // 🌸 Ürün listesini her olası alandan topla
           const rawItems = o.order_items || o.items || o.products || [];
 
           const mappedItems = rawItems.map((item: any) => {
@@ -67,7 +63,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
               item.title ||
               'Çiçek Ürünü';
 
-            // 🌸 Ürün görselini products tablosundan çek
             const productImage = item.products?.image || item.products?.image_url || item.image || item.image_url;
             const productImages = productImage ? [productImage] : [];
 
@@ -83,7 +78,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 images: productImages,
                 image: productImage,
               },
-              // 🌸 Görsel bilgisini doğrudan item'e de ekle
               images: productImages,
               image: productImage,
             };
@@ -103,10 +97,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
             subtotal: Number(o.subtotal || 0),
             deliveryFee: Number(o.delivery_fee || o.deliveryFee || 0),
             discountAmount: Number(o.discount_amount || o.discountAmount || 0),
+            applied_coupon_code: o.applied_coupon_code || o.couponCode || null,
             status: o.status || 'pending',
             note: o.note,
             tracking_number: o.tracking_number,
-            // 🌸 DİKKAT: Ürünleri hem items hem order_items içerisine atıyoruz ki fatura servisi kesin bulsun!
             items: mappedItems,
             order_items: mappedItems
           };
@@ -124,17 +118,12 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
     fetchUserOrders();
   }, []);
 
-  // Prop'tan gelen veya DB'den çekilen siparişleri harmanla
   const orderList = dbOrders.length > 0
     ? dbOrders
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  // 🌸 Sipariş İptal Talebi Fonksiyonu
   const handleCancelOrder = async (orderId: string, reason: string) => {
     try {
-      console.log('🔄 İptal gönderiliyor... ID:', orderId, 'Neden:', reason);
-  
-      // 1. Supabase Update
       const { data, error } = await supabase
         .from('orders')
         .update({ 
@@ -145,14 +134,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
         .select();
   
       if (error) {
-        console.error('❌ SUPABASE UPDATE HATASI:', error);
-        alert('İptal veritabanına işlenemedi (Yetki Hatası): ' + error.message);
+        alert('İptal veritabanına işlenemedi: ' + error.message);
         return;
       }
   
-      console.log('✅ Supabase Güncellendi:', data);
-  
-      // 2. Local State Güncelleme
       setDbOrders((prevOrders) =>
         prevOrders.map((o) =>
           String(o.id) === String(orderId) 
@@ -163,12 +148,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
   
       alert('Siparişiniz başarıyla iptal edildi!');
     } catch (err: any) {
-      console.error('❌ Beklenmeyen hata:', err);
       alert('Hata oluştu: ' + (err.message || ''));
     }
   };
 
-  // 🌸 Siparişin teslim edilmiş ürünlerinden yorum yap
   const handleReviewOrder = (order: OrderInfo) => {
     const deliveredProducts = order.items
       .map((item: any) => {
@@ -243,15 +226,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
           const isCancelled = order.status === 'İptal Edildi' || order.status === 'cancelled' || order.status === 'İptal Talebi Alındı';
           const canCancel = order.status === 'pending' || order.status === 'Hazırlanıyor' || order.status === 'processing';
 
-          // Sipariş Hesaplama Değerleri
-          const currentSubtotal = Number(order?.subtotal || 0);
-          const calculatedSubtotal = currentSubtotal > 0
-            ? currentSubtotal
-            : (order.items || []).reduce((sum: number, item: any) => {
-                const price = Number(item.price || item.unit_price || item.product?.price || 0);
-                const qty = Number(item.quantity || 1);
-                return sum + (price * qty);
-              }, 0);
           return (
             <div
               key={order.id}
@@ -285,37 +259,32 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* 🌸 Sipariş Durum Rozeti */}
-<span
-  className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
-    isDelivered || order.status === 'delivered'
-      ? 'bg-emerald-100 text-emerald-800'
-      : isCancelled || order.status === 'cancelled'
-      ? 'bg-red-100 text-red-800 border border-red-200'
-      : 'bg-amber-100 text-amber-800'
-  }`}
->
-  {isCancelled || order.status === 'cancelled'
-    ? '❌ İptal Edildi'
-    : isDelivered || order.status === 'delivered'
-    ? '✅ Teslim Edildi'
-    : (order.status || 'pending')}
-</span>
+                  <span
+                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
+                      isDelivered || order.status === 'delivered'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : isCancelled || order.status === 'cancelled'
+                        ? 'bg-red-100 text-red-800 border border-red-200'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {isCancelled || order.status === 'cancelled'
+                      ? '❌ İptal Edildi'
+                      : isDelivered || order.status === 'delivered'
+                      ? '✅ Teslim Edildi'
+                      : (order.status || 'pending')}
+                  </span>
 
-                  {/* 💬 WhatsApp Destek Buttonu */}
                   <button
                     onClick={() => openWhatsApp(order)}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-emerald-200"
-                    title="WhatsApp Destek"
                   >
                     <MessageCircle className="w-4 h-4" />
                     WhatsApp Destek
                   </button>
 
-                  {/* 📄 Fatura İndir Butonu */}
                   <button
                     onClick={() => {
-                      // Faturaya gönderilmeden önce items dizisinin dolu olduğundan emin olunur
                       const invoiceData = {
                         ...order,
                         items: (order.items && order.items.length > 0)
@@ -329,25 +298,24 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                     <Download className="w-3.5 h-3.5" />
                     Fatura
                   </button>
-{/* 🚫 Sipariş İptal Et Butonu */}
-{canCancel && (
-  <button
-    type="button"
-    onClick={() => {
-      const reason = window.prompt('Lütfen siparişinizi iptal etme nedeninizi yazınız:');
-      if (reason && reason.trim() !== '') {
-        handleCancelOrder(order.id, reason.trim());
-      } else if (reason !== null) {
-        alert('İptal işlemi için bir neden belirtmelisiniz.');
-      }
-    }}
-    className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
-  >
-    🚫 İptal Et
-  </button>
-)}
 
-                  {/* 🌸 Yorum Yap Buttonu (Teslim Edildiyse) */}
+                  {canCancel && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const reason = window.prompt('Lütfen siparişinizi iptal etme nedeninizi yazınız:');
+                        if (reason && reason.trim() !== '') {
+                          handleCancelOrder(order.id, reason.trim());
+                        } else if (reason !== null) {
+                          alert('İptal işlemi için bir neden belirtmelisiniz.');
+                        }
+                      }}
+                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                    >
+                      🚫 İptal Et
+                    </button>
+                  )}
+
                   {isDelivered && (
                     <button
                       onClick={() => handleReviewOrder(order)}
@@ -360,7 +328,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 </div>
               </div>
 
-              {/* Sipariş İçindeki Ürünler */}
+              {/* Sipariş Ürünleri */}
               <div className="p-6">
                 <div className="divide-y divide-gray-100">
                   {order.items.map((item: any, index) => {
@@ -385,9 +353,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                         key={index}
                         onClick={() => {
                           const slug = item.product?.slug || item.product_id;
-                          if (slug) {
-                            navigate({ name: 'product', slug: slug });
-                          }
+                          if (slug) navigate({ name: 'product', slug: slug });
                         }}
                         className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 w-full text-left hover:bg-pink-50/50 rounded-lg px-2 -mx-2 transition-colors cursor-pointer"
                       >
@@ -434,50 +400,49 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 {/* 🧾 Sipariş Tutar Detayları */}
                 <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
                   {(() => {
-                    // 🌸 1. Değişkenleri Çekme
                     const tot = Number(order.total ?? (order as any).total_amount ?? 0);
                     const recordedDiscount = Number(order.discountAmount ?? (order as any).discount_amount ?? 0);
                     let fee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
 
-                    // 🌸 2. Kargo DB'de 0 ise akıllı kargo varsayımı (300 TL)
-                    if (fee === 0 && tot > 0) {
-                      fee = 300; // Varsayılan kargo ücreti
-                    }
+                    if (fee === 0 && tot > 0) fee = 300;
 
-                    // 🌸 3. Gerçek Net Ürün Tutarı (Subtotal)
                     let rawSubtotal = Number(order.subtotal || 0);
                     if (rawSubtotal <= 0 || rawSubtotal >= tot) {
                       rawSubtotal = tot - fee + recordedDiscount;
                     }
 
-                    // 🌸 4. Gerçek İndirim Yüzdesi (%10)
                     const discountRate = rawSubtotal > 0 && recordedDiscount > 0
                       ? Math.round((recordedDiscount / rawSubtotal) * 100)
                       : 0;
 
+                    const couponCode = (order as any).applied_coupon_code || (order as any).applied_coupon;
+
                     return (
                       <div className="space-y-1.5 text-sm">
-                        {/* Ürünler Toplamı (290 TL) */}
                         <div className="flex justify-between text-gray-600">
                           <span>Ürünler Toplamı:</span>
                           <span className="font-semibold text-gray-800">₺{rawSubtotal.toFixed(2)}</span>
                         </div>
 
-                        {/* 🎟️ Kupon İndirimi (%10 -> -29 TL) */}
+                        {/* 🌸 DİNAMİK İNDİRİM ETİKETİ (KUPON vs KAMPANYA) */}
                         {recordedDiscount > 0 && (
                           <div className="flex justify-between text-emerald-600 font-semibold">
-                            <span>🎟️ Kupon İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</span>
+                            <span className="flex items-center gap-1">
+                              {couponCode ? (
+                                <>🎟️ Kupon İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</>
+                              ) : (
+                                <>🏷️ Kampanya İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</>
+                              )}
+                            </span>
                             <span>-₺{recordedDiscount.toFixed(2)}</span>
                           </div>
                         )}
 
-                        {/* 🚚 Kargo / Teslimat Ücreti (300 TL) */}
                         <div className="flex justify-between text-gray-600">
                           <span>🚚 Kargo / Teslimat Ücreti:</span>
                           <span className="font-semibold text-gray-800">₺{fee.toFixed(2)}</span>
                         </div>
 
-                        {/* Genel Toplam (561 TL) */}
                         <div className="flex justify-between pt-2 border-t border-gray-200 text-base font-bold text-pink-600">
                           <span>Genel Toplam:</span>
                           <span>₺{tot.toFixed(2)}</span>
@@ -487,7 +452,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                   })()}
                 </div>
 
-                {/* Adres, Not ve Kargo Takip Bilgisi */}
+                {/* Adres & Kargo Takip */}
                 <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-gray-600 bg-gray-50/80 p-3.5 rounded-xl">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
                     <div>
@@ -502,7 +467,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                     )}
                   </div>
 
-                  {/* 🚚 KARGO TAKİP NUMARASI */}
                   {order.tracking_number && (
                     <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
                       <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
@@ -530,7 +494,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
         })}
       </div>
 
-      {/* 🌸 Ürün Seçimi Modalı (Birden fazla ürün varsa) */}
+      {/* Yorum Yapılacak Ürün Seçimi Modalı */}
       {reviewProductSelection && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
@@ -566,16 +530,12 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
         </div>
       )}
 
-      {/* 🌸 Ürün Değerlendirme Modalı */}
       {reviewProduct && (
         <ReviewModal
           product={reviewProduct}
           isOpen={true}
           onClose={() => setReviewProduct(null)}
-          onReviewSubmitted={() => {
-            // Yorum gönderildikten sonra siparişleri yenile
-            fetchUserOrders();
-          }}
+          onReviewSubmitted={() => fetchUserOrders()}
         />
       )}
     </div>

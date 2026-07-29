@@ -3,7 +3,7 @@ import type { OrderInfo } from '../types';
 export const generateInvoicePDF = (order: OrderInfo) => {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
-    alert('Lütfen açılır pencerelere (pop-up) izin verin.');
+    alert('Lütfen açılır pencerilere (pop-up) izin verin.');
     return;
   }
 
@@ -41,7 +41,7 @@ export const generateInvoicePDF = (order: OrderInfo) => {
 
   const couponCode = (order as any).applied_coupon_code || (order as any).couponCode || (order as any).coupon_code || null;
 
-  // 🌸 3. Tutar Hesaplamaları (Önce tanımlıyoruz ki ürün tablosunda rawSubtotal kullanılabilsin)
+  // 🌸 3. Tutar Hesaplamaları
   const totalAmount = Number(order.total || (order as any).total_amount || 0);
   let deliveryFee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
   const discountAmount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
@@ -59,7 +59,7 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     ? Math.round((discountAmount / rawSubtotal) * 100) 
     : 0;
 
-  // 🌸 4. Ürün Satırlarını Oluşturma (Artık rawSubtotal üstte tanımlı!)
+  // 🌸 4. Ürün Satırlarını Oluşturma
   const rawItems = 
     order.items || 
     (order as any).order_items || 
@@ -125,7 +125,6 @@ export const generateInvoicePDF = (order: OrderInfo) => {
       })
       .join('');
   } else {
-    // Fallback: Ürün çekilemediyse bile fiyat bilgisiyle basılır
     itemsHtml = `
       <tr>
         <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
@@ -219,7 +218,9 @@ export const generateInvoicePDF = (order: OrderInfo) => {
           </tr>
           ${discountAmount > 0 ? `
           <tr style="color: #059669; font-weight: 600; background-color: #ecfdf5;">
-            <td style="padding: 4px 6px;">🎟️ İndirim Kuponu ${discountPercentage > 0 ? `(%${discountPercentage})` : ''}:</td>
+            <td style="padding: 4px 6px;">
+              ${couponCode ? '🎟️ İndirim Kuponu' : '🏷️ Kampanya İndirimi'} ${discountPercentage > 0 ? `(%${discountPercentage})` : ''}:
+            </td>
             <td style="text-align: right; padding: 4px 6px;">-₺${discountAmount.toFixed(2)}</td>
           </tr>
           ` : ''}

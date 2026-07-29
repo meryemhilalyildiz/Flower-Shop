@@ -16,6 +16,7 @@ export function useCart() {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [autoDiscount, setAutoDiscount] = useState<{ percentage: number; minAmount: number } | null>(null);
 
   // Get localStorage keys based on userId
   const getStorageKeys = () => {
@@ -26,6 +27,32 @@ export function useCart() {
       COUPON_KEY: `cicekci-cart-coupon-${userId}`,
     };
   };
+
+  // 🌸 Aktif Kampanyayı Supabase'den Çek
+  useEffect(() => {
+    const fetchCartCampaign = async () => {
+      const now = new Date().toISOString();
+      const { data } = await supabase
+        .from('campaigns')
+        .select('discount_percentage, min_order_amount')
+        .eq('is_active', true)
+        .lte('start_date', now)
+        .gte('end_date', now)
+        .order('discount_percentage', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        setAutoDiscount({
+          percentage: Number(data[0].discount_percentage),
+          minAmount: Number(data[0].min_order_amount),
+        });
+      } else {
+        setAutoDiscount(null);
+      }
+    };
+
+    fetchCartCampaign();
+  }, []);
 
   // Load user ID from localStorage on mount
   useEffect(() => {
@@ -279,10 +306,18 @@ export function useCart() {
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
 
-  // 🌸 Kargo ücreti CheckoutPage'de dinamik olarak hesaplanır.
-  // Sepet sayfasında varsayılan olarak 0 TL gösterilir.
+  // 🌸 Otomatik Kampanya İndirimi Hesabı
+  const campaignDiscountAmount =
+    autoDiscount && subtotal >= autoDiscount.minAmount
+      ? (subtotal * autoDiscount.percentage) / 100
+      : 0;
+
+  // En yüksek avantaj sağlayan indirimi seç (Kupon veya Otomatik Kampanya)
+  const effectiveDiscount = Math.max(discountAmount || 0, campaignDiscountAmount);
+
+  // Kargo ve Nihai Toplam
   const deliveryFee = 0;
-  const total = subtotal + deliveryFee;
+  const total = Math.max(0, subtotal - effectiveDiscount + deliveryFee);
 
   return {
     items,
@@ -293,10 +328,10 @@ export function useCart() {
     totalItems,
     subtotal,
     deliveryFee,
+    discountAmount: effectiveDiscount, // 👈 Otomatik indirimi sepete yansıtıyoruz
     total,
     timeRemaining,
     appliedCoupon,
-    discountAmount,
     applyCoupon,
     removeCoupon,
   };

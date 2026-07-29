@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Clock, Ticket, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Clock, Ticket, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import type { CartItem, Route } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { supabase } from '../supabaseClient';
@@ -29,7 +29,7 @@ export async function applyCouponCode(code: string, cartTotal: number) {
     .single();
 
   if (error || !coupon) {
-    return { success: false, message: 'Geçersiz veya bulunamayan kupon kargo!' };
+    return { success: false, message: 'Geçersiz veya bulunamayan kupon kodu!' };
   }
 
   // Kişi Limiti Kontrolü (Hak doldu mu?)
@@ -135,7 +135,6 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
   }
 
   const isTimeRunningLow = timeRemaining !== null && timeRemaining < 60000;
-  const finalTotalWithDiscount = Math.max(0, total - discountAmount);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
@@ -146,6 +145,22 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Items List */}
         <div className="lg:col-span-2 space-y-4">
+          {/* 🌸 Otomatik Kampanya İndirimi Bildirimi */}
+          {discountAmount > 0 && !appliedCoupon && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-center justify-between shadow-sm animate-fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm">Tebrikler! Kampanya İndirimi Kazandınız</p>
+                  <p className="text-xs text-emerald-600">Sepet limitini aştığınız için özel indirim otomatik uygulandı.</p>
+                </div>
+              </div>
+              <span className="font-bold text-lg text-emerald-700 font-mono">-{discountAmount.toFixed(2)} TL</span>
+            </div>
+          )}
+
           {timeRemaining !== null && (
             <div className={`rounded-2xl p-4 flex items-center gap-3 border ${
               isTimeRunningLow 
@@ -185,7 +200,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
                   </div>
                   <button
                     onClick={() => onRemove(item.product.id)}
-                    className="p-2 rounded-lg text-sand-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0"
+                    className="p-2 rounded-lg text-sand-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0 cursor-pointer"
                     aria-label="Sil"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -196,7 +211,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
                   <div className="flex items-center gap-1 bg-sand-100 rounded-full p-1">
                     <button
                       onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
-                      className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors"
+                      className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
                       aria-label="Azalt"
                     >
                       <Minus className="w-3.5 h-3.5" />
@@ -204,7 +219,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
                     <span className="w-8 text-center font-semibold text-sm text-sand-800">{item.quantity}</span>
                     <button
                       onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors"
+                      className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
                       aria-label="Artır"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -286,7 +301,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
 
               {discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-700 font-semibold">
-                  <span>Kupon İndirimi</span>
+                  <span>{appliedCoupon ? 'Kupon İndirimi' : 'Kampanya İndirimi'}</span>
                   <span>- {discountAmount.toFixed(2)} TL</span>
                 </div>
               )}
@@ -300,7 +315,7 @@ export default function CartPage({ items, subtotal, deliveryFee, total, timeRema
 
               <div className="border-t border-sand-100 pt-3 flex justify-between items-baseline">
                 <span className="font-semibold text-sand-800">Toplam</span>
-                <span className="text-2xl font-bold text-brand-700">{finalTotalWithDiscount} TL</span>
+                <span className="text-2xl font-bold text-brand-700">{total} TL</span>
               </div>
             </div>
 

@@ -79,29 +79,30 @@ export interface OrderInfo {
   }> | CartItem[];
 };
 
+// types.ts içinde Route tipi:
 export type Route =
   | { name: 'home' }
-  | { name: 'admin-dashboard' }
-  | { name: 'admin-products' }
-  | { name: 'admin-categories' }
-  | { name: 'admin-orders' }
-  | { name: 'admin-shipping' }
-  | { name: 'admin-wiki' }
-  | { name: 'admin-reviews' }
-  | { name: 'admin-coupons' }
-  | { name: 'admin-editor' }
   | { name: 'shop'; categorySlug?: string }
   | { name: 'product'; slug: string }
   | { name: 'cart' }
   | { name: 'checkout' }
-  | { name: 'order-success'; orderId: string }
-  | { name: 'orders' }
-  | { name: 'favorites' }
   | { name: 'about' }
   | { name: 'contact' }
   | { name: 'faq' }
-  | { name: 'admin-login' };
-
+  | { name: 'favorites' }
+  | { name: 'orders' }
+  | { name: 'order-success'; orderId: string }
+  | { name: 'admin-login' }
+  | { name: 'admin-dashboard' }
+  | { name: 'admin-products' }
+  | { name: 'admin-categories' }
+  | { name: 'admin-orders' }
+  | { name: 'admin-reviews' }
+  | { name: 'admin-coupons' }
+  | { name: 'admin-campaigns' } // 👈 BURAYI EKLİYORUZ
+  | { name: 'admin-editor' }
+  | { name: 'admin-shipping' }
+  | { name: 'admin-wiki' };
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri
 // =====================================================================
