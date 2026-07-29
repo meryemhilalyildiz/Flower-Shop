@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Truck, Clock, ShieldCheck, Sparkles, Star } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { ArrowRight, Truck, Clock, ShieldCheck, Sparkles, Star, ChevronRight, ChevronLeft, Tag } from 'lucide-react';
 import type { Product, Route, Category } from '../types';
 import { routeToHash } from '../router';
 import ProductCard from '../components/ProductCard';
@@ -19,6 +20,15 @@ type Props = {
   onToggleFavorite: (p: Product) => void;
 };
 
+type Campaign = {
+  id: string;
+  title: string;
+  subtitle: string;
+  image_url: string;
+  discount_percentage: number;
+  min_order_amount: number;
+};
+
 const features = [
   { icon: Truck, title: 'Aynı Gün Teslimat', desc: '16:00\'dan önce verilen siparişler' },
   { icon: ShieldCheck, title: 'Tazelik Garantisi', desc: '7 gün taze kalır, değilse iade' },
@@ -27,10 +37,12 @@ const features = [
 ];
 
 export default function HomePage({ categories, featured, discounted, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
-  const { content, loading } = usePageContent('home');
+  const { content } = usePageContent('home');
   const { isEditing, onTextChange, onImageChange } = useAdminEditing();
   const [testimonials, setTestimonials] = useState<FeaturedReview[]>([]);
   const [testimonialsLoading, setTestimonialsLoading] = useState(true);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   // Varsayılan değerler
   const heroTitle = content?.hero_title || 'Sevdiklerinize Çiçek Gönderin';
@@ -43,6 +55,7 @@ export default function HomePage({ categories, featured, discounted, navigate, o
   useEffect(() => {
     let cancelled = false;
 
+    // Yorumları Çek
     fetchRandomApprovedReviews(3)
       .then((reviews) => {
         if (!cancelled) setTestimonials(reviews);
@@ -54,10 +67,37 @@ export default function HomePage({ categories, featured, discounted, navigate, o
         if (!cancelled) setTestimonialsLoading(false);
       });
 
+    // Aktif Kampanyaları Çek
+    const fetchActiveCampaigns = async () => {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('is_active', true)
+        .lte('start_date', now)
+        .gte('end_date', now)
+        .order('created_at', { ascending: false });
+
+      if (!error && data && !cancelled) {
+        setCampaigns(data);
+      }
+    };
+
+    fetchActiveCampaigns();
+
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // 🌸 Birden fazla kampanya varsa otomatik kaydırma efekti (4 saniyede bir)
+  useEffect(() => {
+    if (campaigns.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % campaigns.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [campaigns.length]);
 
   return (
     <div className="animate-fade-in">
@@ -66,7 +106,7 @@ export default function HomePage({ categories, featured, discounted, navigate, o
         <div className="absolute top-20 right-10 w-72 h-72 bg-brand-200/30 rounded-full blur-3xl animate-float" />
         <div className="absolute bottom-10 left-10 w-64 h-64 bg-leaf-200/30 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
 
-        <div className="max-w-7xl mx-auto px-4 py-16 lg:py-24 relative">
+        <div className="max-w-7xl mx-auto px-4 py-12 lg:py-16 relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="animate-slide-up">
               <span className="chip bg-brand-100 text-brand-700 mb-4">
@@ -110,6 +150,8 @@ export default function HomePage({ categories, featured, discounted, navigate, o
                   Hikayemiz
                 </button>
               </div>
+
+              {/* ⭐ Yıldızlar ve Müşteri Sayısı */}
               <div className="flex items-center gap-6 mt-10">
                 <div>
                   <div className="flex items-center gap-1">
@@ -125,78 +167,143 @@ export default function HomePage({ categories, featured, discounted, navigate, o
                   <p className="text-sm text-sand-500">Mutlu müşteri</p>
                 </div>
               </div>
+
+              {/* 🌸 🏷️ YILDIZLARIN ALTINA EKLENEN KAMPANYA BANNER SLIDER */}
+              {campaigns.length > 0 && (
+                <div className="mt-8 relative rounded-3xl overflow-hidden bg-white border border-brand-200 shadow-lg group transition-all">
+                  <div
+                    onClick={() => navigate({ name: 'shop' })}
+                    className="relative h-44 sm:h-48 w-full cursor-pointer"
+                  >
+                    <img
+                      src={campaigns[currentSlide].image_url}
+                      alt={campaigns[currentSlide].title}
+                      className="w-full h-full object-cover transition-all duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-sand-900/85 via-sand-900/50 to-transparent flex flex-col justify-center p-6 text-white space-y-1.5">
+                      <div className="inline-flex items-center gap-1.5 bg-brand-600 text-white text-[11px] font-bold px-3 py-1 rounded-full w-fit shadow-md">
+                        <Tag className="w-3 h-3" /> %{campaigns[currentSlide].discount_percentage} İNDİRİM
+                      </div>
+                      <h3 className="font-display text-2xl font-bold">{campaigns[currentSlide].title}</h3>
+                      <p className="text-xs sm:text-sm text-sand-200 line-clamp-2">{campaigns[currentSlide].subtitle}</p>
+                      <p className="text-[10px] text-brand-200 font-semibold pt-1">
+                        * ₺{campaigns[currentSlide].min_order_amount} üzerindeki siparişlerde geçerlidir.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Birden fazla kampanya varsa Sol/Sağ Butonları & Noktalar */}
+                  {campaigns.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentSlide((prev) => (prev === 0 ? campaigns.length - 1 : prev - 1));
+                        }}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentSlide((prev) => (prev + 1) % campaigns.length);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+
+                      <div className="absolute bottom-2.5 right-4 flex gap-1.5">
+                        {campaigns.map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentSlide(idx);
+                            }}
+                            className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                              idx === currentSlide ? 'w-5 bg-white' : 'w-1.5 bg-white/50'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="relative animate-scale-in">
               <div className="relative grid grid-cols-2 gap-4">
                 <div className="space-y-4">
-                <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
-                  {isEditing ? (
-                    <EditableImage
-                      src={heroImage1}
-                      alt="Buket"
-                      onSave={(newSrc) => onImageChange('hero_image_1', newSrc)}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={heroImage1}
-                      alt="Buket"
-                      className="w-full h-full object-cover"
-                    />
-                  )}
+                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
+                    {isEditing ? (
+                      <EditableImage
+                        src={heroImage1}
+                        alt="Buket"
+                        onSave={(newSrc) => onImageChange('hero_image_1', newSrc)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={heroImage1}
+                        alt="Buket"
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
+                    {isEditing ? (
+                      <EditableImage
+                        src={heroImage2}
+                        alt="Saksılı"
+                        onSave={(newSrc) => onImageChange('hero_image_2', newSrc)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={heroImage2}
+                        alt="Saksılı"
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
-                  {isEditing ? (
-                    <EditableImage
-                      src={heroImage2}
-                      alt="Saksılı"
-                      onSave={(newSrc) => onImageChange('hero_image_2', newSrc)}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={heroImage2}
-                      alt="Saksılı"
-                      className="w-full h-full object-cover"
-                    />
-                  )}
+                <div className="space-y-4 pt-8">
+                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
+                    {isEditing ? (
+                      <EditableImage
+                        src={heroImage3}
+                        alt="Gül"
+                        onSave={(newSrc) => onImageChange('hero_image_3', newSrc)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={heroImage3}
+                        alt="Gül"
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
+                    {isEditing ? (
+                      <EditableImage
+                        src={heroImage1}
+                        alt="Özel gün"
+                        onSave={(newSrc) => onImageChange('hero_image_1', newSrc)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={heroImage1}
+                        alt="Özel gün"
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-4 pt-8">
-                <div className="rounded-3xl overflow-hidden shadow-soft aspect-square">
-                  {isEditing ? (
-                    <EditableImage
-                      src={heroImage3}
-                      alt="Gül"
-                      onSave={(newSrc) => onImageChange('hero_image_3', newSrc)}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={heroImage3}
-                      alt="Gül"
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                </div>
-                <div className="rounded-3xl overflow-hidden shadow-soft aspect-[3/4]">
-                  {isEditing ? (
-                    <EditableImage
-                      src={heroImage1}
-                      alt="Özel gün"
-                      onSave={(newSrc) => onImageChange('hero_image_1', newSrc)}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={heroImage1}
-                      alt="Özel gün"
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                </div>
-              </div>
               </div>
               <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl shadow-soft px-5 py-3 flex items-center gap-3 animate-float">
                 <div className="w-10 h-10 rounded-full bg-leaf-100 flex items-center justify-center">
@@ -232,7 +339,7 @@ export default function HomePage({ categories, featured, discounted, navigate, o
         <div className="flex items-end justify-between mb-8">
           <div>
             <h2 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">Kategoriler</h2>
-            <p className="text-sand-500 mt-2">Her durasa uygun çiçekler</p>
+            <p className="text-sand-500 mt-2">Her duruma uygun çiçekler</p>
           </div>
           <button onClick={() => navigate({ name: 'shop' })} className="btn-ghost text-brand-600 hidden sm:flex">
             Tümünü Gör
@@ -285,36 +392,6 @@ export default function HomePage({ categories, featured, discounted, navigate, o
               onToggleFavorite={onToggleFavorite}
             />
           ))}
-        </div>
-      </section>
-
-      {/* Campaign Banner */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-brand-600 to-brand-800">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="relative px-8 py-12 lg:px-16 lg:py-20 flex flex-col lg:flex-row items-center justify-between gap-8">
-            <div className="text-white max-w-lg">
-              <span className="chip bg-white/20 text-white mb-4">Kampanya</span>
-              <h2 className="font-display text-3xl lg:text-4xl font-bold leading-tight">
-                İlk siparişe özel %20 indirim
-              </h2>
-              <p className="text-white/80 mt-3 text-lg">
-                Sepetinizde 400 TL ve üzeri çiçeklerde, ilk siparişinizde geçerli.
-              </p>
-              <button onClick={() => navigate({ name: 'shop' })} className="btn bg-white text-brand-700 px-6 py-3 mt-6 hover:bg-sand-50 hover:scale-105 active:scale-95 transition-all">
-                Hemen Keşfet
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="relative w-48 h-48 lg:w-64 lg:h-64 flex-shrink-0">
-              <div className="absolute inset-0 bg-white/10 rounded-full blur-2xl" />
-              <img
-                src="https://images.pexels.com/photos/165826/pexels-photo-165826.jpeg?auto=compress&cs=tinysrgb&w=600"
-                alt="Kampanya"
-                className="relative w-full h-full object-cover rounded-3xl shadow-2xl"
-              />
-            </div>
-          </div>
         </div>
       </section>
 

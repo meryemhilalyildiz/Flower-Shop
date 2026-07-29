@@ -6,7 +6,6 @@ import { supabase } from './supabaseClient';
 import {
   getFeaturedProducts,
   getDiscountedProducts,
-  getProductBySlug,
 } from './data';
 import { fetchCategoriesFromSupabase, fetchProductsFromSupabase } from './services/supabaseData';
 import type { Product, OrderInfo } from './types';
@@ -32,11 +31,11 @@ import AdminDashboardNew from './pages/AdminDashboardNew';
 import AdminCategoriesPage from './pages/AdminCategoriesPage';
 import AdminWikiPage from './pages/AdminWikiPage';
 import AdminReviewsPage from './pages/AdminReviewsPage';
-import { useAdminAuth } from './hooks/useAdminAuth';
 import { normalizeOrderStatusToTurkish } from './services/adminApi';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminCouponsPage from './pages/AdminCouponsPage';
 import AdminEditorPage from './pages/AdminEditorPage';
+import AdminCampaignsPage from './pages/AdminCampaignsPage';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -97,12 +96,9 @@ function App() {
 
   const handlePlaceOrder = useCallback(
     async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
-      // 1. Kullanıcı oturumunu al
       const { data: { user } } = await supabase.auth.getUser();
-  
-      // 2. orders tablosuna kayıt
       const validUserId = user?.id ? user.id : null;
-  
+
       const { data: insertedOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -120,15 +116,14 @@ function App() {
         })
         .select()
         .single();
-  
+
       if (orderError) {
         alert(`❌ ORDERS HATASI:\n${orderError.message}`);
         throw orderError;
       }
-  
+
       const orderId = insertedOrder.id.toString();
-  
-      // 3. order_items tablosuna kayıt
+
       if (orderData.items && orderData.items.length > 0) {
         const itemsToInsert = orderData.items.map((item) => ({
           order_id: orderId,
@@ -136,22 +131,20 @@ function App() {
           quantity: item.quantity,
           unit_price: item.product.price || 0,
         }));
-  
+
         const { error: itemsError } = await supabase
           .from('order_items')
           .insert(itemsToInsert);
-  
+
         if (itemsError) {
           console.error('ORDER_ITEMS HATASI:', itemsError);
         }
-  
-        // 🌸 4. STOK DÜŞÜRME İŞLEMİ (Sadece ID ile) 🌸
+
         for (const item of orderData.items) {
           try {
             const productId = String(item.product.id);
             const buyQty = item.quantity || 1;
 
-            // A) ID ile ürünü veritabanından çekiyoruz
             const { data: dbProduct } = await supabase
               .from('products')
               .select('id, stock')
@@ -162,7 +155,6 @@ function App() {
               const currentStock = Number(dbProduct.stock || 0);
               const newStock = Math.max(0, currentStock - buyQty);
 
-              // B) Stoğu güncelliyoruz
               const { error: updateErr } = await supabase
                 .from('products')
                 .update({ stock: newStock })
@@ -177,17 +169,17 @@ function App() {
           }
         }
       }
-  
+
       const order: OrderInfo = {
         ...orderData,
         id: orderId,
         createdAt: insertedOrder.created_at || new Date().toISOString(),
         status: 'Hazırlanıyor',
       };
-  
+
       setOrders((prev) => ({ ...prev, [orderId]: order }));
       cart.clearCart();
-  
+
       return orderId;
     },
     [cart],
@@ -236,7 +228,7 @@ function App() {
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
-            deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
+            deliveryDate: ord.delivery_date || '',
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
             subtotal: ord.total_amount != null ? ord.total_amount + (ord.discount_amount || 0) : undefined,
             deliveryFee: undefined,
@@ -304,6 +296,7 @@ function App() {
             onToggleFavorite={favorites.toggleFavorite}
           />
         );
+
       case 'shop':
         return (
           <ShopPage
@@ -316,6 +309,7 @@ function App() {
             onToggleFavorite={favorites.toggleFavorite}
           />
         );
+
       case 'product': {
         return (
           <ProductPage
@@ -329,6 +323,7 @@ function App() {
           />
         );
       }
+
       case 'cart':
         return (
           <CartPage
@@ -346,6 +341,7 @@ function App() {
             onRemoveCoupon={cart.removeCoupon}
           />
         );
+
       case 'checkout':
         return (
           <CheckoutPage
@@ -361,6 +357,7 @@ function App() {
             onRemoveCoupon={cart.removeCoupon}
           />
         );
+
       case 'order-success': {
         const order = orders[route.orderId];
         return <OrderSuccessPage order={order} navigate={navigate} />;
@@ -388,50 +385,59 @@ function App() {
 
       case 'about':
         return <AboutPage navigate={navigate} />;
+
       case 'contact':
         return <ContactPage navigate={navigate} />;
+
       case 'faq':
         return <FaqPage navigate={navigate} />;
 
       /* ⚙️ ADMİN ROTALARI */
       case 'admin-login':
         return <AdminLoginPage onLoginSuccess={() => navigate({ name: 'admin-dashboard' })} />;
+
       case 'admin-dashboard':
         return (
           <AdminLayout currentPage="admin-dashboard" navigate={navigate}>
             <AdminDashboardNew navigate={navigate} />
           </AdminLayout>
         );
-        case 'admin-products':
-          return (
-            <AdminLayout currentPage="admin-products" navigate={navigate}>
-              <AdminDashboard />
-            </AdminLayout>
-          );
+
+      case 'admin-products':
+        return (
+          <AdminLayout currentPage="admin-products" navigate={navigate}>
+            <AdminDashboard />
+          </AdminLayout>
+        );
+
       case 'admin-categories':
         return (
           <AdminLayout currentPage="admin-categories" navigate={navigate}>
             <AdminCategoriesPage />
           </AdminLayout>
         );
+
       case 'admin-orders':
         return (
           <AdminLayout currentPage="admin-orders" navigate={navigate}>
             <AdminOrdersPageNew />
           </AdminLayout>
         );
+
       case 'admin-shipping':
         return (
           <AdminLayout currentPage="admin-shipping" navigate={navigate}>
             <AdminShippingPage />
           </AdminLayout>
         );
+
       case 'admin-wiki':
         return (
           <AdminLayout currentPage="admin-wiki" navigate={navigate}>
             <AdminWikiPage />
           </AdminLayout>
         );
+
       case 'admin-reviews':
         return (
           <AdminLayout currentPage="admin-reviews" navigate={navigate}>
@@ -444,6 +450,14 @@ function App() {
         return (
           <AdminLayout currentPage="admin-coupons" navigate={navigate}>
             <AdminCouponsPage />
+          </AdminLayout>
+        );
+
+      /* 🏷️ KAMPANYA YÖNETİMİ SAYFASI ROTASI */
+      case 'admin-campaigns':
+        return (
+          <AdminLayout currentPage="admin-campaigns" navigate={navigate}>
+            <AdminCampaignsPage />
           </AdminLayout>
         );
 
@@ -468,7 +482,7 @@ function App() {
           />
         );
     }
-  };
+  }; // 👈 renderPage kapanış süslü parantezi buraya eklendi!
 
   const isAdminRoute = route.name.startsWith('admin');
 
