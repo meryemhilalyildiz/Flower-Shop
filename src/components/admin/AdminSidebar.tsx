@@ -1,4 +1,4 @@
-import { Home, Package, ShoppingBag, FolderTree, LogOut, Flower2, Truck, BookOpen, Star, Ticket, Edit, Tag } from 'lucide-react';
+import { Home, Package, ShoppingBag, FolderTree, LogOut, Flower2, Truck, BookOpen, Star, Ticket, Edit, Tag, HelpCircle } from 'lucide-react';
 
 interface Props {
   currentPage: string;
@@ -19,6 +19,7 @@ const menuItems = [
   { id: 'admin-coupons', label: 'Kupon Yönetimi', icon: Ticket },
   { id: 'admin-campaigns', label: 'Kampanya Yönetimi', icon: Tag }, // 👈 BURASI EKLENDİ
   { id: 'admin-editor', label: 'Düzenleme', icon: Edit },
+  { id: 'admin-faq', label: 'S.S.S Yönetimi', icon: HelpCircle }, // 👈 BURASI EKLENDİ
 ];
 
 export default function AdminSidebar({ currentPage, navigate, onSignOut, onClose }: Props) {

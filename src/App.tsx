@@ -36,6 +36,7 @@ import AdminLayout from './components/admin/AdminLayout';
 import AdminCouponsPage from './pages/AdminCouponsPage';
 import AdminEditorPage from './pages/AdminEditorPage';
 import AdminCampaignsPage from './pages/AdminCampaignsPage';
+import AdminFaqPage from './pages/AdminFaqPage';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -478,6 +479,13 @@ function App() {
             <AdminEditorPage navigate={navigate} />
           </AdminLayout>
         );
+
+        case 'admin-faq':
+    return (
+      <AdminLayout currentPage="admin-faq" navigate={navigate}>
+        <AdminFaqPage />
+      </AdminLayout>
+    );
 
       default:
         return (

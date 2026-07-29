@@ -31,6 +31,7 @@ function parseHash(): Route {
     if (parts[1] === 'kuponlar') return { name: 'admin-coupons' };
     if (parts[1] === 'kampanyalar') return { name: 'admin-campaigns' }; // 🌸 Kampanya rotası yakalanıyor
     if (parts[1] === 'duzenleme') return { name: 'admin-editor' };
+    if (parts[1] === 'faq' || parts[1] === 'sss') return { name: 'admin-faq' };
   }
   return { name: 'home' };
 }
@@ -81,6 +82,8 @@ export function routeToHash(route: Route): string {
       return '#/admin/kampanyalar';
     case 'admin-editor':
       return '#/admin/duzenleme';
+      case 'admin-faq':
+        return '#/admin/faq';
     default:
       return '#/';
   }
