@@ -1,123 +1,206 @@
-import React, { useState } from 'react'
-import { supabase } from '../supabaseClient'
+import React, { useState } from 'react';
+import { Mail, Lock, User, X, Flower2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 interface AuthModalProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const [isSignUp, setIsSignUp] = useState(false)
-  
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  if (!isOpen) return null
-
-  const handleGoToAdminLogin = () => {
-    onClose()
-    window.location.hash = '#/admin/login'
-  }
+  if (!isOpen) return null;
 
   const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMessage('')
-    setLoading(true)
+    e.preventDefault();
+    setMessage('');
+    setLoading(true);
 
     if (isSignUp) {
       // 📝 KAYIT OLMA AKIŞI
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
             role: 'customer',
-          }
-        }
-      })
+          },
+        },
+      });
 
-      setLoading(false)
+      setLoading(false);
 
       if (error) {
-        setMessage('❌ ' + error.message)
+        setMessage('❌ ' + error.message);
       } else {
-        setMessage('✅ Kayıt başarılı! Giriş yapabilirsiniz.')
+        setMessage('✅ Kayıt başarılı! Giriş yapabilirsiniz.');
+        setIsSignUp(false);
       }
     } else {
       // 🔑 GİRİŞ YAPMA AKIŞI
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        setLoading(false)
-        setMessage('❌ ' + error.message)
-        return
+        setLoading(false);
+        setMessage('❌ ' + error.message);
+        return;
       }
 
-      // Giriş yapan kullanıcının profil ve onay durumunu kontrol et
+      // Giriş yapan kullanıcının profil ve rol durumunu kontrol et
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', data.user.id)
-        .single()
+        .single();
 
-      setLoading(false)
+      setLoading(false);
 
       if (profile?.role === 'admin') {
-        setMessage('✅ Yönetici girişi başarılı!')
+        setMessage('✅ Yönetici girişi başarılı!');
         setTimeout(() => {
-          onClose()
-          window.location.hash = '#/admin/dashboard'
-        }, 500)
-        return
+          onClose();
+          window.location.hash = '#/admin/dashboard';
+        }, 500);
+        return;
       }
 
-      setMessage('✅ Giriş başarılı!')
+      setMessage('✅ Giriş başarılı!');
       setTimeout(() => {
-        onClose()
-        window.location.hash = '#/magaza'
-      }, 500)
+        onClose();
+        window.location.hash = '#/magaza';
+      }, 500);
     }
-  }
+  };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '380px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ marginBottom: '1rem', color: '#111827' }}>{isSignUp ? 'Kayıt Ol' : 'Giriş Yap'}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sand-900/40 backdrop-blur-sm animate-fade-in">
+      <div
+        className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl border border-sand-100 transition-all transform scale-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Kapat Butonu */}
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 p-2 text-sand-400 hover:text-sand-600 rounded-full hover:bg-sand-50 transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
-        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+        {/* Üst Logo ve Başlık */}
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center mx-auto mb-4 shadow-md shadow-brand-200">
+            <Flower2 className="w-7 h-7 text-white" />
+          </div>
+          <h2 className="font-display text-2xl font-bold text-sand-900">
+            {isSignUp ? 'Hesap Oluştur' : 'Giriş Yap'}
+          </h2>
+          <p className="text-xs text-sand-500 mt-1">
+            {isSignUp ? 'Taze çiçekler dünyasına katılın' : 'Flower Shop — Hoş Geldiniz'}
+          </p>
+        </div>
+
+        {/* Form Alanı */}
+        <form onSubmit={handleAuth} className="space-y-4">
+          {/* Ad Soyad İnput (Yalnızca Kayıt Ol Modunda) */}
           {isSignUp && (
-            <input type="text" placeholder="Ad Soyad" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={{ padding: '0.6rem', border: '1px solid #ddd', borderRadius: '6px' }} />
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-sand-700 ml-1">Ad Soyad</label>
+              <div className="relative">
+                <User className="w-5 h-5 text-sand-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Adınız Soyadınız"
+                  className="w-full pl-11 pr-4 py-3 bg-brand-50/50 border border-brand-100 rounded-2xl text-sand-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
+                />
+              </div>
+            </div>
           )}
 
-          <input type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ padding: '0.6rem', border: '1px solid #ddd', borderRadius: '6px' }} />
-          <input type="password" placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ padding: '0.6rem', border: '1px solid #ddd', borderRadius: '6px' }} />
-          
-          <button type="submit" disabled={loading} style={{ padding: '0.75rem', background: '#e11d48', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-            {loading ? 'İşleniyor...' : (isSignUp ? 'Kayıt Ol' : 'Giriş Yap')}
+          {/* E-posta İnput */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-sand-700 ml-1">E-posta</label>
+            <div className="relative">
+              <Mail className="w-5 h-5 text-sand-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ornek@email.com"
+                className="w-full pl-11 pr-4 py-3 bg-brand-50/50 border border-brand-100 rounded-2xl text-sand-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Şifre İnput */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-sand-700 ml-1">Şifre</label>
+            <div className="relative">
+              <Lock className="w-5 h-5 text-sand-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-11 pr-4 py-3 bg-brand-50/50 border border-brand-100 rounded-2xl text-sand-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Giriş Yap / Kayıt Ol Butonu */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 mt-2 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white font-semibold rounded-2xl shadow-lg shadow-brand-500/25 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+          >
+            {loading ? 'İşlem yapılıyor...' : isSignUp ? 'Kayıt Ol' : 'Giriş Yap'}
           </button>
         </form>
 
-        {message && <p style={{ fontSize: '0.875rem', marginTop: '1rem', padding: '0.5rem', background: '#fef2f2', borderRadius: '4px' }}>{message}</p>}
+        {/* Mesaj Bildirim Kutusu */}
+        {message && (
+          <div
+            className={`mt-4 p-3 rounded-2xl text-xs font-medium text-center border ${
+              message.startsWith('❌')
+                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            }`}
+          >
+            {message}
+          </div>
+        )}
 
-        <p onClick={() => { setIsSignUp(!isSignUp); setMessage('') }} style={{ marginTop: '1rem', fontSize: '0.875rem', color: '#2563eb', cursor: 'pointer', textAlign: 'center' }}>
-          {isSignUp ? 'Zaten hesabınız var mı? Giriş Yap' : 'Hesabınız yok mu? Kayıt Ol'}
-        </p>
+        {/* Alt Değiştirme ve Bilgi Metni */}
+        <div className="mt-6 text-center space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setMessage('');
+            }}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors cursor-pointer"
+          >
+            {isSignUp ? 'Zaten hesabınız var mı? Giriş Yap' : 'Hesabınız yok mu? Kayıt Ol'}
+          </button>
 
-        <button
-          type="button"
-          onClick={handleGoToAdminLogin}
-          style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#111827', cursor: 'pointer', textAlign: 'center', textDecoration: 'underline' }}
-        >
-          Yönetici girişi için buraya tıklayın
-        </button>
-        
-        <button onClick={onClose} style={{ marginTop: '0.5rem', width: '100%', padding: '0.4rem', border: 'none', background: '#e5e7eb', borderRadius: '6px', cursor: 'pointer' }}>Kapat</button>
+          <p className="text-[11px] text-sand-400 pt-2 border-t border-sand-100">
+            Hesabınıza giriş yaparak tüm siparişlerinize ve avantajlara ulaşabilirsiniz.
+          </p>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default AuthModal;
