@@ -19,6 +19,7 @@ const PAGE_TITLES: Record<string, string> = {
   'admin-wiki': 'Botanik Wiki',
   'admin-reviews': 'Yorumlar',
   'admin-coupons': 'Kupon Yönetimi',
+  'admin-campaigns': 'Kampanya & Banner',
   'admin-editor': 'Düzenleme',
 };
 
@@ -28,14 +29,22 @@ export default function AdminLayout({ children, currentPage, navigate }: Props) 
 
   useEffect(() => {
     if (loading) return;
+    
+    // 🌸 Yönetici oturumu yoksa admin-login yerine doğrudan anasayfaya (home) yönlendir
     if (!profile || !isAdmin) {
-      navigate({ name: 'admin-login' });
+      navigate({ name: 'home' });
     }
   }, [loading, profile, isAdmin, navigate]);
 
+  // 🌸 Çıkış yapıldığında oturumu kapatıp doğrudan Anasayfa'ya yönlendirir
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate({ name: 'home' });
+    try {
+      await supabase.auth.signOut();
+      navigate({ name: 'home' });
+    } catch (error) {
+      console.error('Çıkış yapılırken hata oluştu:', error);
+      navigate({ name: 'home' });
+    }
   };
 
   const handleGoToStore = () => {
@@ -106,19 +115,19 @@ export default function AdminLayout({ children, currentPage, navigate }: Props) 
             <div className="flex items-center gap-2">
               <button
                 onClick={handleGoToStore}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm cursor-pointer"
               >
                 <Store className="h-4 w-4" /> Mağaza
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm cursor-pointer"
               >
                 <RefreshCw className="h-4 w-4" /> Yenile
               </button>
               <button
                 onClick={handleSignOut}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-red-600 hover:bg-red-700 text-sm"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-red-600 hover:bg-red-700 text-sm cursor-pointer"
               >
                 <LogOut className="h-4 w-4" /> Çıkış
               </button>

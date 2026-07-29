@@ -53,11 +53,18 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setIsAdmin(false);
+    try {
+      // 1. Oturumu Kapat
+      await supabase.auth.signOut();
+      
+      // 2. 🌸 Otomatik Anasayfaya Yönlendir
+      navigate({ name: 'home' }); 
+    } catch (error) {
+      console.error('Çıkış hatası:', error);
+      navigate({ name: 'home' });
+    }
   };
-
+  
   const handleAccountClick = () => {
     if (isAdmin) {
       window.location.hash = '#/admin/dashboard';
