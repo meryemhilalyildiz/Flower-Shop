@@ -86,7 +86,7 @@ export default function AdminEditorPage({ navigate }: Props) {
 
   // Metin değişikliği handler
   const handleTextChange = (fieldPath: string, newValue: string) => {
-    const updatedContent = { ...pageContent[activeTab] };
+    const updatedContent = { ...(pageContent[activeTab] || {}) };
     const keys = fieldPath.split('.');
     let current: any = updatedContent;
 
@@ -106,7 +106,7 @@ export default function AdminEditorPage({ navigate }: Props) {
 
   // Görsel değişikliği handler
   const handleImageChange = (fieldPath: string, newSrc: string) => {
-    const updatedContent = { ...pageContent[activeTab] };
+    const updatedContent = { ...(pageContent[activeTab] || {}) };
     const keys = fieldPath.split('.');
     let current: any = updatedContent;
 
@@ -141,22 +141,39 @@ export default function AdminEditorPage({ navigate }: Props) {
     );
   }
 
-  // İçeriği kaydet
+  // 🌸 İçeriği kaydet (Aktif tab'a göre kesin Supabase Upsert)
   const handleSave = async () => {
     setSaving(true);
     try {
+      const activeData = pageContent[activeTab] || {};
+
+      // Metin alanlarının hepsini senkronize edelim
+      const finalContent = {
+        ...activeData,
+        hero_description: activeData.hero_description || activeData.description || activeData.story,
+        description: activeData.hero_description || activeData.description || activeData.story,
+        story: activeData.hero_description || activeData.description || activeData.story,
+      };
+
       const { error } = await supabase
         .from('page_contents')
-        .update({ content: pageContent[activeTab] })
-        .eq('page_key', activeTab);
+        .upsert(
+          {
+            page_key: activeTab, // 'about', 'home' vb.
+            content: finalContent,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'page_key' }
+        );
 
       if (error) throw error;
 
       setHasChanges(false);
-      alert('İçerik başarıyla kaydedildi!');
-    } catch (err) {
+      alert('İçerik veritabanına başarıyla kaydedildi! 🌸');
+      window.location.reload();
+    } catch (err: any) {
       console.error('Kaydetme hatası:', err);
-      alert('Kaydetme sırasında bir hata oluştu.');
+      alert('Kaydederken bir hata oluştu: ' + (err.message || err));
     } finally {
       setSaving(false);
     }
@@ -183,7 +200,7 @@ export default function AdminEditorPage({ navigate }: Props) {
               </button>
             ))}
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsEditingMode(!isEditingMode)}
@@ -200,7 +217,7 @@ export default function AdminEditorPage({ navigate }: Props) {
         </div>
       </div>
 
-      {/* Canlı Önüz Görünümü ve Düzenleme Alanı */}
+      {/* Canlı Önizleme ve Düzenleme Alanı */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white px-6 py-4 flex items-center justify-between">
@@ -218,25 +235,25 @@ export default function AdminEditorPage({ navigate }: Props) {
               <RefreshCw className="w-4 h-4" />
               Yenile
             </button>
-            {hasChanges && (
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-sm transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {saving ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Kaydediliyor...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Kaydet
-                  </>
-                )}
-              </button>
-            )}
+
+            {/* 🌸 Kaydet Butonu (Değişiklik olmasa da test ve manuel kaydetme için her zaman hazır) */}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-sm transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Kaydediliyor...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  {hasChanges ? 'Değişiklikleri Kaydet' : 'Kaydet'}
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -273,7 +290,7 @@ export default function AdminEditorPage({ navigate }: Props) {
           <Edit2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-800">
             <p className="font-semibold mb-1">Nasıl Düzenlenir?</p>
-            <p>Metinlerin veya görsellerin üzerine tıklayarak düzenleyebilirsiniz. Değişiklikler otomatik olarak kaydedilir.</p>
+            <p>Metinlerin üzerine tıklayıp düzenledikten sonra sağ üstteki yeşil <b>Kaydet</b> butonuna basarak veritabanına aktarabilirsiniz.</p>
           </div>
         </div>
       )}

@@ -1,8 +1,18 @@
 import { Flower2, Instagram, Facebook, Twitter, Mail, Phone, MapPin } from 'lucide-react';
 import { routeToHash } from '../router';
 import type { Route } from '../types';
+import { usePageContent } from '../hooks/usePageContent';
 
 export default function Footer() {
+  // 🌸 Hakkımızda sayfasının canlı içeriğini çekiyoruz
+  const { content } = usePageContent('about');
+
+  // 🌸 Veritabanındaki 'hero_description', 'story' veya 'description' alanlarından hangisi güncellendiyse onu alıyoruz
+  const footerDescription = 
+    content?.hero_description || 
+    content?.description || 
+    content?.story || 
+    "1998'den beri taze çiçekler ve özel buketler tasarlıyoruz. Sevdiklerinizi en güzel çiçeklerle mutlu ediyoruz.";
   const linkGroups = [
     {
       title: 'Mağaza',
@@ -35,9 +45,12 @@ export default function Footer() {
               </div>
               <span className="font-display text-2xl font-bold text-white">Çiçekçi</span>
             </div>
+            
+            {/* 🌸 Hakkımızda Sayfası ile Eş Zamanlı Canlı Metin */}
             <p className="text-sm text-sand-400 leading-relaxed mb-4">
-              1998'den beri taze çiçekler ve özel buketler tasarlıyoruz. Sevdiklerinizi en güzel çiçeklerle mutlu ediyoruz.
-            </p>
+      {footerDescription}
+    </p>
+
             <div className="flex gap-2">
               {[Instagram, Facebook, Twitter].map((Icon, i) => (
                 <a
@@ -90,7 +103,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-sand-800 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-sand-500">© 2025 Çiçekçi. Tüm hakları saklıdır.</p>
+          <p className="text-sm text-sand-500">© 2026 Çiçekçi. Tüm hakları saklıdır.</p>
           <div className="flex gap-6 text-sm text-sand-500">
             <a href="#/" className="hover:text-brand-300 transition-colors">Gizlilik Politikası</a>
             <a href="#/" className="hover:text-brand-300 transition-colors">Kullanım Şartları</a>
