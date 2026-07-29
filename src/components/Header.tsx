@@ -64,7 +64,7 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
       navigate({ name: 'home' });
     }
   };
-  
+
   const handleAccountClick = () => {
     if (isAdmin) {
       window.location.hash = '#/admin/dashboard';
@@ -79,6 +79,7 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
   const navLinks: { label: string; route: Route }[] = isAdmin
     ? [
         { label: 'Anasayfa', route: { name: 'home' } },
+        { label: 'Mağaza', route: { name: 'shop' } },
         { label: 'Hakkımızda', route: { name: 'about' } },
         { label: 'İletişim', route: { name: 'contact' } },
       ]
@@ -128,21 +129,24 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
               </span>
             </button>
 
-            <nav className="hidden lg:flex items-center gap-1">
-              {navLinks.map((link) => (
-                <a
-                  key={link.label}
-                  href={routeToHash(link.route)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                    isActive(link.route)
-                      ? 'bg-brand-50 text-brand-700'
-                      : 'text-sand-600 hover:text-brand-600 hover:bg-sand-50'
-                  }`}
-                >
-                  {link.label}
-                </a>
-              ))}
-            </nav>
+            <nav className="hidden md:flex items-center gap-8">
+  {navLinks.map((link) => {
+    const isActive = currentRoute.name === link.route.name;
+    return (
+      <button
+        key={link.label}
+        onClick={() => navigate(link.route)}
+        className={`text-sm font-medium transition-colors cursor-pointer ${
+          isActive
+            ? 'text-brand-600 font-semibold px-3 py-1 bg-brand-50 rounded-full'
+            : 'text-sand-600 hover:text-sand-900'
+        }`}
+      >
+        {link.label}
+      </button>
+    );
+  })}
+</nav>
 
             <div className="flex items-center gap-2">
               <button
