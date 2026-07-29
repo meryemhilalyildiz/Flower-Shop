@@ -6,6 +6,7 @@ import { usePageContent } from '../hooks/usePageContent';
 import EditableText from '../components/admin/EditableText';
 import EditableImage from '../components/admin/EditableImage';
 import { useAdminEditing } from '../contexts/AdminEditingContext';
+import { supabase } from '../supabaseClient';
 
 // Icon mapping for database string names to actual components
 const iconMap: Record<string, any> = {
@@ -24,8 +25,9 @@ export default function ContactPage({ navigate }: Props) {
   const { isEditing, onTextChange, onImageChange } = useAdminEditing();
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [sent, setSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },
     { label: 'İletişim' },
@@ -35,7 +37,7 @@ export default function ContactPage({ navigate }: Props) {
   const defaultContactInfo = [
     { icon: 'MapPin', title: 'Adres', value: 'İstiklal Cd. No:123, Beyoğlu, İstanbul' },
     { icon: 'Phone', title: 'Telefon', value: '0850 123 45 67' },
-    { icon: 'Mail', title: 'E-posta', value: 'destek@cicekci.com' },
+    { icon: 'Mail', title: 'E-posta', value: 'flowershop.iletisim@gmail.com' },
     { icon: 'Clock', title: 'Çalışma Saatleri', value: 'Her gün 08:00 - 22:00' },
   ];
 
@@ -43,7 +45,7 @@ export default function ContactPage({ navigate }: Props) {
 
   // Icon string'ini bileşene çevir
   const getIconComponent = (iconName: string) => {
-    return iconMap[iconName] || MapPin; // Fallback to MapPin
+    return iconMap[iconName] || MapPin;
   };
   const heroTitle = content?.hero_title || 'İletişime Geçin';
   const heroDescription = content?.hero_description || 'Sorularınız, özel siparişler veya işbirlikleri için bize ulaşın. Size yardımcı olmaktan mutluluk duyarız.';
@@ -58,7 +60,7 @@ export default function ContactPage({ navigate }: Props) {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
     if (!form.name.trim()) newErrors.name = 'Ad gerekli';
@@ -66,10 +68,30 @@ export default function ContactPage({ navigate }: Props) {
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Geçerli bir e-posta girin';
     if (!form.message.trim()) newErrors.message = 'Mesaj gerekli';
     setErrors(newErrors);
+
     if (Object.keys(newErrors).length === 0) {
-      setSent(true);
-      setForm({ name: '', email: '', subject: '', message: '' });
-      setTimeout(() => setSent(false), 4000);
+      setIsSubmitting(true);
+      try {
+        const { error } = await supabase.from('contact_messages').insert([
+          {
+            name: form.name.trim(),
+            email: form.email.trim(),
+            subject: form.subject.trim() || 'Konu Yok',
+            message: form.message.trim(),
+          },
+        ]);
+
+        if (error) throw error;
+
+        setSent(true);
+        setForm({ name: '', email: '', subject: '', message: '' });
+        setTimeout(() => setSent(false), 4000);
+      } catch (error: any) {
+        console.error('Mesaj gönderilirken hata oluştu:', error.message);
+        alert('Mesaj gönderilirken bir hata oluştu, lütfen tekrar deneyin.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -165,6 +187,7 @@ export default function ContactPage({ navigate }: Props) {
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="input"
                   placeholder="Adınız"
+                  disabled={isSubmitting}
                 />
                 {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
               </div>
@@ -176,6 +199,7 @@ export default function ContactPage({ navigate }: Props) {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className="input"
                   placeholder="ornek@email.com"
+                  disabled={isSubmitting}
                 />
                 {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
               </div>
@@ -187,6 +211,7 @@ export default function ContactPage({ navigate }: Props) {
                   onChange={(e) => setForm({ ...form, subject: e.target.value })}
                   className="input"
                   placeholder="Mesaj konusu"
+                  disabled={isSubmitting}
                 />
               </div>
               <div>
@@ -196,6 +221,7 @@ export default function ContactPage({ navigate }: Props) {
                   onChange={(e) => setForm({ ...form, message: e.target.value })}
                   className="input min-h-[120px]"
                   placeholder="Mesajınızı buraya yazın..."
+                  disabled={isSubmitting}
                 />
                 {errors.message && <p className="text-xs text-red-500 mt-1">{errors.message}</p>}
               </div>
@@ -205,6 +231,8 @@ export default function ContactPage({ navigate }: Props) {
                     <Check className="w-5 h-5" />
                     Mesaj Gönderildi
                   </>
+                ) : isSubmitting ? (
+                  <>Gönderiliyor...</>
                 ) : (
                   <>
                     <Send className="w-5 h-5" />
