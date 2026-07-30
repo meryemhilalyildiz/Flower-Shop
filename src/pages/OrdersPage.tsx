@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { OrderInfo, Route, Product } from '../types';
-import { Star, Download, MessageCircle, RefreshCw, X } from 'lucide-react';
+import { Star, Download, MessageCircle, RefreshCw } from 'lucide-react';
 import { supabase } from "../supabaseClient";
 import { generateInvoicePDF } from "../services/pdfService";
 import { openWhatsApp } from "../services/whatsappService";
@@ -16,9 +16,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
   const [dbOrders, setDbOrders] = useState<OrderInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
-  const [reviewProductSelection, setReviewProductSelection] = useState<{ order: OrderInfo; products: Product[] } | null>(null);
 
-  // 🔄 Supabase'den kullanıcının canlı siparişlerini çekme
   const fetchUserOrders = async () => {
     setLoading(true);
     try {
@@ -94,16 +92,18 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
             shipping_address: o.shipping_address || o.address || 'Belirtilmedi',
             address: o.shipping_address || o.address || 'Belirtilmedi',
             total: Number(o.total_amount || o.total || 0),
-            subtotal: Number(o.subtotal || 0),
-            deliveryFee: Number(o.delivery_fee || o.deliveryFee || 0),
+            subtotal: Number(o.subtotal_amount || o.subtotal || 0),
+            deliveryFee: Number(o.delivery_fee ?? o.deliveryFee ?? 0),
             discountAmount: Number(o.discount_amount || o.discountAmount || 0),
-            applied_coupon_code: o.applied_coupon_code || o.couponCode || null,
+            coupon_discount: Number(o.coupon_discount || 0),
+            campaign_discount: Number(o.campaign_discount || 0),
+            applied_coupon_code: o.applied_coupon_code || o.coupon_code || o.couponCode || null,
             status: o.status || 'pending',
             note: o.note,
             tracking_number: o.tracking_number,
             items: mappedItems,
             order_items: mappedItems
-          };
+          } as any;
         });
         setDbOrders(mappedOrders);
       }
@@ -122,65 +122,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
     ? dbOrders
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const handleCancelOrder = async (orderId: string, reason: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .update({ 
-          status: 'cancelled', 
-          cancel_reason: reason 
-        })
-        .eq('id', orderId)
-        .select();
-  
-      if (error) {
-        alert('İptal veritabanına işlenemedi: ' + error.message);
-        return;
-      }
-  
-      setDbOrders((prevOrders) =>
-        prevOrders.map((o) =>
-          String(o.id) === String(orderId) 
-            ? { ...o, status: 'cancelled', cancel_reason: reason } 
-            : o
-        )
-      );
-  
-      alert('Siparişiniz başarıyla iptal edildi!');
-    } catch (err: any) {
-      alert('Hata oluştu: ' + (err.message || ''));
-    }
-  };
-
-  const handleReviewOrder = (order: OrderInfo) => {
-    const deliveredProducts = order.items
-      .map((item: any) => {
-        const productId = item.product?.id || item.product_id;
-        if (!productId) return null;
-
-        const baseProduct = item.product || {};
-        return {
-          id: productId,
-          name: baseProduct.name || item.product_name || 'Çiçek Ürünü',
-          price: baseProduct.price ?? item.price ?? item.unit_price ?? 0,
-          images: baseProduct.images
-            ?? (baseProduct.image ? [baseProduct.image] : []),
-        } as Product;
-      })
-      .filter((product): product is Product => product !== null);
-
-    if (deliveredProducts.length === 0) {
-      alert('Bu siparişteki ürün bilgisi bulunamadı. Lütfen destek ile iletişime geçin.');
-      return;
-    }
-
-    if (deliveredProducts.length === 1) {
-      setReviewProduct(deliveredProducts[0]);
-    } else {
-      setReviewProductSelection({ order, products: deliveredProducts });
-    }
-  };
-
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center text-gray-500">
@@ -194,21 +135,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-pink-100">
-          <div className="w-16 h-16 bg-pink-50 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
-            🌸
-          </div>
+          <div className="w-16 h-16 bg-pink-50 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">🌸</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Henüz Siparişiniz Bulunmuyor</h2>
-          <p className="text-gray-600 mb-6">
-            Henüz hiç sipariş vermediniz. Çiçek koleksiyonumuza göz atarak hemen sipariş verebilirsiniz.
-          </p>
-          {onNavigateToShop && (
-            <button
-              onClick={onNavigateToShop}
-              className="bg-pink-600 hover:bg-pink-700 text-white font-medium px-6 py-3 rounded-xl transition-colors shadow-md shadow-pink-200 cursor-pointer"
-            >
-              Çiçekleri Keşfet
-            </button>
-          )}
         </div>
       </div>
     );
@@ -221,36 +149,23 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
       </h1>
 
       <div className="space-y-6">
-        {orderList.map((order) => {
+        {orderList.map((order: any) => {
           const isDelivered = order.status === 'Teslim Edildi' || order.status === 'delivered';
-          const isCancelled = order.status === 'İptal Edildi' || order.status === 'cancelled' || order.status === 'İptal Talebi Alındı';
-          const canCancel = order.status === 'pending' || order.status === 'Hazırlanıyor' || order.status === 'processing';
+          const isCancelled = order.status === 'İptal Edildi' || order.status === 'cancelled';
 
           return (
-            <div
-              key={order.id}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-            >
-              {/* Üst Bilgi Barı */}
+            <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
                 <div>
                   <p className="text-xs text-gray-500 font-medium">SİPARİŞ TARİHİ</p>
                   <p className="text-sm font-semibold text-gray-700">
-                    {new Date(order.createdAt).toLocaleDateString('tr-TR', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {new Date(order.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
 
                 <div>
                   <p className="text-xs text-gray-500 font-medium">ALICI & ŞEHİR / İLÇE</p>
-                  <p className="text-sm font-semibold text-gray-700">
-                    {order.recipientName} ({order.city})
-                  </p>
+                  <p className="text-sm font-semibold text-gray-700">{order.recipientName} ({order.city})</p>
                 </div>
 
                 <div>
@@ -259,188 +174,99 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
-                      isDelivered || order.status === 'delivered'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : isCancelled || order.status === 'cancelled'
-                        ? 'bg-red-100 text-red-800 border border-red-200'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {isCancelled || order.status === 'cancelled'
-                      ? '❌ İptal Edildi'
-                      : isDelivered || order.status === 'delivered'
-                      ? '✅ Teslim Edildi'
-                      : (order.status || 'pending')}
+                  <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
+                    isDelivered ? 'bg-emerald-100 text-emerald-800' : isCancelled ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {isCancelled ? '❌ İptal Edildi' : isDelivered ? '✅ Teslim Edildi' : (order.status || 'pending')}
                   </span>
 
                   <button
                     onClick={() => openWhatsApp(order)}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-emerald-200"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 cursor-pointer"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    WhatsApp Destek
+                    <MessageCircle className="w-4 h-4" /> WhatsApp Destek
                   </button>
 
                   <button
-                    onClick={() => {
-                      const invoiceData = {
-                        ...order,
-                        items: (order.items && order.items.length > 0)
-                          ? order.items
-                          : ((order as any).order_items || [])
-                      };
-                      generateInvoicePDF(invoiceData);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors cursor-pointer"
+                    onClick={() => generateInvoicePDF(order)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    Fatura
+                    <Download className="w-3.5 h-3.5" /> Fatura
                   </button>
-
-                  {canCancel && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const reason = window.prompt('Lütfen siparişinizi iptal etme nedeninizi yazınız:');
-                        if (reason && reason.trim() !== '') {
-                          handleCancelOrder(order.id, reason.trim());
-                        } else if (reason !== null) {
-                          alert('İptal işlemi için bir neden belirtmelisiniz.');
-                        }
-                      }}
-                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
-                    >
-                      🚫 İptal Et
-                    </button>
-                  )}
-
-                  {isDelivered && (
-                    <button
-                      onClick={() => handleReviewOrder(order)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
-                    >
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      Yorum Yap
-                    </button>
-                  )}
                 </div>
               </div>
 
-              {/* Sipariş Ürünleri */}
               <div className="p-6">
                 <div className="divide-y divide-gray-100">
-                  {order.items.map((item: any, index) => {
-                    const imageUrl = Array.isArray(item.product?.images)
-                      ? item.product.images[0]
-                      : (item.product?.images as unknown as string) || item.image || item.image_url;
-
-                    const fullName = item.product?.name || item.product_name || item.name || item.title || 'Çiçek Ürünü';
-                    let baseName = fullName;
-                    let variantSubtext = '';
-
-                    if (fullName.includes('(') && fullName.includes(')')) {
-                      const parts = fullName.split('(');
-                      baseName = parts[0].trim();
-                      variantSubtext = parts[1].replace(')', '').trim();
-                    }
-
+                  {order.items.map((item: any, index: number) => {
+                    const imageUrl = item.product?.images?.[0] || item.image || item.image_url;
+                    const fullName = item.product?.name || item.product_name || 'Çiçek Ürünü';
                     const itemUnitPrice = item.product?.price || item.unit_price || item.price || 0;
 
                     return (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          const slug = item.product?.slug || item.product_id;
-                          if (slug) navigate({ name: 'product', slug: slug });
-                        }}
-                        className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 w-full text-left hover:bg-pink-50/50 rounded-lg px-2 -mx-2 transition-colors cursor-pointer"
-                      >
+                      <div key={index} className="py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={baseName}
-                              className="w-14 h-14 object-cover rounded-lg border border-gray-100"
-                            />
-                          ) : (
-                            <div className="w-14 h-14 bg-pink-50 rounded-lg flex items-center justify-center text-pink-400 text-xl border border-pink-100">
-                              🌸
-                            </div>
-                          )}
+                          {imageUrl && <img src={imageUrl} alt="" className="w-14 h-14 object-cover rounded-lg border" />}
                           <div>
-                            <h4 className="font-semibold text-gray-800 text-sm group-hover:text-pink-700 transition-colors">
-                              {baseName}
-                            </h4>
-                            {variantSubtext ? (
-                              <p className="text-xs text-pink-600 font-medium mt-0.5">
-                                ✨ {variantSubtext}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-gray-400 mt-0.5">Standart Boyut</p>
-                            )}
-                            <p className="text-xs text-gray-500">
-                              Adet: <span className="font-medium text-gray-700">{item.quantity}</span>
-                            </p>
+                            <h4 className="font-semibold text-gray-800 text-sm">{fullName}</h4>
+                            <p className="text-xs text-gray-500">Adet: {item.quantity}</p>
                           </div>
                         </div>
-
-                        <div className="text-right">
-                          <p className="text-sm font-semibold text-gray-800">
-                            ₺{(itemUnitPrice * item.quantity).toFixed(2)}
-                          </p>
-                          <p className="text-xs text-pink-600 mt-1">Ürünü Gör →</p>
-                        </div>
-                      </button>
+                        <p className="text-sm font-semibold text-gray-800">₺{(itemUnitPrice * item.quantity).toFixed(2)}</p>
+                      </div>
                     );
                   })}
                 </div>
 
-                {/* 🧾 Sipariş Tutar Detayları */}
+                {/* 🧾 DÖKÜM TABLOSU */}
                 <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/80 p-3.5 rounded-xl">
                   {(() => {
-                    const tot = Number(order.total ?? (order as any).total_amount ?? 0);
-                    const recordedDiscount = Number(order.discountAmount ?? (order as any).discount_amount ?? 0);
-                    let fee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
+                    const tot = Number(order.total || 0);
+                    const fee = Number(order.deliveryFee ?? order.delivery_fee ?? 0);
+                    const couponDisc = Number(order.coupon_discount || 0);
+                    const campaignDisc = Number(order.campaign_discount || 0);
+                    const recordedDiscount = Number(order.discountAmount || order.discount_amount || 0);
 
-                    if (fee === 0 && tot > 0) fee = 300;
-
-                    let rawSubtotal = Number(order.subtotal || 0);
-                    if (rawSubtotal <= 0 || rawSubtotal >= tot) {
-                      rawSubtotal = tot - fee + recordedDiscount;
+                    // Doğru Ürünler Toplamı
+                    let itemsSubtotal = Number(order.subtotal || order.subtotal_amount || 0);
+                    if (itemsSubtotal <= 0) {
+                      itemsSubtotal = order.items.reduce((acc: number, i: any) => acc + ((i.price || i.unit_price || 0) * (i.quantity || 1)), 0);
                     }
 
-                    const discountRate = rawSubtotal > 0 && recordedDiscount > 0
-                      ? Math.round((recordedDiscount / rawSubtotal) * 100)
-                      : 0;
-
-                    const couponCode = (order as any).applied_coupon_code || (order as any).applied_coupon;
+                    const couponCode = order.applied_coupon_code || order.couponCode;
 
                     return (
                       <div className="space-y-1.5 text-sm">
                         <div className="flex justify-between text-gray-600">
                           <span>Ürünler Toplamı:</span>
-                          <span className="font-semibold text-gray-800">₺{rawSubtotal.toFixed(2)}</span>
+                          <span className="font-semibold text-gray-800">₺{itemsSubtotal.toFixed(2)}</span>
                         </div>
 
-                        {/* 🌸 DİNAMİK İNDİRİM ETİKETİ (KUPON vs KAMPANYA) */}
-                        {recordedDiscount > 0 && (
+                        {/* 🎟️ Kupon İndirimi Satırı */}
+                        {(couponDisc > 0 || (recordedDiscount > 0 && couponCode && campaignDisc === 0)) && (
                           <div className="flex justify-between text-emerald-600 font-semibold">
-                            <span className="flex items-center gap-1">
-                              {couponCode ? (
-                                <>🎟️ Kupon İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</>
-                              ) : (
-                                <>🏷️ Kampanya İndirimi {discountRate > 0 ? `(%${discountRate})` : ''}:</>
-                              )}
-                            </span>
-                            <span>-₺{recordedDiscount.toFixed(2)}</span>
+                            <span>🎟️ Kupon İndirimi ({couponCode || 'KUPON'}):</span>
+                            <span>-₺{(couponDisc || recordedDiscount).toFixed(2)}</span>
                           </div>
                         )}
 
+                        {/* İki nokta üst üste işaretini parantezin dışına alıyoruz */}
+                        {/* 🌸 OrdersPage.tsx Kampanya Satırı */}
+{(campaignDisc > 0 || (recordedDiscount > 0 && !couponCode && couponDisc === 0)) && (
+  <div className="flex justify-between text-emerald-600 font-semibold text-sm">
+    <span className="flex items-center gap-1.5">
+      ✨ Kampanya İndirimi{(order?.campaign_title || order?.campaignTitle) ? ` (${order.campaign_title || order.campaignTitle})` : ''}:
+    </span>
+    <span>-₺{(campaignDisc || recordedDiscount).toFixed(2)}</span>
+  </div>
+)}
+
+                        {/* 🚚 Kargo Satırı */}
                         <div className="flex justify-between text-gray-600">
                           <span>🚚 Kargo / Teslimat Ücreti:</span>
-                          <span className="font-semibold text-gray-800">₺{fee.toFixed(2)}</span>
+                          <span className="font-semibold text-gray-800">
+                            {fee > 0 ? `₺${fee.toFixed(2)}` : 'Ücretsiz'}
+                          </span>
                         </div>
 
                         <div className="flex justify-between pt-2 border-t border-gray-200 text-base font-bold text-pink-600">
@@ -451,93 +277,11 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                     );
                   })()}
                 </div>
-
-                {/* Adres & Kargo Takip */}
-                <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-gray-600 bg-gray-50/80 p-3.5 rounded-xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-                    <div>
-                      <span className="font-semibold text-gray-700">📍 Teslimat Adresi:</span>{' '}
-                      {order.shipping_address || order.address || 'Belirtilmemiş'}
-                    </div>
-                    {order.note && (
-                      <div>
-                        <span className="font-semibold text-gray-700">📝 Sipariş Notu:</span>{' '}
-                        {order.note}
-                      </div>
-                    )}
-                  </div>
-
-                  {order.tracking_number && (
-                    <div className="flex items-center gap-2 bg-blue-100/90 text-blue-900 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
-                      <span className="text-xs font-semibold">🚚 Kargo Takip No:</span>
-                      <span className="font-mono font-bold text-xs text-blue-800">
-                        {order.tracking_number}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (order.tracking_number) {
-                            navigator.clipboard.writeText(order.tracking_number);
-                            alert('Kargo takip numarası kopyalandı! 📋');
-                          }
-                        }}
-                        className="ml-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
-                      >
-                        Kopyala
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           );
         })}
       </div>
-
-      {/* Yorum Yapılacak Ürün Seçimi Modalı */}
-      {reviewProductSelection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-sand-200">
-              <h2 className="text-xl font-bold text-sand-900">Yorum Yapılacak Ürünü Seçin</h2>
-              <button
-                onClick={() => setReviewProductSelection(null)}
-                className="w-8 h-8 rounded-full bg-sand-100 hover:bg-sand-200 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4 text-sand-600" />
-              </button>
-            </div>
-            <div className="p-6">
-              {reviewProductSelection.products.map((product) => (
-                <button
-                  key={product.id}
-                  onClick={() => {
-                    setReviewProduct(product);
-                    setReviewProductSelection(null);
-                  }}
-                  className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-sand-50 transition-colors text-left"
-                >
-                  {product.images?.[0] ? (
-                    <img src={product.images[0]} alt={product.name} className="w-12 h-12 object-cover rounded-xl" />
-                  ) : (
-                    <div className="w-12 h-12 bg-pink-50 rounded-xl flex items-center justify-center text-pink-400">🌸</div>
-                  )}
-                  <span className="font-medium text-sand-800">{product.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {reviewProduct && (
-        <ReviewModal
-          product={reviewProduct}
-          isOpen={true}
-          onClose={() => setReviewProduct(null)}
-          onReviewSubmitted={() => fetchUserOrders()}
-        />
-      )}
     </div>
   );
 };

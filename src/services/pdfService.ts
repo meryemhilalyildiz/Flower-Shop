@@ -3,7 +3,7 @@ import type { OrderInfo } from '../types';
 export const generateInvoicePDF = (order: OrderInfo) => {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
-    alert('Lütfen açılır pencerilere (pop-up) izin verin.');
+    alert('Lütfen açılır pencerelere (pop-up) izin verin.');
     return;
   }
 
@@ -17,14 +17,14 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     (order as any).recipient_telephone ||
     'Belirtilmedi';
 
-  const locationCity = order.city || (order as any).province || (order as any).district || 'Belirtilmedi';
-  const fullAddress = order.shipping_address || order.address || (order as any).shippingAddress || 'Belirtilmedi';
-
-  // 🌸 2. Ödeme Yöntemi & Taksit
-  const paymentMethodRaw = (order as any).paymentMethod || (order as any).payment_method || 'Online Kredi / Banka Kartı (Tek Çekim)';
-  const installmentCount = (order as any).installment || (order as any).installments || 1;
+    const locationCity = order.city || (order as any).province || (order as any).district || 'Belirtilmedi';
+    const fullAddress = order.shipping_address || order.address || (order as any).shippingAddress || 'Belirtilmedi';
   
-  let paymentMethodText = 'Online Kredi / Banka Kartı (Tek Çekim)';
+    // 🌸 2. Ödeme Yöntemi & Taksit
+    const paymentMethodRaw = (order as any).paymentMethod || (order as any).payment_method || 'Online Kredi / Banka Kartı (Tek Çekim)';
+    const installmentCount = (order as any).installment || (order as any).installments || 1;
+    
+    let paymentMethodText = 'Online Kredi / Banka Kartı (Tek Çekim)';
 
   if (typeof paymentMethodRaw === 'string') {
     const lower = paymentMethodRaw.toLowerCase();
@@ -39,25 +39,21 @@ export const generateInvoicePDF = (order: OrderInfo) => {
     }
   }
 
-  const couponCode = (order as any).applied_coupon_code || (order as any).couponCode || (order as any).coupon_code || null;
-
-  // 🌸 3. Tutar Hesaplamaları
+  const couponCode = (order as any).applied_coupon_code || (order as any).coupon_code || (order as any).couponCode || null;
+  const campaignTitle = (order as any).campaign_title || (order as any).campaignTitle || (order as any).campaign_name || null;
+  // 🌸 3. DOĞRU TÜM TUTAR HESAPLAMALARI
   const totalAmount = Number(order.total || (order as any).total_amount || 0);
-  let deliveryFee = Number(order.deliveryFee ?? (order as any).delivery_fee ?? 0);
-  const discountAmount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
+  const deliveryFee = Number((order as any).deliveryFee ?? (order as any).delivery_fee ?? 0);
+  
+  const totalRecordedDiscount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
+  const couponDiscount = Number((order as any).coupon_discount || (couponCode ? totalRecordedDiscount : 0));
+  const campaignDiscount = Number((order as any).campaign_discount || (!couponCode ? totalRecordedDiscount : 0));
 
-  if (deliveryFee === 0 && totalAmount > 0) {
-    deliveryFee = 300;
+  // Ürünler Toplamı = Genel Toplam - Kargo + Toplam İndirim
+  let rawSubtotal = Number(order.subtotal || (order as any).subtotal_amount || 0);
+  if (rawSubtotal <= 0) {
+    rawSubtotal = totalAmount - deliveryFee + (couponDiscount + campaignDiscount || totalRecordedDiscount);
   }
-
-  let rawSubtotal = Number(order.subtotal || 0);
-  if (rawSubtotal <= 0 || rawSubtotal >= totalAmount) {
-    rawSubtotal = totalAmount - deliveryFee + discountAmount;
-  }
-
-  const discountPercentage = rawSubtotal > 0 && discountAmount > 0 
-    ? Math.round((discountAmount / rawSubtotal) * 100) 
-    : 0;
 
   // 🌸 4. Ürün Satırlarını Oluşturma
   const rawItems = 
@@ -212,18 +208,24 @@ export const generateInvoicePDF = (order: OrderInfo) => {
             <td>Ürünler Toplamı:</td>
             <td style="text-align: right; font-weight: 500;">₺${rawSubtotal.toFixed(2)}</td>
           </tr>
+          
+          ${couponDiscount > 0 ? `
+          <tr style="color: #059669; font-weight: 600; background-color: #ecfdf5;">
+            <td style="padding: 4px 6px;">🎟️ Kupon İndirimi (${couponCode || 'KUPON'}):</td>
+            <td style="text-align: right; padding: 4px 6px;">-₺${couponDiscount.toFixed(2)}</td>
+          </tr>
+          ` : ''}
+
+          ${campaignDiscount > 0 ? `
+            <tr style="color: #059669; font-weight: 600; background-color: #ecfdf5;">
+              <td style="padding: 4px 6px;">✨ Kampanya İndirimi${campaignTitle ? ` (${campaignTitle})` : ''}:</td>
+              <td style="text-align: right; padding: 4px 6px;">-₺${campaignDiscount.toFixed(2)}</td>
+            </tr>
+            ` : ''}
           <tr>
             <td>🚚 Teslimat / Kargo Ücreti:</td>
             <td style="text-align: right; font-weight: 500;">₺${deliveryFee.toFixed(2)}</td>
           </tr>
-          ${discountAmount > 0 ? `
-          <tr style="color: #059669; font-weight: 600; background-color: #ecfdf5;">
-            <td style="padding: 4px 6px;">
-              ${couponCode ? '🎟️ İndirim Kuponu' : '🏷️ Kampanya İndirimi'} ${discountPercentage > 0 ? `(%${discountPercentage})` : ''}:
-            </td>
-            <td style="text-align: right; padding: 4px 6px;">-₺${discountAmount.toFixed(2)}</td>
-          </tr>
-          ` : ''}
           <tr class="grand-total">
             <td>Genel Toplam:</td>
             <td style="text-align: right;">₺${totalAmount.toFixed(2)}</td>

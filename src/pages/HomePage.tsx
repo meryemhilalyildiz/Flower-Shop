@@ -25,7 +25,11 @@ type Campaign = {
   title: string;
   subtitle: string;
   image_url: string;
-  discount_percentage: number;
+  discount_percentage?: number;
+  discount_value?: number;
+  discount_type?: 'percentage' | 'fixed_amount' | 'buy_x_pay_y' | 'second_item_discount';
+  buy_x?: number;
+  pay_y?: number;
   min_order_amount: number;
 };
 
@@ -69,13 +73,10 @@ export default function HomePage({ categories, featured, discounted, navigate, o
 
     // Aktif Kampanyaları Çek
     const fetchActiveCampaigns = async () => {
-      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('campaigns')
         .select('*')
         .eq('is_active', true)
-        .lte('start_date', now)
-        .gte('end_date', now)
         .order('created_at', { ascending: false });
 
       if (!error && data && !cancelled) {
@@ -169,69 +170,81 @@ export default function HomePage({ categories, featured, discounted, navigate, o
               </div>
 
               {/* 🌸 🏷️ YILDIZLARIN ALTINA EKLENEN KAMPANYA BANNER SLIDER */}
-              {campaigns.length > 0 && (
-                <div className="mt-8 relative rounded-3xl overflow-hidden bg-white border border-brand-200 shadow-lg group transition-all">
-                  <div
-                    onClick={() => navigate({ name: 'shop' })}
-                    className="relative h-44 sm:h-48 w-full cursor-pointer"
-                  >
-                    <img
-                      src={campaigns[currentSlide].image_url}
-                      alt={campaigns[currentSlide].title}
-                      className="w-full h-full object-cover transition-all duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-sand-900/85 via-sand-900/50 to-transparent flex flex-col justify-center p-6 text-white space-y-1.5">
-                      <div className="inline-flex items-center gap-1.5 bg-brand-600 text-white text-[11px] font-bold px-3 py-1 rounded-full w-fit shadow-md">
-                        <Tag className="w-3 h-3" /> %{campaigns[currentSlide].discount_percentage} İNDİRİM
-                      </div>
-                      <h3 className="font-display text-2xl font-bold">{campaigns[currentSlide].title}</h3>
-                      <p className="text-xs sm:text-sm text-sand-200 line-clamp-2">{campaigns[currentSlide].subtitle}</p>
-                      <p className="text-[10px] text-brand-200 font-semibold pt-1">
-                        * ₺{campaigns[currentSlide].min_order_amount} üzerindeki siparişlerde geçerlidir.
-                      </p>
-                    </div>
-                  </div>
+{campaigns.length > 0 && (
+  <div className="mt-8 relative rounded-3xl overflow-hidden bg-white border border-brand-200 shadow-lg group transition-all">
+    <a
+  href={`#/magaza/${campaigns[currentSlide].id}`}
+  className="relative h-44 sm:h-48 w-full block cursor-pointer"
+>
+      <img
+        src={campaigns[currentSlide].image_url}
+        alt={campaigns[currentSlide].title}
+        className="w-full h-full object-cover transition-all duration-700"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-sand-900/85 via-sand-900/50 to-transparent flex flex-col justify-center p-6 text-white space-y-1.5">
+        
+        {/* 🌸 DİNAMİK KAMPANYA TİPİ ROZETİ */}
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500 text-white font-bold text-xs rounded-full shadow-sm mb-2 w-fit">
+          <Tag className="w-3.5 h-3.5" />
+          {campaigns[currentSlide].discount_type === 'fixed_amount' && `₺${campaigns[currentSlide].discount_value} İNDİRİM`}
+          {campaigns[currentSlide].discount_type === 'percentage' && `%${campaigns[currentSlide].discount_value || campaigns[currentSlide].discount_percentage} İNDİRİM`}
+          {campaigns[currentSlide].discount_type === 'buy_x_pay_y' && `${campaigns[currentSlide].buy_x || 2} AL ${campaigns[currentSlide].pay_y || 1} ÖDE`}
+          {campaigns[currentSlide].discount_type === 'second_item_discount' && `2. ÜRÜNE %${campaigns[currentSlide].discount_value} İNDİRİM`}
+          {(!campaigns[currentSlide].discount_type || campaigns[currentSlide].discount_type === 'percentage') && !campaigns[currentSlide].discount_value && `%${campaigns[currentSlide].discount_percentage} İNDİRİM`}
+        </span>
 
-                  {/* Birden fazla kampanya varsa Sol/Sağ Butonları & Noktalar */}
-                  {campaigns.length > 1 && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentSlide((prev) => (prev === 0 ? campaigns.length - 1 : prev - 1));
-                        }}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentSlide((prev) => (prev + 1) % campaigns.length);
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
+        <h3 className="font-display text-2xl font-bold">{campaigns[currentSlide].title}</h3>
+        <p className="text-xs sm:text-sm text-sand-200 line-clamp-2">{campaigns[currentSlide].subtitle}</p>
+        <p className="text-[10px] text-brand-200 font-semibold pt-1">
+          * ₺{campaigns[currentSlide].min_order_amount} üzerindeki siparişlerde geçerlidir.
+        </p>
+      </div>
+    </a>
 
-                      <div className="absolute bottom-2.5 right-4 flex gap-1.5">
-                        {campaigns.map((_, idx) => (
-                          <button
-                            key={idx}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCurrentSlide(idx);
-                            }}
-                            className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                              idx === currentSlide ? 'w-5 bg-white' : 'w-1.5 bg-white/50'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+    {/* Birden fazla kampanya varsa Sol/Sağ Butonları & Noktalar */}
+    {campaigns.length > 1 && (
+      <>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setCurrentSlide((prev) => (prev === 0 ? campaigns.length - 1 : prev - 1));
+          }}
+          className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer z-10"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setCurrentSlide((prev) => (prev + 1) % campaigns.length);
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer z-10"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+
+        <div className="absolute bottom-2.5 right-4 flex gap-1.5 z-10">
+          {campaigns.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setCurrentSlide(idx);
+              }}
+              className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                idx === currentSlide ? 'w-5 bg-white' : 'w-1.5 bg-white/50'
+              }`}
+            />
+          ))}
+        </div>
+      </>
+    )}
+  </div>
+)}
+
             </div>
 
             <div className="relative animate-scale-in">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { SlidersHorizontal, ChevronDown, X, RefreshCw } from 'lucide-react';
+import { SlidersHorizontal, ChevronDown, X, Sparkles, RefreshCw } from 'lucide-react';
 import type { Product, Route, Category } from '../types';
 import ProductCard from '../components/ProductCard';
 import Breadcrumbs from '../components/Breadcrumbs';
@@ -7,7 +7,7 @@ import { supabase } from '../supabaseClient';
 import { fetchProductReviewStats } from '../services/adminApi';
 
 type Props = {
-  products?: Product[]; // Opsiyonel hale getirdik, DB'den de dolacak
+  products?: Product[];
   categories: Category[];
   activeCategorySlug?: string;
   navigate: (r: Route) => void;
@@ -36,6 +36,40 @@ export default function ShopPage({
   const [showDiscounted, setShowDiscounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  // 🌸 Kampanya Filtreleme State'i
+  const [activeCampaignFilter, setActiveCampaignFilter] = useState<any>(null);
+
+  // 🌸 URL'den kampanya ID'si gelmiş mi kontrol et (#/magaza/CAMPAIGN_ID)
+  useEffect(() => {
+    const checkCampaignHash = async () => {
+      const hash = window.location.hash;
+      const parts = hash.split('#/magaza/');
+      
+      // Eğer /magaza/'dan sonra bir ID gelmişse
+      if (parts.length > 1 && parts[1]) {
+        const campaignId = parts[1].split('?')[0];
+
+        if (campaignId) {
+          const { data, error } = await supabase
+            .from('campaigns')
+            .select('*')
+            .eq('id', campaignId)
+            .single();
+            
+          if (data && !error) {
+            setActiveCampaignFilter(data);
+          }
+        }
+      } else {
+        setActiveCampaignFilter(null);
+      }
+    };
+
+    checkCampaignHash();
+    window.addEventListener('hashchange', checkCampaignHash);
+    return () => window.removeEventListener('hashchange', checkCampaignHash);
+  }, []);
+  
   // 🌸 Supabase'den Canlı Ürünleri Çekiyoruz
   const loadShopProducts = async () => {
     setLoading(true);
@@ -48,11 +82,9 @@ export default function ShopPage({
       if (error) throw error;
 
       if (data) {
-        // Supabase veri yapısını Product arayüzüne eksiksiz eşliyoruz
         const mappedProducts: Product[] = await Promise.all(data.map(async (p: any) => {
           const imgUrl = p.image || p.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=800';
           
-          // ⭐ Gerçek yorum istatistiklerini çek
           const reviewStats = await fetchProductReviewStats(p.id);
 
           return {
@@ -87,28 +119,43 @@ export default function ShopPage({
     }
   };
 
-
   useEffect(() => {
     loadShopProducts();
   }, []);
 
-  // Prop'tan gelen veya DB'den canlı çekilen ürünleri birleştir
   const allProducts = dbProducts.length > 0 ? dbProducts : initialProducts;
 
   const activeCategory = activeCategorySlug
     ? categories.find((c) => c.slug === activeCategorySlug)
     : undefined;
 
-  // 🎯 Filtreleme ve Sıralama Mantığı (Orijinal Kod Korundu)
+  // 🎯 Kampanya + Kategori + Fiyat + Stok Filtreleme ve Sıralama Mantığı
   const filtered = useMemo(() => {
-    let list = activeCategory
-      ? allProducts.filter((p) => p.categoryId === activeCategory.id || (p as any).category_id === activeCategory.id || (p as any).category === activeCategory.slug)
-      : [...allProducts];
+    let list = [...allProducts];
 
+    // 🌸 1. Kampanya Seçili Çiçek Filtresi
+    if (activeCampaignFilter && activeCampaignFilter.target_type === 'selected_products') {
+      const targetIds = activeCampaignFilter.target_product_ids || [];
+      list = list.filter((p) => targetIds.includes(p.id));
+    }
+
+    // 🌸 2. Kategori Filtresi
+    if (activeCategory) {
+      list = list.filter((p) => 
+        p.categoryId === activeCategory.id || 
+        (p as any).category_id === activeCategory.id || 
+        (p as any).category === activeCategory.slug
+      );
+    }
+
+    // 🌸 3. Stok ve İndirim Filtreleri
     if (showInStock) list = list.filter((p) => (p.stock !== undefined ? p.stock > 0 : p.inStock));
     if (showDiscounted) list = list.filter((p) => p.oldPrice !== undefined);
+    
+    // 🌸 4. Fiyat Aralığı
     list = list.filter((p) => p.price >= priceRange[0] && p.price <= priceRange[1]);
 
+    // 🌸 5. Sıralama
     switch (sort) {
       case 'price-asc':
         list.sort((a, b) => a.price - b.price);
@@ -124,7 +171,7 @@ export default function ShopPage({
     }
 
     return list;
-  }, [allProducts, activeCategory, sort, priceRange, showInStock, showDiscounted]);
+  }, [allProducts, activeCategory, activeCampaignFilter, sort, priceRange, showInStock, showDiscounted]);
 
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },
@@ -143,7 +190,7 @@ export default function ShopPage({
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
       <Breadcrumbs items={crumbs} />
 
-      <div className="mt-4 mb-8">
+      <div className="mt-4 mb-6">
         <h1 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">
           {activeCategory ? activeCategory.name : 'Tüm Çiçekler'}
         </h1>
@@ -151,6 +198,27 @@ export default function ShopPage({
           {activeCategory ? activeCategory.description : 'Taze çiçekler, buketler ve aranjmanlar'}
         </p>
       </div>
+
+      {/* 🌸 Kampanya Filtresi Aktifse Üstte Gösterilecek Rozet */}
+      {activeCampaignFilter && (
+        <div className="mb-6 p-4 bg-brand-50 border border-brand-200 rounded-2xl flex items-center justify-between shadow-xs animate-fade-in">
+          <div className="flex items-center gap-2.5 text-brand-900 font-bold text-sm">
+            <div className="w-8 h-8 rounded-xl bg-brand-100 flex items-center justify-center text-brand-600">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <span>'{activeCampaignFilter.title}' Kampanyasına Dahil Çiçekler Listeleniyor</span>
+          </div>
+          <button
+            onClick={() => {
+              setActiveCampaignFilter(null);
+              window.location.hash = '#/magaza';
+            }}
+            className="text-xs text-sand-700 hover:text-red-600 font-bold flex items-center gap-1.5 bg-white px-3 py-2 rounded-xl border border-sand-200 transition-all cursor-pointer hover:border-red-200"
+          >
+            <X className="w-4 h-4" /> Tüm Ürünleri Göster
+          </button>
+        </div>
+      )}
 
       {/* Category pills */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-6">
@@ -270,6 +338,8 @@ export default function ShopPage({
                   setPriceRange([0, 2000]);
                   setShowInStock(false);
                   setShowDiscounted(false);
+                  setActiveCampaignFilter(null);
+                  window.location.hash = '#/magaza';
                 }}
                 className="btn-secondary mt-4 cursor-pointer"
               >

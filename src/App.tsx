@@ -69,7 +69,7 @@ function App() {
     
     loadData();
 
-    // 🌸 OTURUM DURUMU DEĞİŞTİĞİNDE (ÇIKIŞ YAPILDINDA) ANASAYFAYA YÖNLENDİRME
+    // 🌸 OTURUM DURUMU DEĞİŞTİĞİNDE ANASAYFAYA YÖNLENDİRME
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         navigate({ name: 'home' });
@@ -88,7 +88,7 @@ function App() {
 
     return () => {
       clearInterval(interval);
-      authListener.subscription.unsubscribe(); // 🌸 Dinleyiciyi temizliyoruz
+      authListener.subscription.unsubscribe();
     };
   }, [navigate]);
 
@@ -106,27 +106,47 @@ function App() {
   );
 
   const handlePlaceOrder = useCallback(
-    async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'>): Promise<string> => {
+    async (orderData: Omit<OrderInfo, 'id' | 'createdAt' | 'status'> & any): Promise<string> => {
       const { data: { user } } = await supabase.auth.getUser();
       const validUserId = user?.id ? user.id : null;
 
-      const { data: insertedOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: validUserId,
-          recipient_name: orderData.recipientName || 'Alıcı Adı Belirtilmedi',
-          recipient_phone: orderData.recipientPhone || '',
-          shipping_address: orderData.address || 'Adres Belirtilmedi',
-          city: orderData.city || '',
-          delivery_date: orderData.deliveryDate || '',
-          note: orderData.note || '',
-          total_amount: orderData.total,
-          discount_amount: orderData.discountAmount || 0,
-          applied_coupon_code: orderData.couponCode || null,
-          status: 'pending',
-        })
-        .select()
-        .single();
+      // 🌸 Tutar Değerlerini Güvenli Şekilde Alıyoruz
+      const subtotal = Number(orderData.subtotal || orderData.subtotal_amount || 0);
+      const deliveryFee = Number(orderData.deliveryFee ?? orderData.delivery_fee ?? 0);
+      const couponDiscount = Number(orderData.coupon_discount || 0);
+      const campaignDiscount = Number(orderData.campaign_discount || 0);
+      const totalDiscount = Number(orderData.discountAmount || orderData.discount_amount || (couponDiscount + campaignDiscount));
+      const totalAmount = Number(orderData.total || orderData.total_amount || 0);
+
+      // 🌸 1. EKLENEN PARÇA: App.tsx -> handlePlaceOrder içindeki .insert({}) bloğu
+      // App.tsx -> handlePlaceOrder içi:
+const { data: insertedOrder, error: orderError } = await supabase
+.from('orders')
+.insert({
+  user_id: validUserId,
+  recipient_name: orderData.recipientName || orderData.recipient_name || 'Alıcı Adı Belirtilmedi',
+  recipient_phone: orderData.recipientPhone || orderData.recipient_phone || '',
+  shipping_address: orderData.address || orderData.shipping_address || 'Adres Belirtilmedi',
+  city: orderData.city || '',
+  delivery_date: orderData.deliveryDate || orderData.delivery_date || '',
+  note: orderData.note || '',
+
+  subtotal_amount: subtotal,
+  delivery_fee: deliveryFee,
+  coupon_discount: couponDiscount,
+  campaign_discount: campaignDiscount,
+
+  // 🌸 İŞTE EKSİK OLAN KISIM BURASI: Kampanya Adını Supabase'e Yazıyoruz!
+  campaign_title: orderData.campaign_title || orderData.campaignTitle || null,
+
+  discount_amount: totalDiscount,
+  total_amount: totalAmount,
+
+  applied_coupon_code: orderData.couponCode || orderData.applied_coupon_code || null,
+  status: 'pending',
+})
+.select()
+.single();
 
       if (orderError) {
         alert(`❌ ORDERS HATASI:\n${orderError.message}`);
@@ -136,11 +156,13 @@ function App() {
       const orderId = insertedOrder.id.toString();
 
       if (orderData.items && orderData.items.length > 0) {
-        const itemsToInsert = orderData.items.map((item) => ({
+        const itemsToInsert = orderData.items.map((item: any) => ({
           order_id: orderId,
-          product_id: String(item.product.id),
-          quantity: item.quantity,
-          unit_price: item.product.price || 0,
+          product_id: String(item.product?.id || item.product_id || item.id),
+          product_name: item.product?.name || item.product_name || 'Çiçek Ürünü',
+          quantity: item.quantity || 1,
+          unit_price: item.product?.price || item.unit_price || item.price || 0,
+          price: item.product?.price || item.unit_price || item.price || 0,
         }));
 
         const { error: itemsError } = await supabase
@@ -153,7 +175,7 @@ function App() {
 
         for (const item of orderData.items) {
           try {
-            const productId = String(item.product.id);
+            const productId = String(item.product?.id || item.product_id || item.id);
             const buyQty = item.quantity || 1;
 
             const { data: dbProduct } = await supabase
@@ -184,6 +206,10 @@ function App() {
       const order: OrderInfo = {
         ...orderData,
         id: orderId,
+        subtotal: subtotal,
+        deliveryFee: deliveryFee,
+        discountAmount: totalDiscount,
+        total: totalAmount,
         createdAt: insertedOrder.created_at || new Date().toISOString(),
         status: 'Hazırlanıyor',
       };
@@ -202,6 +228,7 @@ function App() {
 
       if (!user) return;
 
+      // 🌸 2. EKLENEN PARÇA: App.tsx -> fetchUserOrders içindeki .select() alanı
       const { data: fetchedOrders, error } = await supabase
         .from('orders')
         .select(`
@@ -209,8 +236,14 @@ function App() {
           created_at,
           delivery_date,
           status,
+          subtotal_amount,
+          delivery_fee,
+          coupon_discount,
+          campaign_discount,
+          campaign_title,
           discount_amount,
           total_amount,
+          applied_coupon_code,
           shipping_address,
           city,
           recipient_name,
@@ -220,6 +253,7 @@ function App() {
           order_items (
             id,
             product_id,
+            product_name,
             quantity,
             unit_price
           )
@@ -235,14 +269,22 @@ function App() {
       if (fetchedOrders) {
         const ordersMap: Record<string, OrderInfo> = {};
 
+        // 🌸 3. EKLENEN PARÇA: App.tsx -> fetchUserOrders içi ordersMap nesnesi
         fetchedOrders.forEach((ord: any) => {
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
             deliveryDate: ord.delivery_date || '',
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
-            subtotal: ord.total_amount != null ? ord.total_amount + (ord.discount_amount || 0) : undefined,
-            deliveryFee: undefined,
+            subtotal: ord.subtotal_amount ?? (ord.total_amount != null ? ord.total_amount + (ord.discount_amount || 0) : 0),
+            deliveryFee: ord.delivery_fee ?? 0,
+            discountAmount: ord.discount_amount ?? 0,
+            coupon_discount: ord.coupon_discount ?? 0,
+            campaign_discount: ord.campaign_discount ?? 0,
+            // 🌸 Kampanya Başlığını Sipariş Nesnesine Geçiriyoruz:
+            campaign_title: ord.campaign_title || undefined,
+            campaignTitle: ord.campaign_title || undefined,
+            couponCode: ord.applied_coupon_code || undefined,
             total: ord.total_amount,
             address: ord.shipping_address,
             city: ord.city,
@@ -254,7 +296,7 @@ function App() {
               const foundProduct = products.find((p) => String(p.id) === String(item.product_id));
               const fallbackProduct = {
                 id: item.product_id,
-                name: 'Ürün Detayı',
+                name: item.product_name || 'Ürün Detayı',
                 price: item.unit_price || 0,
                 image: '',
                 slug: 'urun',
@@ -268,7 +310,7 @@ function App() {
                 price: item.unit_price,
               };
             }) : [],
-          };
+          } as any;
         });
 
         setOrders(ordersMap);
@@ -350,6 +392,8 @@ function App() {
             discountAmount={cart.discountAmount}
             onApplyCoupon={cart.applyCoupon}
             onRemoveCoupon={cart.removeCoupon}
+            selectedCampaign={cart.selectedCampaign}
+            onSelectCampaign={cart.setSelectedCampaign}
           />
         );
 
@@ -366,6 +410,7 @@ function App() {
             discountAmount={cart.discountAmount}
             onApplyCoupon={cart.applyCoupon}
             onRemoveCoupon={cart.removeCoupon}
+            selectedCampaign={(cart as any).selectedCampaign} // 🌸 KARTTAN VEYA STATE'TEN AKTARILIYOR
           />
         );
 
@@ -480,12 +525,12 @@ function App() {
           </AdminLayout>
         );
 
-        case 'admin-faq':
-    return (
-      <AdminLayout currentPage="admin-faq" navigate={navigate}>
-        <AdminFaqPage />
-      </AdminLayout>
-    );
+      case 'admin-faq':
+        return (
+          <AdminLayout currentPage="admin-faq" navigate={navigate}>
+            <AdminFaqPage />
+          </AdminLayout>
+        );
 
       default:
         return (
@@ -500,7 +545,7 @@ function App() {
           />
         );
     }
-  }; // 👈 renderPage kapanış süslü parantezi buraya eklendi!
+  };
 
   const isAdminRoute = route.name.startsWith('admin');
 

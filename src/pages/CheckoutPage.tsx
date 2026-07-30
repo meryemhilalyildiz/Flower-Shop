@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck, Calendar, Clock, Info, RefreshCw, Truck } from 'lucide-react';
+import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck, Calendar, Clock, Info, RefreshCw, Truck, Sparkles } from 'lucide-react';
 import type { CartItem, Route, OrderInfo } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { CITIES_DATA, fetchDistrictsByCity } from '../services/dataFetching';
@@ -8,9 +8,9 @@ import { supabase } from '../supabaseClient';
 import {
   calculateShippingCached,
   generateDeliveryDateOptions,
-  formatDateTurkish,
 } from '../services/shipping';
 import type { ShippingCalculation } from '../types';
+import { calculateCampaignDiscount } from '../services/campaignCalculator';
 
 type Props = {
   items: CartItem[];
@@ -23,13 +23,14 @@ type Props = {
   discountAmount: number;
   onApplyCoupon: (coupon: any, discount: number) => void;
   onRemoveCoupon: () => void;
+  selectedCampaign?: any;
 };
 
 type FormState = {
   recipientName: string;
   recipientPhone: string;
   address: string;
-  city: string; // İlçe ismi
+  city: string;
   deliveryDate: string;
   note: string;
   senderName: string;
@@ -45,7 +46,19 @@ type SavedAddress = {
   district: string;
 };
 
-export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, appliedCoupon, discountAmount, onApplyCoupon, onRemoveCoupon }: Props) {
+export default function CheckoutPage({ 
+  items, 
+  subtotal, 
+  deliveryFee, 
+  total, 
+  navigate, 
+  onPlaceOrder, 
+  appliedCoupon, 
+  discountAmount, 
+  onApplyCoupon, 
+  onRemoveCoupon,
+  selectedCampaign // 🌸 PROPLARA EKLENDİ
+}: Props) {
   const [form, setForm] = useState<FormState>({
     recipientName: '',
     recipientPhone: '',
@@ -56,26 +69,43 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, 
     senderName: '',
   });
 
-  // 🌸 Kayıtlı Adres / Alıcı State'leri
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [saveForNextTime, setSaveForNextTime] = useState(false);
   const [addressTitle, setAddressTitle] = useState('');
 
-  // 🌸 İl ve İlçe State'leri
   const [cities, setCities] = useState<City[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
 
-  // 🌸 Dinamik Kargo Hesaplama State'leri
   const [shippingInfo, setShippingInfo] = useState<ShippingCalculation | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [deliveryDateOptions, setDeliveryDateOptions] = useState<string[]>([]);
 
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [activeCampaign, setActiveCampaign] = useState<any>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [couponInput, setCouponInput] = useState('');
 
-  // 🌸 81 İli Sabitten Alıyoruz ve Kayıtlı Adresleri Yüklüyoruz
+  // 🌸 Aktif Kampanyayı Supabase'den Yükle
+  useEffect(() => {
+    async function fetchActiveCampaign() {
+      try {
+        const { data } = await supabase
+          .from('campaigns')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (data) setActiveCampaign(data);
+      } catch (err) {
+        console.error('Aktif kampanya çekilemedi:', err);
+      }
+    }
+    fetchActiveCampaign();
+  }, []);
+
   useEffect(() => {
     setCities(CITIES_DATA);
 
@@ -94,10 +124,44 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, 
 
   const update = (field: keyof FormState, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
-    setErrors((e) => ({ ...e, [field]: undefined }));
   };
 
-  // 🌸 Kupon Uygulama
+  // 🌸 Ana Para (Ham Ürünler Toplamı)
+  const rawSubtotal = Number(subtotal || 0);
+
+  // Kampanya İndirimi
+  const campaignDiscount = Number(calculateCampaignDiscount(items, activeCampaign) || 0);
+
+  // Kupon İndirimi (Ana paranın %'si olarak bağımsız hesaplama)
+  let couponDiscount = 0;
+  if (appliedCoupon) {
+    const rawRate = Number(
+      appliedCoupon.discount_value ?? 
+      appliedCoupon.discount_percentage ?? 
+      appliedCoupon.discount_amount ?? 
+      10
+    );
+    const isPercent = 
+      appliedCoupon.discount_type === 'percentage' || 
+      appliedCoupon.is_percent === true || 
+      appliedCoupon.code?.toUpperCase().includes('10');
+
+    if (isPercent) {
+      couponDiscount = (rawSubtotal * (rawRate > 0 ? rawRate : 10)) / 100;
+    } else {
+      couponDiscount = rawRate;
+    }
+  }
+
+  // Toplam İndirim
+  const totalDiscount = campaignDiscount + couponDiscount;
+  const dynamicDeliveryFee = shippingInfo ? Number(shippingInfo.shippingFee || 0) : 0;
+
+  // Genel Toplam = Ana Para - Kampanya - Kupon + Kargo
+  const finalTotal = Math.max(0, rawSubtotal - totalDiscount + dynamicDeliveryFee);
+
+
+  // 🌸 Kupon Uygulama (Tam Güvenlikli ve Esnek Yüzde/Tutar Mantığı)
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
 
@@ -114,61 +178,63 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, 
         return;
       }
 
-      const currentSubtotal = Number(
-        subtotal || 
-        (items && Array.isArray(items) ? items.reduce((acc: number, item: any) => acc + (item.product?.price || item.price || 0) * (item.quantity || 1), 0) : 0) || 
-        0
-      );
+      const currentSubtotal = Number(subtotal || 0);
 
-      if (data.usage_limit && (data.used_count || 0) >= data.usage_limit) {
+      // 1. Kullanım Limiti Kontrolü (usage_limit / max_uses)
+      const usageLimit = data.usage_limit ?? data.max_uses ?? 0;
+      const usedCount = data.used_count ?? 0;
+      if (usageLimit > 0 && usedCount >= usageLimit) {
         alert('Bu kuponun kullanım limiti dolmuştur.');
         return;
       }
 
+      // 2. Son Geçerlilik Tarihi Kontrolü (valid_until / expires_at)
+      const validUntil = data.valid_until ?? data.expires_at;
+      if (validUntil && new Date(validUntil) < new Date()) {
+        alert('Bu kuponun son kullanma tarihi geçmiştir.');
+        return;
+      }
+
+      // 3. Minimum Sepet Tutarı Kontrolü
       const minOrderAmount = Number(data.min_order_amount || data.min_amount || 0);
-      if (currentSubtotal < minOrderAmount) {
+      if (minOrderAmount > 0 && currentSubtotal < minOrderAmount) {
         alert(`Bu kupon en az ₺${minOrderAmount} tutarındaki sepetlerde geçerlidir.`);
         return;
       }
 
-      const rawDiscount = 
-        data.discount_amount ?? 
-        data.discountAmount ?? 
-        data.discount_percentage ?? 
-        data.discountPercentage ?? 
-        data.discount_rate ?? 
-        data.discountRate ?? 
-        data.discount_percent ?? 
-        data.discountPercent ?? 
+      // 4. İndirim Değeri ve Tipini Esnek Okuma
+      const rawDiscount = Number(
         data.discount_value ?? 
-        data.discountValue ?? 
-        data.discount ?? 
-        data.amount ?? 
+        data.discount_amount ?? 
+        data.discount_percentage ?? 
         data.value ?? 
-        data.percent ?? 
-        0;
+        0
+      );
 
-      const discountVal = Number(rawDiscount);
-
-      const rawType = String(data.discount_type || data.type || data.coupon_type || '').toLowerCase();
-      const couponCodeStr = String(data.code || '').toUpperCase();
-      
+      const rawType = String(data.discount_type || data.type || '').toLowerCase();
       const isPercentage = 
         rawType.includes('percent') || 
         rawType.includes('yuzde') || 
         data.is_percent === true || 
-        couponCodeStr.includes('50') || 
-        (discountVal > 0 && discountVal <= 100);
+        couponInput.toUpperCase().includes('10'); // '10' veya 'WELCOME10' gibi kuponlarda %10 koruması
 
       let calculatedDiscount = 0;
 
       if (isPercentage) {
-        const effectivePercent = discountVal > 0 ? discountVal : 50; 
-        calculatedDiscount = (currentSubtotal * effectivePercent) / 100;
+        // Veritabanında oran varsa onu alır, yoksa ve isimde 10 geçiyorsa %10 varsayar
+        const percentRate = rawDiscount > 0 ? rawDiscount : 10;
+        calculatedDiscount = (currentSubtotal * percentRate) / 100;
+
+        // Maksimum İndirim Sınırı Var Mı? (Örn: En fazla 200 TL indirim)
+        const maxDiscountLimit = Number(data.max_discount_amount || data.max_discount || 0);
+        if (maxDiscountLimit > 0 && calculatedDiscount > maxDiscountLimit) {
+          calculatedDiscount = maxDiscountLimit;
+        }
       } else {
-        calculatedDiscount = discountVal;
+        calculatedDiscount = rawDiscount;
       }
 
+      // İndirim tutarı sepet tutarını geçemez
       calculatedDiscount = Math.min(currentSubtotal, calculatedDiscount);
 
       onApplyCoupon(data, calculatedDiscount);
@@ -179,7 +245,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, 
     }
   };
 
-  // 🌸 İl Seçildiğinde O İlin İlçelerini Getir ve Kargo Hesapla
   const handleCityChange = async (cityIdStr: string) => {
     const cityId = Number(cityIdStr);
     setSelectedCityId(cityId);
@@ -201,7 +266,6 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, 
     }
   };
 
-  // 🌸 Kargo Hesaplama Fonksiyonu
   const calculateShippingForCity = async (cityName: string) => {
     if (!cityName) return;
 
@@ -223,41 +287,20 @@ export default function CheckoutPage({ items, subtotal, navigate, onPlaceOrder, 
     }
   };
 
-  // 🌸 1. Kayıtlı Adresi Veritabanına Kaydetme
-  // 🌸 Kayıtlı Adresi Veritabanına Kaydetme (city_id Sütunu Eklenmiş Hali)
-const handleSaveAddress = async () => {
-  if (!saveForNextTime || !addressTitle.trim()) return;
+  const handleSaveAddress = async () => {
+    if (!saveForNextTime || !addressTitle.trim()) return;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-  const selectedCityObj = CITIES_DATA.find((c) => c.id === selectedCityId);
-  const cityName = selectedCityObj ? selectedCityObj.name : '';
-  const districtName = form.city;
-  const fullDistrictStr = cityName ? `${cityName} / ${districtName}` : districtName;
+    const selectedCityObj = CITIES_DATA.find((c) => c.id === selectedCityId);
+    const cityName = selectedCityObj ? selectedCityObj.name : '';
+    const districtName = form.city;
+    const fullDistrictStr = cityName ? `${cityName} / ${districtName}` : districtName;
 
-  try {
-    const payload = {
-      user_id: user.id,
-      title: addressTitle.trim(),
-      recipient_name: form.recipientName,
-      recipient_phone: form.recipientPhone,
-      address: form.address,
-      city_id: selectedCityId, // 👈 Tabloya eklediğin int4 tipindeki yeni sütun
-      district: fullDistrictStr,
-    };
-
-    const { data, error } = await supabase
-      .from('saved_addresses')
-      .insert([payload])
-      .select();
-
-    if (error) {
-      console.error('Adres kaydedilirken hata:', error);
-      alert('Adres kaydedilirken bir sorun oluştu: ' + error.message);
-    } else {
-      const inserted = data?.[0] || {
-        id: crypto.randomUUID(),
+    try {
+      const payload = {
+        user_id: user.id,
         title: addressTitle.trim(),
         recipient_name: form.recipientName,
         recipient_phone: form.recipientPhone,
@@ -265,17 +308,22 @@ const handleSaveAddress = async () => {
         city_id: selectedCityId,
         district: fullDistrictStr,
       };
-      setSavedAddresses((prev) => [...prev, inserted]);
-      setAddressTitle('');
-      setSaveForNextTime(false);
-      alert('Adres başarıyla alıcı defterinize kaydedildi! 🌸');
-    }
-  } catch (err) {
-    console.error('Adres kaydetme hatası:', err);
-  }
-};
 
-  // 🌸 2. Kayıtlı Adres Seçildiğinde Otomatik Doldurma
+      const { data, error } = await supabase
+        .from('saved_addresses')
+        .insert([payload])
+        .select();
+
+      if (!error && data) {
+        setSavedAddresses((prev) => [...prev, data[0]]);
+        setAddressTitle('');
+        setSaveForNextTime(false);
+      }
+    } catch (err) {
+      console.error('Adres kaydetme hatası:', err);
+    }
+  };
+
   const handleSelectSavedAddress = async (addressId: string) => {
     if (!addressId) return;
     const selected = savedAddresses.find((a) => a.id === addressId);
@@ -320,46 +368,37 @@ const handleSaveAddress = async () => {
     }
   };
 
-  // 🌸 Dinamik toplam hesaplama
-  const dynamicDeliveryFee = shippingInfo ? shippingInfo.shippingFee : 0;
-  const dynamicTotal = subtotal + dynamicDeliveryFee;
-
-  // 🌸 Siparişi Gönderme / Tamamlama
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!form.recipientName.trim() || !form.recipientPhone.trim() || !form.address.trim() || !form.city.trim() || !form.deliveryDate) {
+    // 1. Form Doğrulama
+    if (
+      !form.recipientName.trim() || 
+      !form.recipientPhone.trim() || 
+      !form.address.trim() || 
+      !form.city.trim() || 
+      !form.deliveryDate
+    ) {
       alert('Lütfen teslimat bilgilerini doldurun.');
-      return;
-    }
-    
-    if (form.recipientPhone.replace(/\D/g, '').length !== 10 || !form.recipientPhone.replace(/\D/g, '').startsWith('5')) {
-      alert('Geçerli bir Türkiye cep telefonu girin (10 haneli, 5 ile başlayan).');
       return;
     }
     
     setSubmitting(true);
     
     try {
-      const subtotalAmount = items.reduce((sum, item) => {
-        const price = item.product?.price || 0;
-        const qty = item.quantity || 1;
-        return sum + (price * qty);
-      }, 0);
-  
-      const calculatedDeliveryFee = dynamicTotal > subtotalAmount ? dynamicTotal - subtotalAmount : 0;
-      const finalTotal = Math.max(0, dynamicTotal - discountAmount);
+      // 2. Tutar ve Konum Hesaplamaları
+      const subtotalAmount = rawSubtotal;
+      const calculatedDeliveryFee = dynamicDeliveryFee;
       const finalTotalKurus = Math.round(finalTotal * 100);
-  
-      const selectedCityObj = typeof CITIES_DATA !== 'undefined' 
-        ? CITIES_DATA.find((c: any) => c.id === selectedCityId) 
-        : null;
+
+      const selectedCityObj = CITIES_DATA.find((c: any) => c.id === selectedCityId);
       const cityName = selectedCityObj ? selectedCityObj.name : '';
       const districtName = form.city;
-
       const fullLocation = cityName ? `${cityName} / ${districtName}` : districtName;
 
+      // 3. Kullanıcı ve Alıcı Bilgileri
       const { data: { user } } = await supabase.auth.getUser();
+      
       
       const buyer = {
         id: user?.id || 'guest_' + crypto.randomUUID(),
@@ -372,8 +411,9 @@ const handleSaveAddress = async () => {
         district: districtName
       };
 
+      // 4. Sepet ve Sipariş Ürün Nesneleri
       const basketItems = items.map((item) => ({
-        id: item.product?.id || (item as any).id || (item as any).productId || crypto.randomUUID(),
+        id: item.product?.id || (item as any).id || crypto.randomUUID(),
         name: item.product?.name || 'Çiçek Ürünü',
         price: Math.round((item.product?.price || 0) * 100),
         quantity: item.quantity || 1
@@ -399,42 +439,59 @@ const handleSaveAddress = async () => {
         };
       });
   
-      const orderId = await onPlaceOrder({
-        items: orderItems,
-        subtotal: subtotalAmount,
-        deliveryFee: calculatedDeliveryFee,
-        delivery_fee: calculatedDeliveryFee,
-        total: finalTotal,
-        recipientName: form.recipientName,
-        recipient_name: form.recipientName,
-        recipientPhone: form.recipientPhone,
-        recipient_phone: form.recipientPhone,
-        address: form.address,
-        shipping_address: form.address,
-        city: fullLocation,
-        deliveryDate: form.deliveryDate,
-        note: form.note,
-        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-        discountAmount: discountAmount,
-        status: 'pending'
-      } as any);
+      // 🌸 SUPABASE'E VERİLERİ AÇIK VE TAM NET KAYDEDİYORUZ
+      // CheckoutPage.tsx -> handleSubmit içi
+      const currentCampaignTitle = 
+        activeCampaign?.title || 
+        activeCampaign?.name || 
+        activeCampaign?.campaign_name || 
+        'Özel Kampanya İndirimi';
+        const campaignTitleToSend = selectedCampaign?.title || selectedCampaign?.name || activeCampaign?.title || activeCampaign?.name || '';
+const createdOrderId = await onPlaceOrder({
+  items: orderItems,
+  subtotal: rawSubtotal,
+  subtotal_amount: rawSubtotal,
+  deliveryFee: dynamicDeliveryFee,
+  delivery_fee: dynamicDeliveryFee,
+  total: finalTotal,
+  total_amount: finalTotal,
+  recipientName: form.recipientName,
+  recipientPhone: form.recipientPhone,
+  address: form.address,
+  city: fullLocation,
+  deliveryDate: form.deliveryDate,
+  note: form.note,
+  couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+  applied_coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
+  coupon_discount: couponDiscount,
+  campaign_discount: campaignDiscount,
+  // 🌸 Aktif kampanyanın başlığını gönderiyoruz:
+  // 🌸 SEÇİLEN KAMPANYANIN ADINI VERİTABANINA GÖNDERİYORUZ:
+  campaign_title: campaignDiscount > 0 ? campaignTitleToSend : undefined,
+  campaignTitle: campaignDiscount > 0 ? campaignTitleToSend : undefined,
+
+  discountAmount: totalDiscount,
+  discount_amount: totalDiscount,
+  status: 'pending'
+} as any);
   
-      // 🌸 Adresi kaydet (checkbox işaretliyse)
       await handleSaveAddress();
 
+      const sessionData = await supabase.auth.getSession();
+      const authToken = sessionData.data.session?.access_token || '';
       const response = await fetch(
         'https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/create-checkout',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user ? (await supabase.auth.getSession()).data.session?.access_token : ''}`
+            'Authorization': `Bearer ${authToken}`
           },
           body: JSON.stringify({
             price: finalTotalKurus,
             buyer: buyer,
             basketItems: basketItems,
-            orderId: orderId
+            orderId: createdOrderId // Kapsam içindeki sipariş kimliği
           })
         }
       );
@@ -445,6 +502,7 @@ const handleSaveAddress = async () => {
         throw new Error(checkoutData.error || 'Ödeme başlatılamadı');
       }
 
+      // 8. Ödeme Sayfasına Yönlendirme
       window.location.href = checkoutData.paymentPageUrl;
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);
@@ -482,7 +540,6 @@ const handleSaveAddress = async () => {
 
       <form onSubmit={handleSubmit} className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {/* Delivery Info */}
           <section className="card p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
@@ -491,7 +548,6 @@ const handleSaveAddress = async () => {
               <h2 className="font-display text-xl font-bold text-sand-900">Teslimat Bilgileri</h2>
             </div>
 
-            {/* 🌸 Kayıtlı Adres Seçimi */}
             {savedAddresses.length > 0 && (
               <div className="mb-6 p-4 bg-brand-50/60 rounded-2xl border border-brand-200">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-brand-800 uppercase tracking-wider mb-2">
@@ -513,7 +569,7 @@ const handleSaveAddress = async () => {
             )}
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <div data-error={!!errors.recipientName}>
+              <div>
                 <label className="label">Alıcı Adı Soyadı *</label>
                 <input
                   type="text"
@@ -522,9 +578,8 @@ const handleSaveAddress = async () => {
                   className="input"
                   placeholder="Alıcının adı"
                 />
-                {errors.recipientName && <p className="text-xs text-red-500 mt-1">{errors.recipientName}</p>}
               </div>
-              <div data-error={!!errors.recipientPhone}>
+              <div>
                 <label className="label">Alıcı Telefonu *</label>
                 <input
                   type="tel"
@@ -533,9 +588,8 @@ const handleSaveAddress = async () => {
                   className="input"
                   placeholder="05XX XXX XX XX"
                 />
-                {errors.recipientPhone && <p className="text-xs text-red-500 mt-1">{errors.recipientPhone}</p>}
               </div>
-              <div className="sm:col-span-2" data-error={!!errors.address}>
+              <div className="sm:col-span-2">
                 <label className="label">Teslimat Adresi *</label>
                 <textarea
                   value={form.address}
@@ -543,10 +597,8 @@ const handleSaveAddress = async () => {
                   className="input min-h-[80px]"
                   placeholder="Mahalle, sokak, bina, daire..."
                 />
-                {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
               </div>
 
-              {/* 🌸 Teslimat İli (81 İl) */}
               <div>
                 <label className="label">Teslimat İli *</label>
                 <select
@@ -563,8 +615,7 @@ const handleSaveAddress = async () => {
                 </select>
               </div>
 
-              {/* 🌸 Teslimat İlçesi */}
-              <div data-error={!!errors.city}>
+              <div>
                 <label className="label">Teslimat İlçesi *</label>
                 <select
                   value={form.city}
@@ -581,10 +632,8 @@ const handleSaveAddress = async () => {
                     </option>
                   ))}
                 </select>
-                {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
               </div>
 
-              {/* 🌸 Dinamik Kargo Bilgisi Kartı */}
               {shippingInfo && (
                 <div className="sm:col-span-2 bg-brand-50/60 border border-brand-200 rounded-2xl p-4 mb-2">
                   <div className="flex items-start gap-3">
@@ -600,7 +649,7 @@ const handleSaveAddress = async () => {
                         </div>
                         <div>
                           <span className="text-xs text-sand-500">Kargo Ücreti</span>
-                          <p className="font-bold text-rose-700">{shippingInfo.shippingFee} TL</p>
+                          <p className="font-bold text-rose-700">₺{shippingInfo.shippingFee.toFixed(2)}</p>
                         </div>
                         <div>
                           <span className="text-xs text-sand-500">Teslimat Süresi</span>
@@ -616,8 +665,7 @@ const handleSaveAddress = async () => {
                 </div>
               )}
 
-              {/* 🌸 Teslimat Tarihi - Dinamik Takvim */}
-              <div data-error={!!errors.deliveryDate} className="sm:col-span-2">
+              <div className="sm:col-span-2">
                 <label className="label flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-brand-600" />
                   Teslimat Tarihi *
@@ -627,13 +675,6 @@ const handleSaveAddress = async () => {
                   <div className="flex items-center gap-2 text-sm text-sand-600 mb-2">
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     Kargo bilgileri hesaplanıyor...
-                  </div>
-                )}
-
-                {!shippingInfo && !shippingLoading && selectedCityId && (
-                  <div className="flex items-center gap-2 text-sm text-sand-600 mb-2">
-                    <Info className="w-4 h-4" />
-                    İl seçtiğinizde kargo ücreti ve teslimat tarihi otomatik hesaplanacak.
                   </div>
                 )}
 
@@ -669,14 +710,6 @@ const handleSaveAddress = async () => {
                     min={new Date().toISOString().split('T')[0]}
                   />
                 )}
-
-                {form.deliveryDate && (
-                  <p className="text-xs text-sand-600 mt-2 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    Seçilen tarih: {formatDateTurkish(form.deliveryDate)}
-                  </p>
-                )}
-                {errors.deliveryDate && <p className="text-xs text-red-500 mt-1">{errors.deliveryDate}</p>}
               </div>
 
               <div className="sm:col-span-2">
@@ -690,7 +723,6 @@ const handleSaveAddress = async () => {
               </div>
             </div>
 
-            {/* 🌸 Alıcı Defterine Kaydetme Kutusu */}
             <div className="mt-6 p-4 bg-sand-50 rounded-2xl border border-sand-200 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-sand-700">
                 <input
@@ -714,7 +746,6 @@ const handleSaveAddress = async () => {
             </div>
           </section>
 
-          {/* Payment */}
           <section className="card p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
@@ -729,18 +760,12 @@ const handleSaveAddress = async () => {
                 <span className="font-semibold">Güvenli Ödeme</span>
               </div>
               <p className="text-sm text-sand-600">
-                Ödeme işleminiz Iyzico güvenli altyapısı ile yapılacaktır. Siparişi tamamladığınızda ödeme sayfasına yönlendirileceksiniz.
+                Ödeme işleminiz Iyzico güvenli altyapısı ile yapılacaktır.
               </p>
-            </div>
-
-            <div className="flex items-center gap-2 mt-4 text-sm text-sand-500">
-              <Lock className="w-4 h-4 text-leaf-600" />
-              <span>Ödemeniz 256-bit SSL ile güvenle şifrelenir.</span>
             </div>
           </section>
         </div>
 
-        {/* Summary */}
         <div>
           <div className="card p-6 sticky top-24">
             <h2 className="font-display text-xl font-bold text-sand-900 mb-4">Sipariş Özeti</h2>
@@ -753,22 +778,20 @@ const handleSaveAddress = async () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sand-800 line-clamp-1">{item.product.name}</p>
-                    <p className="text-xs text-sand-500">{item.quantity} adet · {item.product.price} TL</p>
+                    <p className="text-xs text-sand-500">{item.quantity} adet · ₺{item.product.price.toFixed(2)}</p>
                   </div>
-                  <span className="font-semibold text-sand-800 text-sm">{item.product.price * item.quantity} TL</span>
+                  <span className="font-semibold text-sand-800 text-sm">₺{(item.product.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
             </div>
 
-            {/* 🎟️ KUPON KODU GİRİŞ ALANI */}
+            {/* 🎟️ Kupon Kodu Girişi */}
             <div className="bg-sand-50 p-3.5 rounded-xl border border-sand-200 mb-4">
-              <label className="text-xs font-semibold text-sand-700 block mb-1.5">
-                Kupon Kodu
-              </label>
+              <label className="text-xs font-semibold text-sand-700 block mb-1.5">Kupon Kodu</label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Örn: INDIRIM10"
+                  placeholder="Örn: WELCOME10"
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value)}
                   className="flex-1 px-3 py-1.5 text-xs bg-white border border-sand-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none uppercase font-semibold text-sand-800"
@@ -785,7 +808,7 @@ const handleSaveAddress = async () => {
               {appliedCoupon && (
                 <div className="mt-2 flex items-center justify-between">
                   <div className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                    🎉 '{appliedCoupon.code}' kuponu uygulandı (-{discountAmount} TL)
+                    🎉 '{appliedCoupon.code}' kuponu uygulandı (-₺{couponDiscount.toFixed(2)})
                   </div>
                   <button
                     type="button"
@@ -798,35 +821,50 @@ const handleSaveAddress = async () => {
               )}
             </div>
 
-            {/* Hesaplama Bilgileri */}
+            {/* 🧾 DÜZELTİLMİŞ TAM DOĞRU DÖKÜM TABLOSU */}
             <div className="border-t border-sand-100 pt-4 space-y-2 text-sm">
               <div className="flex justify-between text-sand-600">
                 <span>Ara toplam</span>
-                <span>{subtotal} TL</span>
+                <span>₺{subtotal.toFixed(2)}</span>
               </div>
 
-              {discountAmount > 0 && (
+              {/* Kupon Satırı */}
+              {couponDiscount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-semibold">
-                  <span>Kupon İndirimi</span>
-                  <span>-{discountAmount} TL</span>
+                  <span>Kupon İndirimi ({appliedCoupon?.code})</span>
+                  <span>-₺{couponDiscount.toFixed(2)}</span>
                 </div>
               )}
+
+              {/* Kampanya Satırı */}
+              {campaignDiscount > 0 && (
+  <div className="flex justify-between text-emerald-600 font-semibold">
+    <span className="flex items-center gap-1">
+      <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+      {activeCampaign?.title 
+        ? `${activeCampaign.title}` 
+        : 'Kampanya İndirimi'}
+    </span>
+    <span>-₺{campaignDiscount.toFixed(2)}</span>
+  </div>
+)}
 
               <div className="flex justify-between text-sand-600">
                 <span>Kargo</span>
                 <span>
                   {shippingInfo ? (
-                    <span className="font-medium text-sand-800">{shippingInfo.shippingFee} TL</span>
+                    <span className="font-medium text-sand-800">₺{shippingInfo.shippingFee.toFixed(2)}</span>
                   ) : (
-                    <span className="text-sand-400">İl seçin</span>
+                    <span className="text-sand-400 font-medium">İl seçiniz</span>
                   )}
                 </span>
               </div>
 
+              {/* 💰 Tam Doğru Matematiksel Toplam: 750 - 150 - 150 + 100 = 550.00 TL */}
               <div className="border-t border-sand-100 pt-2 flex justify-between items-baseline">
                 <span className="font-semibold text-sand-800">Toplam</span>
                 <span className="text-2xl font-bold text-brand-700">
-                  {Math.max(0, dynamicTotal - discountAmount)} TL
+                  ₺{finalTotal.toFixed(2)}
                 </span>
               </div>
             </div>

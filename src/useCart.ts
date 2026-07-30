@@ -17,6 +17,7 @@ export function useCart() {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [autoDiscount, setAutoDiscount] = useState<{ percentage: number; minAmount: number } | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
 
   // Get localStorage keys based on userId
   const getStorageKeys = () => {
@@ -329,6 +330,8 @@ export function useCart() {
     subtotal,
     deliveryFee,
     discountAmount: effectiveDiscount, // 👈 Otomatik indirimi sepete yansıtıyoruz
+    selectedCampaign,     // 👈 EKLENDİ
+    setSelectedCampaign,  // 👈 EKLENDİ
     total,
     timeRemaining,
     appliedCoupon,
