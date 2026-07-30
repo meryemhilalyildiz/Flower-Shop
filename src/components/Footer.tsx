@@ -4,23 +4,25 @@ import type { Route } from '../types';
 import { usePageContent } from '../hooks/usePageContent';
 
 export default function Footer() {
-  // 🌸 Hakkımızda ve İletişim sayfalarının canlı verilerini çekiyoruz
+  // 🌸 Hakkımızda sayfasının canlı içeriğini çekiyoruz
   const { content: aboutContent } = usePageContent('about');
+  // 🌸 İletişim sayfasının canlı içeriğini çekiyoruz
   const { content: contactContent } = usePageContent('contact');
 
   // Hakkımızda Açıklaması
   const footerDescription = 
     aboutContent?.hero_description || 
-    aboutContent?.story || 
     aboutContent?.description || 
-    "Çiçekçi, 2004 yılında Trabzon'da küçük bir çiçekçi dükkanı olarak başladı. Bugün, Türkiye'nin dört bir yanına taze çiçek ulaştıran markamızla sevdiklerinize gülümseme taşıyoruz.";
+    aboutContent?.story || 
+    "1998'den beri taze çiçekler ve özel buketler tasarlıyoruz. Sevdiklerinizi en güzel çiçeklerle mutlu ediyoruz.";
 
-  // Dinamik İletişim Bilgileri (İletişim panelinde güncellenen veriler)
-  const infoList = contactContent?.contact_info || [];
-  const address = infoList[0]?.value || contactContent?.address || 'İstiklal Cd. No:123, Beyoğlu, İstanbul';
-  const phone = infoList[1]?.value || contactContent?.phone || '0850 123 45 67';
-  const email = infoList[2]?.value || contactContent?.email || 'destek@cicekci.com';
-
+  // 🌸 İletişim bilgilerini veritabanından alıyoruz
+  const defaultContactInfo = [
+    { icon: 'MapPin', title: 'Adres', value: 'İstiklal Cd. No:123, Beyoğlu, İstanbul' },
+    { icon: 'Phone', title: 'Telefon', value: '0850 123 45 67' },
+    { icon: 'Mail', title: 'E-posta', value: 'destek@cicekci.com' },
+  ];
+  const contactInfo = contactContent?.contact_info || defaultContactInfo;
   const linkGroups = [
     {
       title: 'Mağaza',
@@ -97,18 +99,17 @@ export default function Footer() {
           <div>
             <h4 className="font-display text-lg font-semibold text-white mb-4">İletişim</h4>
             <ul className="space-y-3 text-sm text-sand-400">
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 text-brand-400 flex-shrink-0" />
-                <span>{address}</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-brand-400 flex-shrink-0" />
-                <span>{phone}</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-brand-400 flex-shrink-0" />
-                <span>{email}</span>
-              </li>
+              {contactInfo.map((info: any) => {
+                const IconComponent = info.icon === 'MapPin' ? MapPin : 
+                                     info.icon === 'Phone' ? Phone : 
+                                     info.icon === 'Mail' ? Mail : MapPin;
+                return (
+                  <li key={info.title} className="flex items-start gap-2">
+                    <IconComponent className="w-4 h-4 mt-0.5 text-brand-400 flex-shrink-0" />
+                    <span>{info.value}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 

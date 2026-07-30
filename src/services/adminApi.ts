@@ -75,7 +75,7 @@ export async function fetchRecentProducts(limit = 5) {
 export async function fetchAllProducts() {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select('*, categories(name)')
     .order('created_at', { ascending: false });
   
   if (error) throw error;
@@ -255,6 +255,7 @@ export function normalizeOrderStatus(status: string): string {
   if (['shipped', 'kargoda', 'yolda'].includes(value)) return 'shipped';
   if (['delivered', 'teslim', 'teslim edildi'].includes(value)) return 'delivered';
   if (['cancelled', 'iptal', 'iptal edildi'].includes(value)) return 'cancelled';
+  if (['cancellation_requested', 'iptal talebi alındı', 'iptal talebi', 'iptal talepleri', 'iptal istendi'].includes(value)) return 'cancellation_requested';
 
   return 'pending';
 }

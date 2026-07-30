@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Flower2, ShoppingBag, Menu, X, Search, Phone, User, LogOut, History, Heart } from 'lucide-react';
 import type { Route } from '../types';
 import { routeToHash } from '../router';
@@ -18,6 +18,10 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -26,6 +30,33 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.search-container')) {
+        setSearchOpen(false);
+      }
+    };
+
+    if (searchOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [searchOpen]);
 
   // 🌸 Supabase Oturum Dinleyicisi
   useEffect(() => {
@@ -74,6 +105,29 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
 
     window.location.hash = '#/siparislerim';
     navigate({ name: 'orders' as any });
+  };
+
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .ilike('name', `%${query}%`)
+        .limit(5);
+
+      if (error) throw error;
+      setSearchResults(data || []);
+      setSearchOpen(true);
+    } catch (error) {
+      console.error('Arama hatası:', error);
+      setSearchResults([]);
+    }
   };
 
   const navLinks: { label: string; route: Route }[] = isAdmin
@@ -150,13 +204,66 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
 </nav>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate({ name: 'shop' })}
-                className="hidden sm:flex btn-ghost"
-                aria-label="Ara"
-              >
-                <Search className="w-5 h-5" />
-              </button>
+              <div className="hidden sm:flex items-center bg-sand-100 rounded-full px-4 py-2 w-64 relative search-container">
+                <Search className="w-4 h-4 text-sand-400 mr-2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSearchQuery(value);
+                    
+                    // Clear previous timeout
+                    if (searchTimeoutRef.current) {
+                      clearTimeout(searchTimeoutRef.current);
+                    }
+                    
+                    // Debounce search for dropdown
+                    searchTimeoutRef.current = setTimeout(() => {
+                      handleSearch(value);
+                    }, 300);
+                  }}
+                  onFocus={() => searchQuery && setSearchOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      setSearchOpen(false);
+                      setSearchResults([]);
+                      sessionStorage.setItem('searchQuery', searchQuery.trim());
+                      navigate({ name: 'shop' });
+                    }
+                  }}
+                  placeholder="Çiçek ara..."
+                  className="bg-transparent text-sm text-sand-700 placeholder-sand-400 outline-none w-full"
+                />
+                
+                {/* Dropdown Results */}
+                {searchOpen && searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-sand-100 overflow-hidden z-50">
+                    {searchResults.map((product) => (
+                      <button
+                        key={product.id}
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSearchOpen(false);
+                          setSearchResults([]);
+                          navigate({ name: 'product', slug: product.slug || product.name.toLowerCase().replace(/[^a-z0-9]/g, '-') });
+                        }}
+                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-sand-50 transition-colors text-left cursor-pointer"
+                      >
+                        <img
+                          src={product.image || product.image_url || 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?auto=format&fit=crop&q=80&w=100'}
+                          alt={product.name}
+                          className="w-10 h-10 rounded-lg object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-sand-800 truncate">{product.name}</p>
+                          <p className="text-xs text-sand-500">{product.price} TL</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* 🌸 Favoriler butonu */}
               <button

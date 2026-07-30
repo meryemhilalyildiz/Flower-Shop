@@ -53,6 +53,16 @@
   .admin-editable-container.editing {
     @apply outline-2 outline-dashed outline-pink-300 outline-offset-4 rounded-lg;
   }
+  .admin-editable-container.editing button:not(.editable-component button),
+  .admin-editable-container.editing a:not(.editable-component a) {
+    pointer-events: none !important;
+    opacity: 0.5 !important;
+  }
+  .editable-component,
+  .editable-component * {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+  }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }

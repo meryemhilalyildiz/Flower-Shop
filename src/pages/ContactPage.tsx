@@ -198,7 +198,16 @@ export default function ContactPage({ navigate }: Props) {
         <div className="grid lg:grid-cols-2 gap-12">
           {/* Info Section */}
           <div>
-            <h2 className="font-display text-2xl font-bold text-sand-900 mb-6">İletişim Bilgileri</h2>
+            <h2 className="font-display text-2xl font-bold text-sand-900 mb-6">
+              {isEditing ? (
+                <EditableText
+                  value="İletişim Bilgileri"
+                  onSave={(newValue) => onTextChange('contact_info_title', newValue)}
+                />
+              ) : (
+                'İletişim Bilgileri'
+              )}
+            </h2>
             <div className="space-y-4">
               
               {/* Adres */}
@@ -294,7 +303,16 @@ export default function ContactPage({ navigate }: Props) {
 
           {/* Form Section */}
           <div>
-            <h2 className="font-display text-2xl font-bold text-sand-900 mb-6">Mesaj Gönderin</h2>
+            <h2 className="font-display text-2xl font-bold text-sand-900 mb-6">
+              {isEditing ? (
+                <EditableText
+                  value="Mesaj Gönderin"
+                  onSave={(newValue) => onTextChange('contact_form_title', newValue)}
+                />
+              ) : (
+                'Mesaj Gönderin'
+              )}
+            </h2>
             <form onSubmit={handleSubmit} className="card p-6 space-y-4">
               <div>
                 <label className="label">Adınız Soyadınız *</label>
