@@ -250,8 +250,8 @@ export default function CheckoutPage({
   const totalDiscount = campaignDiscount + couponDiscount;
   const dynamicDeliveryFee = shippingInfo ? Number(shippingInfo.shippingFee || 0) : 0;
 
-  // Genel Toplam
-  const finalTotal = Math.max(0, rawSubtotal - totalDiscount + dynamicDeliveryFee);
+  // Genel Toplam = (Ana Para + Kargo) - Kampanya - Kupon
+  const finalTotal = Math.max(0, rawSubtotal + dynamicDeliveryFee - totalDiscount);
 
   // 🌸 Kupon Uygulama
   const handleApplyCoupon = async () => {
@@ -626,36 +626,66 @@ export default function CheckoutPage({
       };
 
       // 4. Sepet ve Sipariş Ürün Nesneleri
-      const basketItems = items.map((item) => ({
-        id: item.product?.id || (item as any).id || crypto.randomUUID(),
-        name: item.product?.name || 'Çiçek Ürünü',
-        price: Math.round((item.product?.price || 0) * 100),
-        quantity: item.quantity || 1
-      }));
+      // 🌸 İndirimleri ürün fiyatlarına yansıtarak hesapla
+      const totalDiscount = campaignDiscount + couponDiscount;
+      const itemsTotal = rawSubtotal;
+      
+      // İndirim oranını hesapla
+      const discountRatio = itemsTotal > 0 ? totalDiscount / itemsTotal : 0;
+      
+      const basketItems = items.map((item) => {
+        const originalPrice = item.product?.price || 0;
+        const discountedPrice = originalPrice * (1 - discountRatio);
+        return {
+          id: item.product?.id || (item as any).id || crypto.randomUUID(),
+          name: item.product?.name || 'Çiçek Ürünü',
+          price: Math.round(discountedPrice * 100),
+          quantity: item.quantity || 1
+        };
+      });
+
+      // 🌸 Kargo ücretini de basketItems'a ekle
+      if (dynamicDeliveryFee > 0) {
+        basketItems.push({
+          id: 'shipping_' + crypto.randomUUID(),
+          name: 'Kargo Ücreti',
+          price: Math.round(dynamicDeliveryFee * 100),
+          quantity: 1
+        });
+      }
 
       const campaignTitleToSend = selectedCampaign?.title || selectedCampaign?.name || activeCampaign?.title || activeCampaign?.name || '';
       
       const formattedOrderItems = items.map((cartItem: any) => {
         const prod = cartItem.product || cartItem;
+        const fullProductName = prod?.name || cartItem.name || 'Çiçek Ürünü';
+        const originalPrice = prod?.price || 0;
+        const discountedPrice = originalPrice * (1 - discountRatio);
+        const itemPrice = Math.round(discountedPrice * 100);
         return {
-          id: prod.id || cartItem.id,
-          product_id: prod.id || cartItem.id,
-          name: prod.name || cartItem.name || 'Çiçek Ürünü',
-          product_name: prod.name || cartItem.name || 'Çiçek Ürünü',
-          price: Number(prod.price || cartItem.price || 0),
-          unit_price: Number(prod.price || cartItem.price || 0),
-          quantity: Number(cartItem.quantity || 1),
-          image: prod.images?.[0] || prod.image || cartItem.image || '',
-          images: prod.images || (prod.image ? [prod.image] : []),
-          isCustomBouquet: cartItem.isCustomBouquet || cartItem.is_custom_bouquet,
-          customBouquetDetails: cartItem.customBouquetDetails || cartItem.custom_bouquet_details
+          ...cartItem,
+          product_id: cartItem.product?.id || (cartItem as any).productId || (cartItem as any).id,
+          product: {
+            ...cartItem.product,
+            name: fullProductName,
+            price: itemPrice,
+          },
+          product_name: fullProductName,
+          title: fullProductName,
+          quantity: cartItem.quantity || 1,
+          price: itemPrice,
+          unit_price: itemPrice,
+          // 🌸 App.tsx için gerekli alanlar
+          id: cartItem.product?.id || (cartItem as any).id,
         };
       });
-        
-      const createdOrderId = await onPlaceOrder({
+  
+      // 🌸 SUPABASE'E VERİLERİ AÇIK VE TAM NET KAYDEDİYORUZ
+      // CheckoutPage.tsx -> handleSubmit içi
+      
+      // 🌸 Sipariş verilerini session storage'a kaydet (ödeme başarılı olursa OrderSuccessPage'te oluşturulacak)
+      const orderData = {
         items: formattedOrderItems,
-        order_items: formattedOrderItems,
-        products: formattedOrderItems,
         subtotal: rawSubtotal,
         subtotal_amount: rawSubtotal,
         deliveryFee: dynamicDeliveryFee,
@@ -665,7 +695,7 @@ export default function CheckoutPage({
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
         address: form.address,
-        city: fullLocation, // Örn: "Ankara / Polatlı" olarak temiz kaydedilir
+        city: fullLocation,
         deliveryDate: form.deliveryDate,
         note: form.note,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
@@ -676,33 +706,14 @@ export default function CheckoutPage({
         campaignTitle: campaignDiscount > 0 ? campaignTitleToSend : undefined,
         discountAmount: totalDiscount,
         discount_amount: totalDiscount,
-        status: 'pending',
-        
-        // 🌸 Kargo Yönetimi için başlangıç alanları (Admin panelinden doldurulacak)
-        courier_id: null,
-        tracking_code: null
-      } as any);
-
-      if (createdOrderId) {
-        try {
-          const orderItemsPayload = items.map((cartItem: any) => {
-            const prod = cartItem.product || cartItem;
-            return {
-              order_id: createdOrderId,
-              product_name: prod.name || cartItem.name || 'Çiçek Ürünü',
-              quantity: Number(cartItem.quantity || 1),
-              unit_price: Number(prod.price || cartItem.price || 0),
-              price: Number(prod.price || cartItem.price || 0) * Number(cartItem.quantity || 1)
-            };
-          });
-          await supabase.from('order_items').insert(orderItemsPayload);
-        } catch (itemErr) {
-          console.error('order_items kaydı esnasında hata:', itemErr);
-        }
-
-        await decreaseStockOnOrder(items);
-      }
-  
+        status: 'pending'
+      };
+      
+      // 🌸 Geçici order ID oluştur
+      const tempOrderId = 'temp_' + crypto.randomUUID();
+      sessionStorage.setItem('pendingOrderData', JSON.stringify(orderData));
+      sessionStorage.setItem('tempOrderId', tempOrderId);
+      
       await handleSaveAddress();
 
       const sessionData = await supabase.auth.getSession();
@@ -716,10 +727,9 @@ export default function CheckoutPage({
             'Authorization': `Bearer ${authToken}`
           },
           body: JSON.stringify({
-            price: finalTotalKurus,
             buyer: buyer,
             basketItems: basketItems,
-            orderId: createdOrderId
+            orderId: tempOrderId // Geçici sipariş kimliği
           })
         }
       );
