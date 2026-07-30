@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, RefreshCw, Eye, Edit2 } from 'lucide-react';
+import { Save, RefreshCw, MapPin, Phone, Mail, Clock, HelpCircle, CheckCircle2, AlertCircle, Eye, Edit2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { Route, Product, Category } from '../types';
 import AboutPage from './AboutPage';
@@ -22,7 +22,7 @@ type Props = {
 type TabType = 'home' | 'about' | 'contact' | 'faq';
 
 export default function AdminEditorPage({ navigate }: Props) {
-  const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [activeTab, setActiveTab] = useState<TabType>('contact'); // Varsayılan olarak İletişim sekmesi
   const [isEditingMode, setIsEditingMode] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -30,6 +30,7 @@ export default function AdminEditorPage({ navigate }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageContent, setPageContent] = useState<Record<string, any>>({});
+  const [toastMessage, setToastMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
   const tabs = [
     { id: 'home' as TabType, label: 'Anasayfa', icon: '🏠' },
@@ -86,21 +87,26 @@ export default function AdminEditorPage({ navigate }: Props) {
 
   // Metin değişikliği handler
   const handleTextChange = (fieldPath: string, newValue: string) => {
-    const updatedContent = { ...(pageContent[activeTab] || {}) };
-    const keys = fieldPath.split('.');
-    let current: any = updatedContent;
+    setPageContent((prevContent) => {
+      const currentTabContent = { ...(prevContent[activeTab] || {}) };
+      
+      // Eğer fieldPath doğrudan 'address' geldiyse veya 'contact.address' geldiyse
+      const keys = fieldPath.split('.');
+      let current: any = currentTabContent;
 
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (!current[keys[i]]) current[keys[i]] = {};
-      current = current[keys[i]];
-    }
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {};
+        current = current[keys[i]];
+      }
 
-    current[keys[keys.length - 1]] = newValue;
+      current[keys[keys.length - 1]] = newValue;
 
-    setPageContent({
-      ...pageContent,
-      [activeTab]: updatedContent,
+      return {
+        ...prevContent,
+        [activeTab]: currentTabContent,
+      };
     });
+
     setHasChanges(true);
   };
 
@@ -132,34 +138,65 @@ export default function AdminEditorPage({ navigate }: Props) {
   const isFavorite = (productId: string) => false;
   const onToggleFavorite = (product: Product) => {};
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <RefreshCw className="w-8 h-8 animate-spin text-pink-600" />
-        <span className="ml-3 text-gray-600">Yükleniyor...</span>
-      </div>
-    );
-  }
-
-  // 🌸 İçeriği kaydet (Aktif tab'a göre kesin Supabase Upsert)
+  // 🌸 İçeriği kaydet (Supabase `page_contents` Upsert)
+  // 🌸 GÜNCELLENMİŞ VE KİLİTLENMİŞ HANDLE SAVE
+  // 🌸 GÜNCELLENMİŞ VE KİLİTLENMİŞ HANDLE SAVE
   const handleSave = async () => {
     setSaving(true);
+    setToastMessage(null);
     try {
-      const activeData = pageContent[activeTab] || {};
+      const activeData = { ...(pageContent[activeTab] || {}) };
 
-      // Metin alanlarının hepsini senkronize edelim
+      // 🌸 İletişim sayfasındaysak contact_info dizisini temizce güncelliyoruz
+      if (activeTab === 'contact') {
+        // Eğer dizi olarak geldiyse içindeki değerleri de okuyalım
+        const currentList = Array.isArray(activeData.contact_info) ? activeData.contact_info : [];
+
+        const addressVal = 
+          activeData.address || 
+          activeData['contact_info.0.value'] || 
+          currentList[0]?.value || 
+          'ankara-çankaya';
+
+        const phoneVal = 
+          activeData.phone || 
+          activeData['contact_info.1.value'] || 
+          currentList[1]?.value || 
+          '055555';
+
+        const emailVal = 
+          activeData.email || 
+          activeData['contact_info.2.value'] || 
+          currentList[2]?.value || 
+          'flowershop.iletisim@gmail.com';
+
+        const clockVal = 
+          activeData.working_hours || 
+          activeData['contact_info.3.value'] || 
+          currentList[3]?.value || 
+          'Her gün 08:00 - 22:00';
+
+        // Supabase JSON sütununun beklediği tam yapıyı baştan kuruyoruz
+        activeData.contact_info = [
+          { icon: 'MapPin', title: 'Adres', value: addressVal },
+          { icon: 'Phone', title: 'Telefon', value: phoneVal },
+          { icon: 'Mail', title: 'E-posta', value: emailVal },
+          { icon: 'Clock', title: 'Çalışma Saatleri', value: clockVal },
+        ];
+      }
+
+      // Genel başlık/açıklama değerlerini de koruyalım
       const finalContent = {
         ...activeData,
-        hero_description: activeData.hero_description || activeData.description || activeData.story,
-        description: activeData.hero_description || activeData.description || activeData.story,
-        story: activeData.hero_description || activeData.description || activeData.story,
+        hero_title: activeData.hero_title || 'İletişime Geçin',
+        hero_description: activeData.hero_description || activeData.description || 'Sorularınız, özel siparişler veya işbirlikleri için bize ulaşın.',
       };
 
       const { error } = await supabase
         .from('page_contents')
         .upsert(
           {
-            page_key: activeTab, // 'about', 'home' vb.
+            page_key: activeTab,
             content: finalContent,
             updated_at: new Date().toISOString(),
           },
@@ -169,18 +206,28 @@ export default function AdminEditorPage({ navigate }: Props) {
       if (error) throw error;
 
       setHasChanges(false);
-      alert('İçerik veritabanına başarıyla kaydedildi! 🌸');
-      window.location.reload();
+      setToastMessage({ text: '🎉 Başarıyla veritabanına kaydedildi!', isError: false });
+      
+      // Yeniden güncel veriyi çek ve ekranı tazele
+      await fetchPageContent();
     } catch (err: any) {
       console.error('Kaydetme hatası:', err);
-      alert('Kaydederken bir hata oluştu: ' + (err.message || err));
+      setToastMessage({ text: 'Hata oluştu: ' + (err.message || err), isError: true });
     } finally {
       setSaving(false);
     }
   };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-8 h-8 animate-spin text-pink-600" />
+        <span className="ml-3 text-gray-600 font-medium">Sayfa Düzenleyici Yükleniyor...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Üst Sekme Butonları */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center justify-between">
@@ -188,7 +235,10 @@ export default function AdminEditorPage({ navigate }: Props) {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setToastMessage(null);
+                }}
                 className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all cursor-pointer ${
                   activeTab === tab.id
                     ? 'bg-pink-600 text-white shadow-md shadow-pink-200'
@@ -217,12 +267,22 @@ export default function AdminEditorPage({ navigate }: Props) {
         </div>
       </div>
 
+      {/* Toast Bildirim Mesajı */}
+      {toastMessage && (
+        <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 animate-fade-in ${
+          toastMessage.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+        }`}>
+          {toastMessage.isError ? <AlertCircle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+          {toastMessage.text}
+        </div>
+      )}
+
       {/* Canlı Önizleme ve Düzenleme Alanı */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Eye className="w-5 h-5" />
+            <Eye className="w-5 h-5 text-pink-400" />
             <h2 className="font-semibold">
               {tabs.find((t) => t.id === activeTab)?.label} - {isEditingMode ? 'Düzenleme Modu' : 'Görüntüleme Modu'}
             </h2>
@@ -236,11 +296,11 @@ export default function AdminEditorPage({ navigate }: Props) {
               Yenile
             </button>
 
-            {/* 🌸 Kaydet Butonu (Değişiklik olmasa da test ve manuel kaydetme için her zaman hazır) */}
+            {/* Kaydet Butonu */}
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-sm transition-colors cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-sm font-bold transition-all cursor-pointer disabled:opacity-50 shadow-lg shadow-emerald-900/30"
             >
               {saving ? (
                 <>
@@ -290,7 +350,7 @@ export default function AdminEditorPage({ navigate }: Props) {
           <Edit2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-800">
             <p className="font-semibold mb-1">Nasıl Düzenlenir?</p>
-            <p>Metinlerin üzerine tıklayıp düzenledikten sonra sağ üstteki yeşil <b>Kaydet</b> butonuna basarak veritabanına aktarabilirsiniz.</p>
+            <p>Ekranda görünen metinlerin veya alanların üzerine doğrudan tıklayarak içeriği düzenleyebilirsiniz. Düzenleme tamamlandığında sağ üstteki yeşil <b>Kaydet</b> butonuna basarak tüm değişiklikleri veritabanına aktarabilirsiniz.</p>
           </div>
         </div>
       )}

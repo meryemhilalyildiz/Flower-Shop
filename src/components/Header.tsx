@@ -82,6 +82,7 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
         { label: 'Mağaza', route: { name: 'shop' } },
         { label: 'Hakkımızda', route: { name: 'about' } },
         { label: 'İletişim', route: { name: 'contact' } },
+        { label: 'S.S.S.', route: { name: 'faq' } },
       ]
     : [
         { label: 'Anasayfa', route: { name: 'home' } },

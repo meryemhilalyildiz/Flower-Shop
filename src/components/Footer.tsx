@@ -4,15 +4,23 @@ import type { Route } from '../types';
 import { usePageContent } from '../hooks/usePageContent';
 
 export default function Footer() {
-  // 🌸 Hakkımızda sayfasının canlı içeriğini çekiyoruz
-  const { content } = usePageContent('about');
+  // 🌸 Hakkımızda ve İletişim sayfalarının canlı verilerini çekiyoruz
+  const { content: aboutContent } = usePageContent('about');
+  const { content: contactContent } = usePageContent('contact');
 
-  // 🌸 Veritabanındaki 'hero_description', 'story' veya 'description' alanlarından hangisi güncellendiyse onu alıyoruz
+  // Hakkımızda Açıklaması
   const footerDescription = 
-    content?.hero_description || 
-    content?.description || 
-    content?.story || 
-    "1998'den beri taze çiçekler ve özel buketler tasarlıyoruz. Sevdiklerinizi en güzel çiçeklerle mutlu ediyoruz.";
+    aboutContent?.hero_description || 
+    aboutContent?.story || 
+    aboutContent?.description || 
+    "Çiçekçi, 2004 yılında Trabzon'da küçük bir çiçekçi dükkanı olarak başladı. Bugün, Türkiye'nin dört bir yanına taze çiçek ulaştıran markamızla sevdiklerinize gülümseme taşıyoruz.";
+
+  // Dinamik İletişim Bilgileri (İletişim panelinde güncellenen veriler)
+  const infoList = contactContent?.contact_info || [];
+  const address = infoList[0]?.value || contactContent?.address || 'İstiklal Cd. No:123, Beyoğlu, İstanbul';
+  const phone = infoList[1]?.value || contactContent?.phone || '0850 123 45 67';
+  const email = infoList[2]?.value || contactContent?.email || 'destek@cicekci.com';
+
   const linkGroups = [
     {
       title: 'Mağaza',
@@ -38,6 +46,8 @@ export default function Footer() {
     <footer className="bg-sand-900 text-sand-200 mt-20">
       <div className="max-w-7xl mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+          
+          {/* Logo & Hakkında */}
           <div>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
@@ -46,10 +56,9 @@ export default function Footer() {
               <span className="font-display text-2xl font-bold text-white">Çiçekçi</span>
             </div>
             
-            {/* 🌸 Hakkımızda Sayfası ile Eş Zamanlı Canlı Metin */}
             <p className="text-sm text-sand-400 leading-relaxed mb-4">
-      {footerDescription}
-    </p>
+              {footerDescription}
+            </p>
 
             <div className="flex gap-2">
               {[Instagram, Facebook, Twitter].map((Icon, i) => (
@@ -65,6 +74,7 @@ export default function Footer() {
             </div>
           </div>
 
+          {/* Mağaza & Kurumsal Linkler */}
           {linkGroups.map((group) => (
             <div key={group.title}>
               <h4 className="font-display text-lg font-semibold text-white mb-4">{group.title}</h4>
@@ -83,25 +93,28 @@ export default function Footer() {
             </div>
           ))}
 
+          {/* 🌸 İLETİŞİM BİLGİLERİ (DİNAMİK) */}
           <div>
             <h4 className="font-display text-lg font-semibold text-white mb-4">İletişim</h4>
             <ul className="space-y-3 text-sm text-sand-400">
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 text-brand-400 flex-shrink-0" />
-                <span>İstiklal Cd. No:123, Beyoğlu, İstanbul</span>
+                <span>{address}</span>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-brand-400 flex-shrink-0" />
-                <span>0850 123 45 67</span>
+                <span>{phone}</span>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-brand-400 flex-shrink-0" />
-                <span>destek@cicekci.com</span>
+                <span>{email}</span>
               </li>
             </ul>
           </div>
+
         </div>
 
+        {/* Alt Bilgi & Telif */}
         <div className="border-t border-sand-800 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-sand-500">© 2026 Çiçekçi. Tüm hakları saklıdır.</p>
           <div className="flex gap-6 text-sm text-sand-500">
