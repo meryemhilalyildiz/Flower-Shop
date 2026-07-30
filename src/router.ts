@@ -31,8 +31,8 @@ function parseHash(): Route {
     if (parts[1] === 'kuponlar') return { name: 'admin-coupons' };
     if (parts[1] === 'kampanyalar') return { name: 'admin-campaigns' }; // 🌸 Kampanya rotası yakalanıyor
     if (parts[1] === 'duzenleme') return { name: 'admin-editor' };
-    if (parts[1] === 'faq' || parts[1] === 'sss') return { name: 'admin-faq' };
-  }
+    if (parts[1] === 'faq' || parts[1] === 'sss') return { name: 'admin-faq' }; // 👈 BU SATIRI EKLE
+}
   return { name: 'home' };
 }
 

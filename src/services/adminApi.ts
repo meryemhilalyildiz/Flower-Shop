@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { generateOrderEmailHtml } from './emailService';
 
 // Admin erişim kontrolü
 export async function checkAdminAccess(userId: string): Promise<boolean> {
@@ -216,35 +217,65 @@ export async function fetchAllOrders() {
 }
 
 // Sipariş durumu ve opsiyonel kargo takip numarası güncelle
-export async function updateOrderStatus(id: string, status: string, trackingNumber?: string) {
+// Sipariş durumu, opsiyonel kargo takip numarası ve iptal gerekçesi güncelleme & e-posta gönderimi
+export async function updateOrderStatus(
+  id: string, 
+  status: string, 
+  trackingNumber?: string, 
+  cancelReason?: string
+) {
   const normalizedStatus = normalizeOrderStatus(status);
   
   // Güncellenecek veriyi hazırlıyoruz
-  const updatePayload: { status: string; tracking_number?: string } = {
+  const updatePayload: Record<string, any> = {
     status: normalizedStatus,
   };
 
-  // Eğer kargo takip numarası parametre olarak geldiyse payload'a ekliyoruz
-  if (trackingNumber !== undefined) {
-    updatePayload.tracking_number = trackingNumber;
-  }
+  if (trackingNumber !== undefined) updatePayload.tracking_number = trackingNumber;
+  if (cancelReason !== undefined) updatePayload.cancel_reason = cancelReason;
 
   const { data, error } = await supabase
     .from('orders')
     .update(updatePayload)
     .eq('id', id)
-    .select('id, status, tracking_number')
+    .select('*, order_items (*)')
     .limit(1);
 
-  if (error) {
-    const message = error.message || 'Sipariş durumu güncellenemedi.';
-    if (error.code === '42501' || /permission|policy/i.test(message)) {
-      throw new Error(`Sipariş durumu güncellenemedi. Supabase RLS politikalarını kontrol edin. ${message}`);
-    }
-    throw new Error(message);
-  }
+    if (error) throw new Error(error.message);
 
-  return Array.isArray(data) ? data[0] ?? null : data ?? null;
+    const updatedOrder = Array.isArray(data) ? data[0] ?? null : data ?? null;
+  
+    // 🌸 MAİLE İPTAL NEDENİNİ PASLAYARAK TETİKLE
+    // 🌸 MAİLE İPTAL NEDENİNİ PASLAYARAK TETİKLE
+  if (updatedOrder) {
+    try {
+      // 1. Şablondan obje dönüldüğü için `html` alanını destruct ederek alıyoruz
+      const { emailSubject, html } = generateOrderEmailHtml({
+        customerName: updatedOrder.recipient_name || 'Değerli Müşterimiz',
+        orderNumber: updatedOrder.id,
+        totalAmount: updatedOrder.total_amount,
+        status: normalizedStatus,
+        trackingNumber: trackingNumber || updatedOrder.tracking_number,
+        cancelReason: cancelReason || updatedOrder.cancel_reason, // 👈 GEREKÇEYİ BURAYA VERİYORUZ
+});
+
+      const recipientEmail = updatedOrder.user_email || updatedOrder.email;
+
+      if (recipientEmail) {
+        await supabase.functions.invoke('send-email', {
+          body: {
+            to: recipientEmail,
+            subject: emailSubject,
+            html: html,
+            cancelReason: cancelReason || updatedOrder.cancel_reason, // 👈 Edge Function'a iptal gerekçesini gönderiyoruz
+          },
+        });
+      }
+    } catch (emailErr) {
+      console.error('E-posta gönderim hatası:', emailErr);
+    }
+  }
+  return updatedOrder;
 }
 
 export function normalizeOrderStatus(status: string): string {
