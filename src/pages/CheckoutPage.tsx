@@ -157,8 +157,8 @@ export default function CheckoutPage({
   const totalDiscount = campaignDiscount + couponDiscount;
   const dynamicDeliveryFee = shippingInfo ? Number(shippingInfo.shippingFee || 0) : 0;
 
-  // Genel Toplam = Ana Para - Kampanya - Kupon + Kargo
-  const finalTotal = Math.max(0, rawSubtotal - totalDiscount + dynamicDeliveryFee);
+  // Genel Toplam = (Ana Para + Kargo) - Kampanya - Kupon
+  const finalTotal = Math.max(0, rawSubtotal + dynamicDeliveryFee - totalDiscount);
 
 
   // 🌸 Kupon Uygulama (Tam Güvenlikli ve Esnek Yüzde/Tutar Mantığı)
@@ -412,12 +412,33 @@ export default function CheckoutPage({
       };
 
       // 4. Sepet ve Sipariş Ürün Nesneleri
-      const basketItems = items.map((item) => ({
-        id: item.product?.id || (item as any).id || crypto.randomUUID(),
-        name: item.product?.name || 'Çiçek Ürünü',
-        price: Math.round((item.product?.price || 0) * 100),
-        quantity: item.quantity || 1
-      }));
+      // 🌸 İndirimleri ürün fiyatlarına yansıtarak hesapla
+      const totalDiscount = campaignDiscount + couponDiscount;
+      const itemsTotal = rawSubtotal;
+      
+      // İndirim oranını hesapla
+      const discountRatio = itemsTotal > 0 ? totalDiscount / itemsTotal : 0;
+      
+      const basketItems = items.map((item) => {
+        const originalPrice = item.product?.price || 0;
+        const discountedPrice = originalPrice * (1 - discountRatio);
+        return {
+          id: item.product?.id || (item as any).id || crypto.randomUUID(),
+          name: item.product?.name || 'Çiçek Ürünü',
+          price: Math.round(discountedPrice * 100),
+          quantity: item.quantity || 1
+        };
+      });
+
+      // 🌸 Kargo ücretini de basketItems'a ekle
+      if (dynamicDeliveryFee > 0) {
+        basketItems.push({
+          id: 'shipping_' + crypto.randomUUID(),
+          name: 'Kargo Ücreti',
+          price: Math.round(dynamicDeliveryFee * 100),
+          quantity: 1
+        });
+      }
 
       const orderItems = items.map((item) => {
         const fullProductName = item.product?.name || 'Çiçek Ürünü';
@@ -436,6 +457,8 @@ export default function CheckoutPage({
           quantity: item.quantity || 1,
           price: itemPrice,
           unit_price: itemPrice,
+          // 🌸 App.tsx için gerekli alanlar
+          id: item.product?.id || (item as any).id,
         };
       });
   
@@ -447,72 +470,57 @@ export default function CheckoutPage({
         activeCampaign?.campaign_name || 
         'Özel Kampanya İndirimi';
         const campaignTitleToSend = selectedCampaign?.title || selectedCampaign?.name || activeCampaign?.title || activeCampaign?.name || '';
-        const createdOrderId = await onPlaceOrder({
-          items: orderItems,
-          subtotal: rawSubtotal,
-          subtotal_amount: rawSubtotal,
-          deliveryFee: dynamicDeliveryFee,
-          delivery_fee: dynamicDeliveryFee,
-          total: finalTotal,
-          total_amount: finalTotal,
-          recipientName: form.recipientName,
-          recipientPhone: form.recipientPhone,
-          address: form.address,
-          city: fullLocation,
-          deliveryDate: form.deliveryDate,
-          note: form.note,
-          couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-          applied_coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
-          coupon_discount: couponDiscount,
-          campaign_discount: campaignDiscount,
-          campaign_title: campaignDiscount > 0 ? campaignTitleToSend : undefined,
-          campaignTitle: campaignDiscount > 0 ? campaignTitleToSend : undefined,
-          discountAmount: totalDiscount,
-          discount_amount: totalDiscount,
-          status: 'pending'
-        } as any);
+        
+      // 🌸 Sipariş verilerini session storage'a kaydet (ödeme başarılı olursa OrderSuccessPage'te oluşturulacak)
+      const orderData = {
+        items: orderItems,
+        subtotal: rawSubtotal,
+        subtotal_amount: rawSubtotal,
+        deliveryFee: dynamicDeliveryFee,
+        delivery_fee: dynamicDeliveryFee,
+        total: finalTotal,
+        total_amount: finalTotal,
+        recipientName: form.recipientName,
+        recipientPhone: form.recipientPhone,
+        address: form.address,
+        city: fullLocation,
+        deliveryDate: form.deliveryDate,
+        note: form.note,
+        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        applied_coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
+        coupon_discount: couponDiscount,
+        campaign_discount: campaignDiscount,
+        campaign_title: campaignDiscount > 0 ? campaignTitleToSend : undefined,
+        campaignTitle: campaignDiscount > 0 ? campaignTitleToSend : undefined,
+        discountAmount: totalDiscount,
+        discount_amount: totalDiscount,
+        status: 'pending'
+      };
+      
+      // 🌸 Geçici order ID oluştur
+      const tempOrderId = 'temp_' + crypto.randomUUID();
+      sessionStorage.setItem('pendingOrderData', JSON.stringify(orderData));
+      sessionStorage.setItem('tempOrderId', tempOrderId);
+      
+      await handleSaveAddress();
 
-        // 🌸 1. BURA: Siparis urunlerini Supabase order_items tablosuna ekliyoruz
-        if (createdOrderId) {
-          try {
-            const orderItemsPayload = items.map((cartItem: any) => {
-              const prod = cartItem.product || cartItem;
-              return {
-                order_id: createdOrderId,
-                product_id: prod.id || cartItem.id,
-                product_name: prod.name || cartItem.name || 'Cicek Urunu',
-                quantity: cartItem.quantity || 1,
-                unit_price: prod.price || cartItem.price || 0,
-                price: (prod.price || cartItem.price || 0) * (cartItem.quantity || 1)
-              };
-            });
-
-            await supabase.from('order_items').insert(orderItemsPayload);
-          } catch (itemErr) {
-            console.error('order_items kaydi esnasinda hata:', itemErr);
-          }
+      const sessionData = await supabase.auth.getSession();
+      const authToken = sessionData.data.session?.access_token || '';
+      const response = await fetch(
+        'https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/create-checkout',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            buyer: buyer,
+            basketItems: basketItems,
+            orderId: tempOrderId // Geçici sipariş kimliği
+          })
         }
-  
-        await handleSaveAddress();
-
-        const sessionData = await supabase.auth.getSession();
-        const authToken = sessionData.data.session?.access_token || '';
-        const response = await fetch(
-          'https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/create-checkout',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-              price: finalTotalKurus,
-              buyer: buyer,
-              basketItems: basketItems,
-              orderId: createdOrderId
-            })
-          }
-        );
+      );
 
       const checkoutData = await response.json();
 

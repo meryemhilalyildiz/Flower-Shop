@@ -12,9 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { price, buyer, basketItems, orderId } = await req.json();
+    const { buyer, basketItems, orderId } = await req.json();
 
-    console.log('Received request:', { price, buyer, basketItems, orderId });
+    console.log('Received request:', { buyer, basketItems, orderId });
 
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
 
