@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
 import type { CartItem, Product } from './types';
 
-const RESERVATION_DURATION = 999999 * 60 * 1000; // Rezervasyon sistemini devre dışı bırak
+const RESERVATION_DURATION = 15 * 60 * 1000; // 15 dakika
 
 // Function to return products to stock when reservation expired - DEVRE DIŞI
 async function returnProductsToStock(items: CartItem[]) {

@@ -558,7 +558,7 @@ const createdOrderId = await onPlaceOrder({
                   onChange={(e) => handleSelectSavedAddress(e.target.value)}
                   className="input bg-white text-sm cursor-pointer"
                 >
-                  <option value="">-- Kayıtlı Adres Seçin (Örn: Annem) --</option>
+                  <option value="">-- Kayıtlı Adres Seçin (Örn: Ev) --</option>
                   {savedAddresses.map((addr) => (
                     <option key={addr.id} value={addr.id}>
                       {addr.title} - {addr.recipient_name}
@@ -737,7 +737,7 @@ const createdOrderId = await onPlaceOrder({
               {saveForNextTime && (
                 <input
                   type="text"
-                  placeholder="Kayıt Adı (Örn: Annem, Hilal, İş Yeri)"
+                  placeholder="Kayıt Adı (Örn: Ev, İş Yeri)"
                   value={addressTitle}
                   onChange={(e) => setAddressTitle(e.target.value)}
                   className="input bg-white text-sm"
@@ -760,7 +760,7 @@ const createdOrderId = await onPlaceOrder({
                 <span className="font-semibold">Güvenli Ödeme</span>
               </div>
               <p className="text-sm text-sand-600">
-                Ödeme işleminiz Iyzico güvenli altyapısı ile yapılacaktır.
+                Ödeme işleminiz Stripe güvenli altyapısı ile yapılacaktır. Siparişi tamamladığınızda ödeme sayfasına yönlendirileceksiniz.
               </p>
             </div>
           </section>

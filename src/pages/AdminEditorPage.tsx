@@ -30,6 +30,7 @@ export default function AdminEditorPage({ navigate }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageContent, setPageContent] = useState<Record<string, any>>({});
+  const [previewScale, setPreviewScale] = useState(0.6);
 
   const tabs = [
     { id: 'home' as TabType, label: 'Anasayfa', icon: '🏠' },
@@ -132,6 +133,7 @@ export default function AdminEditorPage({ navigate }: Props) {
   const isFavorite = (productId: string) => false;
   const onToggleFavorite = (product: Product) => {};
 
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -217,9 +219,9 @@ export default function AdminEditorPage({ navigate }: Props) {
         </div>
       </div>
 
-      {/* Canlı Önizleme ve Düzenleme Alanı */}
+      {/* Preview Panel */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Header */}
+        {/* Preview Header */}
         <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Eye className="w-5 h-5" />
@@ -229,6 +231,20 @@ export default function AdminEditorPage({ navigate }: Props) {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setPreviewScale(Math.max(0.2, previewScale - 0.1))}
+              className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-sm cursor-pointer"
+            >
+              -
+            </button>
+            <span className="text-xs bg-white/10 px-2 py-1 rounded">{Math.round(previewScale * 100)}%</span>
+            <button
+              onClick={() => setPreviewScale(Math.min(1, previewScale + 0.1))}
+              className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-sm cursor-pointer"
+            >
+              +
+            </button>
+            <div className="w-px h-6 bg-white/20 mx-2" />
+            <button
               onClick={() => window.location.reload()}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm transition-colors cursor-pointer"
             >
@@ -236,7 +252,6 @@ export default function AdminEditorPage({ navigate }: Props) {
               Yenile
             </button>
 
-            {/* 🌸 Kaydet Butonu (Değişiklik olmasa da test ve manuel kaydetme için her zaman hazır) */}
             <button
               onClick={handleSave}
               disabled={saving}
@@ -257,30 +272,40 @@ export default function AdminEditorPage({ navigate }: Props) {
           </div>
         </div>
 
-        {/* İçerik Alanı */}
-        <div className="p-0 min-h-[600px]">
-          <AdminEditingProvider
-            isEditing={isEditingMode}
-            onTextChange={handleTextChange}
-            onImageChange={handleImageChange}
+        {/* Preview Content */}
+        <div className="p-4 bg-gray-100 overflow-auto" style={{ height: '700px' }}>
+          <div 
+            className="bg-white mx-auto shadow-lg overflow-hidden"
+            style={{ 
+              transform: `scale(${previewScale})`,
+              transformOrigin: 'top center',
+              width: `${100 / previewScale}%`,
+              minHeight: `${700 / previewScale}px`
+            }}
           >
-            <div className={`admin-editable-container ${isEditingMode ? 'editing' : ''}`}>
-              {activeTab === 'home' && (
-                <HomePage
-                  categories={categories}
-                  featured={getFeaturedProducts(products)}
-                  discounted={getDiscountedProducts(products)}
-                  navigate={navigate}
-                  onAddToCart={handleAddToCart}
-                  isFavorite={isFavorite}
-                  onToggleFavorite={onToggleFavorite}
-                />
-              )}
-              {activeTab === 'about' && <AboutPage navigate={navigate} />}
-              {activeTab === 'contact' && <ContactPage navigate={navigate} />}
-              {activeTab === 'faq' && <FaqPage navigate={navigate} />}
-            </div>
-          </AdminEditingProvider>
+            <AdminEditingProvider
+              isEditing={isEditingMode}
+              onTextChange={handleTextChange}
+              onImageChange={handleImageChange}
+            >
+              <div className={`admin-editable-container ${isEditingMode ? 'editing' : ''}`}>
+                {activeTab === 'home' && (
+                  <HomePage
+                    categories={categories}
+                    featured={getFeaturedProducts(products)}
+                    discounted={getDiscountedProducts(products)}
+                    navigate={navigate}
+                    onAddToCart={handleAddToCart}
+                    isFavorite={isFavorite}
+                    onToggleFavorite={onToggleFavorite}
+                  />
+                )}
+                {activeTab === 'about' && <AboutPage navigate={navigate} />}
+                {activeTab === 'contact' && <ContactPage navigate={navigate} />}
+                {activeTab === 'faq' && <FaqPage navigate={navigate} />}
+              </div>
+            </AdminEditingProvider>
+          </div>
         </div>
       </div>
 
@@ -290,7 +315,7 @@ export default function AdminEditorPage({ navigate }: Props) {
           <Edit2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-800">
             <p className="font-semibold mb-1">Nasıl Düzenlenir?</p>
-            <p>Metinlerin üzerine tıklayıp düzenledikten sonra sağ üstteki yeşil <b>Kaydet</b> butonuna basarak veritabanına aktarabilirsiniz.</p>
+            <p>Düzenleme modunda metinlerin veya görsellerin üzerine tıklayarak düzenleyebilirsiniz. İşlem bitince sağ üstteki yeşil <b>Kaydet</b> butonuna basın.</p>
           </div>
         </div>
       )}

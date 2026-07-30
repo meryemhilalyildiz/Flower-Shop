@@ -49,7 +49,7 @@ export default function EditableText({ value, onSave, multiline = false, classNa
 
   if (isEditing) {
     return (
-      <div className="relative inline-block w-full">
+      <div className="editable-component relative inline-block w-full">
         {multiline ? (
           <textarea
             ref={inputRef as React.RefObject<HTMLTextAreaElement>}
@@ -92,7 +92,7 @@ export default function EditableText({ value, onSave, multiline = false, classNa
   return (
     <span
       onClick={() => setIsEditing(true)}
-      className={`cursor-pointer group relative inline-block ${className}`}
+      className={`editable-component cursor-pointer group relative inline-block ${className}`}
       title="Düzenlemek için tıklayın"
     >
       {value || <span className="text-gray-400 italic">{placeholder}</span>}

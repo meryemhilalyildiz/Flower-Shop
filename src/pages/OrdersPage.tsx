@@ -16,6 +16,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
   const [dbOrders, setDbOrders] = useState<OrderInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
+  const [reviewProductSelection, setReviewProductSelection] = useState<{ order: OrderInfo; products: Product[] } | null>(null);
 
   const fetchUserOrders = async () => {
     setLoading(true);
@@ -122,6 +123,97 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
     ? dbOrders
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  const handleCancelOrder = async (orderId: string, reason: string) => {
+    console.log('🔍 İptal talebi başlatılıyor:', orderId, reason);
+
+    try {
+      // Önce siparişin mevcut durumunu al
+      const { data: orderData, error: fetchError } = await supabase
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .single();
+
+      console.log('🔍 Sipariş durumu alındı:', orderData, fetchError);
+
+      if (fetchError) {
+        console.error('🔍 Sipariş bilgisi alınamadı:', fetchError);
+        alert('Sipariş bilgisi alınamadı: ' + fetchError.message);
+        return;
+      }
+
+      // İptal talebi oluştur - önceki durumu sakla (previous_status kolonu varsa)
+      const updateData: any = {
+        status: 'cancellation_requested',
+        cancel_reason: reason,
+      };
+
+      // previous_status kolonu varsa ekle
+      try {
+        updateData.previous_status = orderData.status;
+      } catch (e) {
+        // previous_status kolonu yoksa hata yoksay
+      }
+
+      console.log('🔍 Update data:', updateData);
+
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId)
+        .select();
+
+      console.log('🔍 Update sonucu:', data, error);
+
+      if (error) {
+        console.error('🔍 İptal talebi veritabanına işlenemedi:', error);
+        alert('İptal talebi veritabanına işlenemedi: ' + error.message);
+        return;
+      }
+
+      setDbOrders((prevOrders) =>
+        prevOrders.map((o) =>
+          String(o.id) === String(orderId)
+            ? { ...o, status: 'cancellation_requested', cancel_reason: reason, previous_status: orderData.status }
+            : o
+        )
+      );
+
+      alert('İptal talebiniz alındı, admin onayından sonra gerçekleştirilecektir.');
+    } catch (err: any) {
+      console.error('🔍 Hata oluştu:', err);
+      alert('Hata oluştu: ' + (err.message || ''));
+    }
+  };
+
+  const handleReviewOrder = (order: OrderInfo) => {
+    const deliveredProducts = order.items
+      .map((item: any) => {
+        const productId = item.product?.id || item.product_id;
+        if (!productId) return null;
+
+        const baseProduct = item.product || {};
+        return {
+          id: productId,
+          name: baseProduct.name || item.product_name || 'Çiçek Ürünü',
+          price: baseProduct.price ?? item.price ?? item.unit_price ?? 0,
+          images: baseProduct.images
+            ?? (baseProduct.image ? [baseProduct.image] : []),
+        } as Product;
+      })
+      .filter((product): product is Product => product !== null);
+
+    if (deliveredProducts.length === 0) {
+      alert('Bu siparişteki ürün bilgisi bulunamadı. Lütfen destek ile iletişime geçin.');
+      return;
+    }
+
+    if (deliveredProducts.length === 1) {
+      setReviewProduct(deliveredProducts[0]);
+    } else {
+      setReviewProductSelection({ order, products: deliveredProducts });
+    }
+  };
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center text-gray-500">
@@ -151,7 +243,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
       <div className="space-y-6">
         {orderList.map((order: any) => {
           const isDelivered = order.status === 'Teslim Edildi' || order.status === 'delivered';
-          const isCancelled = order.status === 'İptal Edildi' || order.status === 'cancelled';
+          const isCancelled = order.status === 'İptal Edildi' || order.status === 'cancelled' || order.status === 'İptal Talebi Alındı' || order.status === 'cancellation_requested';
+          const isCancellationRequested = order.status === 'cancellation_requested' || order.status === 'İptal Talebi Alındı';
+          const canCancel = !isDelivered && !isCancelled && !isCancellationRequested;
 
           return (
             <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -174,10 +268,24 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
-                    isDelivered ? 'bg-emerald-100 text-emerald-800' : isCancelled ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {isCancelled ? '❌ İptal Edildi' : isDelivered ? '✅ Teslim Edildi' : (order.status || 'pending')}
+                  <span
+                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
+                      isDelivered || order.status === 'delivered'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : isCancellationRequested
+                        ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                        : isCancelled || order.status === 'cancelled'
+                        ? 'bg-red-100 text-red-800 border border-red-200'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {isCancellationRequested
+                      ? '⏳ İptal Talebi Alındı'
+                      : isCancelled || order.status === 'cancelled'
+                      ? '❌ İptal Edildi'
+                      : isDelivered || order.status === 'delivered'
+                      ? '✅ Teslim Edildi'
+                      : (order.status || 'pending')}
                   </span>
 
                   <button
@@ -193,6 +301,35 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
                   >
                     <Download className="w-3.5 h-3.5" /> Fatura
                   </button>
+
+                  {canCancel && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        console.log('🔍 İptal butonuna tıklandı, order.id:', order.id);
+                        const reason = window.prompt('Lütfen siparişinizi iptal etme nedeninizi yazınız:');
+                        console.log('🔍 İptal nedeni:', reason);
+                        if (reason && reason.trim() !== '') {
+                          handleCancelOrder(order.id, reason.trim());
+                        } else if (reason !== null) {
+                          alert('İptal işlemi için bir neden belirtmelisiniz.');
+                        }
+                      }}
+                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                    >
+                      🚫 İptal Et
+                    </button>
+                  )}
+
+                  {isDelivered && (
+                    <button
+                      onClick={() => handleReviewOrder(order)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-all cursor-pointer"
+                    >
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      Yorum Yap
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -282,6 +419,30 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, n
           );
         })}
       </div>
+
+      {reviewProduct && (
+        <ReviewModal
+          product={reviewProduct}
+          isOpen={!!reviewProduct}
+          onClose={() => setReviewProduct(null)}
+          onReviewSubmitted={() => {
+            setReviewProduct(null);
+            fetchUserOrders();
+          }}
+        />
+      )}
+
+      {reviewProductSelection && (
+        <ReviewModal
+          product={reviewProductSelection.products[0]}
+          isOpen={!!reviewProductSelection}
+          onClose={() => setReviewProductSelection(null)}
+          onReviewSubmitted={() => {
+            setReviewProductSelection(null);
+            fetchUserOrders();
+          }}
+        />
+      )}
     </div>
   );
 };

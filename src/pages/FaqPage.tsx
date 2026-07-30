@@ -191,7 +191,14 @@ export default function FaqPage({ navigate }: Props) {
                     className="w-full flex items-center justify-between gap-4 p-5 text-left cursor-pointer"
                   >
                     <span className="font-bold text-sand-900 text-base md:text-lg">
-                      {item.question}
+                      {isEditing ? (
+                        <EditableText
+                          value={item.question}
+                          onSave={(newValue) => onTextChange(`faq_${item.id}_question`, newValue)}
+                        />
+                      ) : (
+                        item.question
+                      )}
                     </span>
                     <ChevronDown
                       className={`w-5 h-5 text-sand-400 flex-shrink-0 transition-transform duration-200 ${
@@ -201,7 +208,15 @@ export default function FaqPage({ navigate }: Props) {
                   </button>
                   {isOpen && (
                     <div className="px-5 pb-5 text-sand-600 text-sm md:text-base leading-relaxed border-t border-sand-100 pt-3 animate-fade-in">
-                      {item.answer}
+                      {isEditing ? (
+                        <EditableText
+                          value={item.answer}
+                          onSave={(newValue) => onTextChange(`faq_${item.id}_answer`, newValue)}
+                          multiline
+                        />
+                      ) : (
+                        item.answer
+                      )}
                     </div>
                   )}
                 </div>
@@ -212,9 +227,26 @@ export default function FaqPage({ navigate }: Props) {
 
         {/* CTA (İletişim Yönlendirmesi) */}
         <div className="text-center mt-12 p-8 rounded-3xl bg-sand-100/70 border border-sand-200">
-          <h3 className="font-display text-xl font-bold text-sand-900">Sorunuz cevaplanmadı mı?</h3>
+          <h3 className="font-display text-xl font-bold text-sand-900">
+            {isEditing ? (
+              <EditableText
+                value="Sorunuz cevaplanmadı mı?"
+                onSave={(newValue) => onTextChange('faq_cta_title', newValue)}
+              />
+            ) : (
+              'Sorunuz cevaplanmadı mı?'
+            )}
+          </h3>
           <p className="text-sand-600 mt-2 text-sm md:text-base">
-            Müşteri hizmetleri ekibimiz size yardımcı olmaktan mutluluk duyar.
+            {isEditing ? (
+              <EditableText
+                value="Müşteri hizmetleri ekibimiz size yardımcı olmaktan mutluluk duyar."
+                onSave={(newValue) => onTextChange('faq_cta_description', newValue)}
+                multiline
+              />
+            ) : (
+              'Müşteri hizmetleri ekibimiz size yardımcı olmaktan mutluluk duyar.'
+            )}
           </p>
           <button
             onClick={() => navigate({ name: 'contact' })}

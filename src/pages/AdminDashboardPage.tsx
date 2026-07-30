@@ -299,7 +299,7 @@ export function AdminDashboard() {
                       />
                     </td>
                     <td className="p-3 font-semibold text-sand-900">{p.name}</td>
-                    <td className="p-3 text-sand-600 text-xs">{p.category_id || p.category || 'Çiçekler'}</td>
+                    <td className="p-3 text-sand-600 text-xs">{p.categories?.name || p.category || 'Çiçekler'}</td>
                     
                     <td className="p-3 font-bold text-rose-800">₺{p.price}</td>
                     <td className="p-3">

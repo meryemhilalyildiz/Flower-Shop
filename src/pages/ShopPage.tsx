@@ -29,9 +29,11 @@ export default function ShopPage({
 }: Props) {
   const [dbProducts, setDbProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const [sort, setSort] = useState<SortKey>('featured');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000]);
+  const [priceRange, setPriceRange] = useState<[number | null, number | null]>([null, null]);
+  const [priceRangeOpen, setPriceRangeOpen] = useState(false);
   const [showInStock, setShowInStock] = useState(false);
   const [showDiscounted, setShowDiscounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -121,6 +123,12 @@ export default function ShopPage({
 
   useEffect(() => {
     loadShopProducts();
+    // Check for search query from sessionStorage
+    const savedSearchQuery = sessionStorage.getItem('searchQuery');
+    if (savedSearchQuery) {
+      setSearchQuery(savedSearchQuery);
+      sessionStorage.removeItem('searchQuery');
+    }
   }, []);
 
   const allProducts = dbProducts.length > 0 ? dbProducts : initialProducts;
@@ -148,12 +156,25 @@ export default function ShopPage({
       );
     }
 
-    // 🌸 3. Stok ve İndirim Filtreleri
+    // 🌸 3. Arama Filtresi
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      list = list.filter((p) =>
+        p.name.toLowerCase().includes(query) ||
+        p.description.toLowerCase().includes(query) ||
+        (p as any).category?.toLowerCase().includes(query) ||
+        p.ingredients.some((ing) => ing.toLowerCase().includes(query))
+      );
+    }
+
+    // 🌸 4. Stok ve İndirim Filtreleri
     if (showInStock) list = list.filter((p) => (p.stock !== undefined ? p.stock > 0 : p.inStock));
     if (showDiscounted) list = list.filter((p) => p.oldPrice !== undefined);
     
-    // 🌸 4. Fiyat Aralığı
-    list = list.filter((p) => p.price >= priceRange[0] && p.price <= priceRange[1]);
+    // 🌸 5. Fiyat Aralığı
+    if (priceRange[0] !== null && priceRange[1] !== null) {
+      list = list.filter((p) => p.price >= priceRange[0]! && p.price <= priceRange[1]!);
+    }
 
     // 🌸 5. Sıralama
     switch (sort) {
@@ -171,7 +192,7 @@ export default function ShopPage({
     }
 
     return list;
-  }, [allProducts, activeCategory, activeCampaignFilter, sort, priceRange, showInStock, showDiscounted]);
+  }, [allProducts, activeCategory, activeCampaignFilter, sort, priceRange, showInStock, showDiscounted, searchQuery]);
 
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },
@@ -192,11 +213,19 @@ export default function ShopPage({
 
       <div className="mt-4 mb-6">
         <h1 className="font-display text-3xl lg:text-4xl font-bold text-sand-900">
-          {activeCategory ? activeCategory.name : 'Tüm Çiçekler'}
+          {searchQuery ? `"${searchQuery}" için sonuçlar` : (activeCategory ? activeCategory.name : 'Tüm Çiçekler')}
         </h1>
         <p className="text-sand-500 mt-2">
-          {activeCategory ? activeCategory.description : 'Taze çiçekler, buketler ve aranjmanlar'}
+          {searchQuery ? `${filtered.length} ürün bulundu` : (activeCategory ? activeCategory.description : 'Taze çiçekler, buketler ve aranjmanlar')}
         </p>
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="mt-2 text-sm text-brand-600 hover:text-brand-700 font-medium cursor-pointer"
+          >
+            Aramayı temizle
+          </button>
+        )}
       </div>
 
       {/* 🌸 Kampanya Filtresi Aktifse Üstte Gösterilecek Rozet */}
@@ -257,23 +286,41 @@ export default function ShopPage({
             <div className="bg-white rounded-2xl border border-sand-100 p-5 space-y-6">
               <div>
                 <h3 className="font-semibold text-sand-800 text-sm mb-3">Fiyat Aralığı</h3>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={priceRange[0]}
-                    onChange={(e) => setPriceRange([Number(e.target.value), priceRange[1]])}
-                    className="input text-sm py-2"
-                    placeholder="Min"
-                  />
-                  <span className="text-sand-400">—</span>
-                  <input
-                    type="number"
-                    value={priceRange[1]}
-                    onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
-                    className="input text-sm py-2"
-                    placeholder="Max"
-                  />
-                </div>
+                {!priceRangeOpen ? (
+                  <button
+                    onClick={() => setPriceRangeOpen(true)}
+                    className="w-full px-4 py-2 border border-sand-200 rounded-xl text-sand-400 text-sm hover:border-brand-300 transition-colors cursor-pointer"
+                  >
+                    min - max
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={priceRange[0] ?? ''}
+                      onChange={(e) => setPriceRange([e.target.value ? Number(e.target.value) : null, priceRange[1]])}
+                      className="input text-sm py-2"
+                      placeholder="min."
+                    />
+                    <span className="text-sand-400">—</span>
+                    <input
+                      type="number"
+                      value={priceRange[1] ?? ''}
+                      onChange={(e) => setPriceRange([priceRange[0], e.target.value ? Number(e.target.value) : null])}
+                      className="input text-sm py-2"
+                      placeholder="max."
+                    />
+                    <button
+                      onClick={() => {
+                        setPriceRangeOpen(false);
+                        setPriceRange([null, null]);
+                      }}
+                      className="p-2 text-sand-400 hover:text-sand-600 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -335,7 +382,7 @@ export default function ShopPage({
               <p className="text-sand-500 text-lg">Bu kriterlere uygun çiçek bulunamadı.</p>
               <button
                 onClick={() => {
-                  setPriceRange([0, 2000]);
+                  setPriceRange([null, null]);
                   setShowInStock(false);
                   setShowDiscounted(false);
                   setActiveCampaignFilter(null);
