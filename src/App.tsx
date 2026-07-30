@@ -274,11 +274,7 @@ const { data: insertedOrder, error: orderError } = await supabase
           ordersMap[ord.id] = {
             id: ord.id.toString(),
             createdAt: ord.created_at,
-<<<<<<< Updated upstream
-            deliveryDate: ord.delivery_date || '',
-=======
             deliveryDate: ord.delivery_date || '', // 🎯 Artık hata vermeyecek!
->>>>>>> Stashed changes
             status: normalizeOrderStatusToTurkish(ord.status) || 'Hazırlanıyor',
             subtotal: ord.subtotal_amount ?? (ord.total_amount != null ? ord.total_amount + (ord.discount_amount || 0) : 0),
             deliveryFee: ord.delivery_fee ?? 0,
