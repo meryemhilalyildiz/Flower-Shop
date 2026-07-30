@@ -5,6 +5,7 @@ import { supabase } from "../supabaseClient";
 import { generateInvoicePDF } from "../services/pdfService";
 import { openWhatsApp } from "../services/whatsappService";
 import ReviewModal from '../components/ReviewModal';
+import { sendCancellationStatusEmail } from '../services/emailService';
 
 interface OrdersPageProps {
   orders?: Record<string, OrderInfo>;
@@ -44,7 +45,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
 
       if (data) {
         const mappedOrders: OrderInfo[] = data.map((o: any) => {
-          // Supabase'deki `items` JSONB alanını öncelikli olarak alıyoruz!
           const rawItems = (Array.isArray(o.items) && o.items.length > 0)
             ? o.items
             : (o.order_items || o.products || []);
@@ -58,7 +58,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
               0
             );
 
-            // 🌸 BİNGO: `title` ALANINI EN BAŞA ALDIK!
             const productName =
               item.title ||
               item.product_name ||
@@ -114,8 +113,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
             campaign_discount: Number(o.campaign_discount || 0),
             applied_coupon_code: o.applied_coupon_code || o.coupon_code || o.couponCode || null,
             status: o.status || 'pending',
+            previous_status: o.previous_status || o.previousStatus || null, // 🌸 İŞTE BURASI EKSİKTİ!
             cancel_reason: o.cancel_reason || o.cancelReason || null,
-            cancel_requested: o.cancel_requested || o.cancelRequested || false,
             note: o.note,
             tracking_number: o.tracking_number,
             items: mappedItems,
@@ -139,11 +138,12 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
     ? dbOrders
     : Object.values(initialOrders || {}).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  // 🌸 İPTAL TALEBİ VE E-POSTA BİLDİRİMİ
   const handleCancelOrder = async (orderId: string, reason: string) => {
     try {
       const { data: orderData, error: fetchError } = await supabase
         .from('orders')
-        .select('status')
+        .select('*')
         .eq('id', orderId)
         .single();
 
@@ -155,6 +155,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
       const updateData: any = {
         status: 'cancellation_requested',
         cancel_reason: reason,
+        previous_status: orderData.status || 'pending', // 🌸 Önemli: Önceki durumu kaydediyoruz!
       };
 
       const { error } = await supabase
@@ -167,6 +168,23 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
         return;
       }
 
+      // 🌸 İptal E-Postası Gönderimi
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          await sendCancellationStatusEmail({
+            toEmail: user.email,
+            recipientName: orderData.recipient_name || orderData.recipientName || 'Değerli Müşterimiz',
+            orderId: String(orderId),
+            cancelReason: reason,
+            totalAmount: Number(orderData.total_amount || orderData.total || 0),
+            type: 'USER_REQUESTED'
+          });
+        } catch (emailErr) {
+          console.error('İptal e-postası gönderilirken hata oluştu:', emailErr);
+        }
+      }
+
       setDbOrders((prevOrders) =>
         prevOrders.map((o) =>
           String(o.id) === String(orderId)
@@ -175,7 +193,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
         )
       );
 
-      alert('İptal talebiniz alındı.');
+      alert('İptal talebiniz alındı ve bilgilendirme e-postası gönderildi.');
     } catch (err: any) {
       alert('Hata oluştu: ' + (err.message || ''));
     }
@@ -248,7 +266,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
           const canCancel = !isDelivered && !isCancelled && !isCancellationRequested;
           const shouldHideInvoice = isCancelled || isCancellationRequested;
 
-          // 🌸 Raw Items Alımı: Supabase'deki `items` nesnesi birinci öncelik!
           const rawItems = 
             (Array.isArray(order.items) && order.items.length > 0) ? order.items :
             (Array.isArray(order.order_items) && order.order_items.length > 0) ? order.order_items :
@@ -274,19 +291,25 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
                   <p className="text-sm font-bold text-pink-600">₺{Number(order.total || order.total_amount || 0).toFixed(2)}</p>
                 </div>
 
-                {/* Rozetler ve İşlem Butonları */}
                 <div className="flex flex-wrap items-center gap-2">
                   {/* 1. İPTAL EDİLDİ DURUMU */}
-                  {isCancelled ? (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200 w-fit">
-                        ❌ İptal Edildi
-                      </span>
-                      <span className="text-[11px] text-red-600 font-medium italic pl-1">
-                        (Admin tarafından iptal edildi{order.cancel_reason ? `: ${order.cancel_reason}` : ''})
-                      </span>
-                    </div>
-                  ) 
+{isCancelled ? (
+  <div className="flex flex-col gap-0.5">
+    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200 w-fit">
+      ❌ İptal Edildi
+    </span>
+    <span className="text-[11px] text-red-600 font-medium italic pl-1">
+      {order.previous_status || order.previousStatus ? (
+        /* previous_status DOLU ise -> Müşteri talep etmiş, Admin onaylamış */
+        `(İptal talebiniz admin tarafından onaylandı${order.cancel_reason ? `: ${order.cancel_reason}` : ''})`
+      ) : (
+        /* previous_status NULL ise -> Admin doğrudan kendisi iptal etmiş */
+        `(Admin tarafından iptal edildi${order.cancel_reason ? `: ${order.cancel_reason}` : ''})`
+      )}
+    </span>
+  </div>
+)
+                  
                   /* 2. İPTAL TALEBİ ALINDI DURUMU */
                   : isCancellationRequested ? (
                     <div className="flex flex-col gap-0.5">
@@ -319,7 +342,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
                     <MessageCircle className="w-4 h-4" /> WhatsApp Destek
                   </button>
 
-                  {/* 📄 Fatura Butonu (İptal/İptal Talebinde GİZLİ) */}
+                  {/* 📄 Fatura Butonu */}
                   {!shouldHideInvoice && (
                     <button
                       onClick={() => generateInvoicePDF(order)}
@@ -372,7 +395,6 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
                         item.product?.image ||
                         item.images?.[0];
 
-                      // 🌸 TITLE KONTROLÜ
                       const fullName =
                         item.title ||
                         item.product_name ||

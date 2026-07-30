@@ -10,6 +10,18 @@ export interface EmailOrderDetails {
     cancelReason?: string;
   }
   
+  export interface OrderEmailData {
+    toEmail: string;
+    recipientName: string;
+    orderId: string;
+    cancelReason: string;
+    totalAmount: number;
+    type: 'USER_REQUESTED' | 'ADMIN_APPROVED'; // 🌸 Mailin türü (Talep mi iletildi yoksa Admin onayladı mı)
+  }
+  
+  /**
+   * Genel Sipariş Durumu Güncelleme HTML Şablonu
+   */
   export const generateOrderEmailHtml = (details: EmailOrderDetails) => {
     const storeName = "A şirketi";
   
@@ -25,14 +37,21 @@ export interface EmailOrderDetails {
       statusTitle = "Siparişiniz Kargoya Verildi";
       statusMessage = `${storeName} mağazasındaki siparişiniz kargo firmasına teslim edilmiştir. Çiçekleriniz yolda!`;
       statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+    } else if (['cancellation_requested', 'iptal talebi alındı'].includes(normalizedStatus)) {
+      emailSubject = `Sipariş İptal Talebi Alındı - ${storeName}`;
+      statusTitle = "İptal Talebiniz Şirkete İletilmiştir";
+      statusMessage = `${storeName} mağazasından verdiğiniz #${details.orderNumber} numaralı siparişiniz için oluşturduğunuz iptal talebi şirketimize ulaşmıştır.`;
+      statusDetail = details.cancelReason
+        ? `<strong>İptal Talebi Gerekçesi:</strong> "${details.cancelReason}"`
+        : 'Talebiniz en kısa sürede değerlendirilip tarafınıza bilgilendirme yapılacaktır.';
     } else if (['cancelled', 'iptal edildi', 'iptal'].includes(normalizedStatus)) {
       emailSubject = `Sipariş İptal Edildi - ${storeName}`;
       statusTitle = "Sipariş İptal Edildi";
       statusMessage = `${storeName} mağazasındaki siparişiniz iptal edilmiştir. Sorularınız için bizimle iletişime geçebilirsiniz.`;
       
-      // 🌸 İptal gerekçesi varsa doğrudan Status Box alt yazısına yazıyoruz:
+      // 🌸 İptal gerekçesi varsa doğrudan Status Box alt yazısına yazıyoruz
       if (details.cancelReason) {
-        statusDetail = `<strong>İptal Gerekçesi:</strong> ${details.cancelReason}`;
+        statusDetail = `<strong>İptal Gerekçesi:</strong> "${details.cancelReason}"`;
       } else {
         statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
       }
@@ -83,7 +102,7 @@ export interface EmailOrderDetails {
               ` : ''}
               <tr>
                 <td style="padding: 6px 0; color: #6b7280;">Toplam Tutar:</td>
-                <td style="padding: 6px 0; font-weight: 700; text-align: right; color: #111827;">₺${details.totalAmount}</td>
+                <td style="padding: 6px 0; font-weight: 700; text-align: right; color: #111827;">₺${Number(details.totalAmount).toFixed(2)}</td>
               </tr>
             </table>
           </div>
@@ -96,4 +115,88 @@ export interface EmailOrderDetails {
     `;
   
     return { emailSubject, html };
+  };
+  
+  /**
+   * 🌸 İptal Durumuna Göre Özelleştirilmiş E-Posta Gönderir
+   */
+  export const sendCancellationStatusEmail = async ({
+    toEmail,
+    recipientName,
+    orderId,
+    cancelReason,
+    totalAmount,
+    type
+  }: OrderEmailData) => {
+    try {
+      const isUserRequest = type === 'USER_REQUESTED';
+  
+      const subject = isUserRequest
+        ? `Sipariş İptal Talebiniz Alındı (#${orderId})`
+        : `Siparişiniz İptal Edilmiştir (#${orderId})`;
+  
+      const titleText = isUserRequest
+        ? 'İptal Talebiniz Şirkete İletilmiştir'
+        : 'Sipariş İptal İşleminiz Onaylandı';
+  
+      const descriptionText = isUserRequest
+        ? `<strong>#${orderId}</strong> numaralı siparişiniz için oluşturduğunuz iptal talebi şirketimize ulaşmıştır. İncelemelerin ardından tarafınıza dönüş yapılacaktır.`
+        : `<strong>#${orderId}</strong> numaralı siparişinizin iptal işlemi yetkili ekibimiz tarafından onaylanmış ve gerçekleştirilmiştir.`;
+  
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #f0f0f0; border-radius: 12px; padding: 24px; background-color: #ffffff;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #db2777; margin: 0;">🌸 Çiçekçi</h1>
+            <p style="color: #6b7280; font-size: 14px;">${titleText}</p>
+          </div>
+  
+          <p style="font-size: 16px; color: #374151;">Sayın <strong>${recipientName}</strong>,</p>
+          
+          <p style="font-size: 14px; color: #4b5563; line-height: 1.5;">
+            ${descriptionText}
+          </p>
+  
+          <!-- 🌸 İPTAL NEDENİ KUTUSU -->
+          <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 20px 0; border-radius: 6px;">
+            <p style="margin: 0; font-size: 12px; color: #991b1b; font-weight: bold; text-transform: uppercase;">İptal Nedeni / Gerekçesi:</p>
+            <p style="margin: 4px 0 0 0; font-size: 14px; color: #7f1d1d; font-style: italic;">
+              "${cancelReason || 'Nedeni belirtilmedi'}"
+            </p>
+          </div>
+  
+          <div style="background-color: #f9fafb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="margin: 0; font-size: 14px; color: #374151;">
+              <strong>Sipariş Tutarı:</strong> <span style="color: #db2777; font-weight: bold;">₺${Number(totalAmount).toFixed(2)}</span>
+            </p>
+          </div>
+  
+          <p style="font-size: 13px; color: #6b7280; line-height: 1.4;">
+            ${
+              isUserRequest
+                ? 'Talebiniz en kısa sürede değerlendirilip mail ve WhatsApp üzerinden bilgilendirme yapılacaktır.'
+                : 'Ücret iadeniz ödeme yönteminize bağlı olarak 1-3 iş günü içerisinde bankanız tarafından hesabınıza yansıtılacaktır.'
+            }
+          </p>
+  
+          <hr style="border: none; border-top: 1px solid #f3f4f6; margin: 20px 0;" />
+          
+          <p style="text-align: center; font-size: 12px; color: #9ca3af; margin: 0;">
+            Çiçekçi © 2026 — Taze Çiçekler & Buketler
+          </p>
+        </div>
+      `;
+  
+      // Supabase edge function üzerinden e-posta gönderimi
+      await fetch('https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: toEmail,
+          subject: subject,
+          html: htmlContent,
+        }),
+      });
+    } catch (error) {
+      console.error('İptal e-postası gönderilirken hata oluştu:', error);
+    }
   };
