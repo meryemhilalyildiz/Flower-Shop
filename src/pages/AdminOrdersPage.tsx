@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search, Truck, Save, Check, AlertTriangle, X } from 'lucide-react';
 import { fetchAllOrders, normalizeOrderStatus, updateOrderStatus } from '../services/adminApi';
 import { supabase } from '../supabaseClient';
 import StatusBadge from '../components/admin/StatusBadge';
+import { sendCancellationStatusEmail } from '../services/emailService';
 
-export default function AdminOrdersPageNew() {
+export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -103,7 +104,6 @@ export default function AdminOrdersPageNew() {
     setUpdatingId(orderId);
     try {
       const normalizedStatus = normalizeOrderStatus(newStatus);
-      // adminApi.ts içindeki e-posta atan fonksiyon çalışır:
       await updateOrderStatus(orderId, normalizedStatus, trackingNum, cancelReason);
 
       setOrders((prevOrders) =>
@@ -139,31 +139,142 @@ export default function AdminOrdersPageNew() {
     setTrackingInput('');
   };
 
-  // 🌸 İptal Modal Onayı
+  // 🌸 İptal Modal Onayı (Admin Doğrudan İptal Ettiğinde)
   const confirmCancelStatus = async () => {
     if (!cancelReasonInput.trim()) {
       alert("Lütfen bir iptal gerekçesi belirtiniz.");
       return;
     }
 
-    // 1. Veritabanını güncelle & e-postayı adminApi üzerinden otomatik tetikle
-    await executeStatusUpdate(selectedOrderForCancel.id, 'cancelled', undefined, cancelReasonInput);
+    try {
+      // Admin doğrudan iptal ettiği için previous_status NULL set edilir
+      await supabase
+        .from('orders')
+        .update({ 
+          status: 'cancelled',
+          previous_status: null, // 🌸 Müşteri talep etmediği için NULL kalıyor
+          cancel_reason: cancelReasonInput
+        })
+        .eq('id', selectedOrderForCancel.id);
 
-    // 2. Modalı kapat ve input'u temizle
-    setSelectedOrderForCancel(null);
-    setCancelReasonInput('');
-  };
+      // 2. Durumu local state ve adminApi üzerinde güncelliyoruz
+      await executeStatusUpdate(selectedOrderForCancel.id, 'cancelled', undefined, cancelReasonInput);
 
-  // İptal Talebi Onay/Reddediş Handler
-  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
-    if (newStatus === 'reject_cancellation') {
-      const order = orders.find(o => o.id === orderId);
-      const previousStatus = order?.previous_status || 'pending';
-      await handleStatusChange(orderId, previousStatus);
-    } else {
-      await handleStatusChange(orderId, newStatus);
+      const clientEmail = selectedOrderForCancel.user_email || selectedOrderForCancel.email;
+      if (clientEmail) {
+        try {
+          await sendCancellationStatusEmail({
+            toEmail: clientEmail,
+            recipientName: selectedOrderForCancel.recipient_name || selectedOrderForCancel.recipientName || 'Değerli Müşterimiz',
+            orderId: String(selectedOrderForCancel.id),
+            cancelReason: cancelReasonInput,
+            totalAmount: Number(selectedOrderForCancel.total_amount || selectedOrderForCancel.total || 0),
+            type: 'ADMIN_APPROVED'
+          });
+        } catch (e) {
+          console.error('Mail atılamadı:', e);
+        }
+      }
+    } catch (err: any) {
+      alert('İptal işlemi esnasında hata: ' + (err.message || ''));
+    } finally {
+      setSelectedOrderForCancel(null);
+      setCancelReasonInput('');
     }
   };
+
+  // 🌸 İptal Talebi Onay/Reddediş Handler
+  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    if (newStatus === 'reject_cancellation') {
+      // 🌸 1. İPTAL TALEBİNİ REDDETME SENARYOSU
+      setUpdatingId(orderId);
+      try {
+        const fallbackStatus = order.previous_status && order.previous_status !== 'cancellation_requested' 
+          ? order.previous_status 
+          : 'processing';
+
+        // DB güncellemesi: status eski haline dönüyor, previous_status temizleniyor
+        const { error } = await supabase
+          .from('orders')
+          .update({ 
+            status: fallbackStatus,
+            previous_status: null 
+          })
+          .eq('id', orderId);
+
+        if (error) throw error;
+
+        // State güncellemesi
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: fallbackStatus, previous_status: null } : o));
+
+        // Müşteriye İptal Reddedildi Maili Gönderimi
+        const clientEmail = order.user_email || order.email;
+        if (clientEmail) {
+          await fetch('https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: clientEmail,
+              subject: `Sipariş İptal Talebiniz Hakkında (#${order.id.slice(0, 8)})`,
+              html: `
+                <div style="font-family: Arial, sans-serif; padding: 24px; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+                  <h2 style="color: #be185d; margin-top: 0;">Sipariş İptal Talebi Güncellemesi 🌸</h2>
+                  <p>Sayın <strong>${order.recipient_name || 'Değerli Müşterimiz'}</strong>,</p>
+                  <p><strong>#${order.id.slice(0, 8)}</strong> numaralı siparişiniz için oluşturduğunuz iptal talebi yetkili ekibimiz tarafından incelenmiş olup, siparişiniz hazırlanma/teslimat aşamasına geçtiği için iptal edilememiştir.</p>
+                  <p>Siparişiniz mevcut durumu (<strong>${fallbackStatus}</strong>) ile özenle hazırlanıp teslim edilmek üzere işlenmeye devam etmektedir.</p>
+                  <p style="color: #6b7280; font-size: 13px; margin-top: 20px;">Çiçekçi © 2026 — Taze Çiçekler & Buketler</p>
+                </div>
+              `,
+            }),
+          });
+        }
+
+        alert('İptal talebi reddedildi ve müşteriye bilgilendirme maili gönderildi.');
+      } catch (err: any) {
+        alert('İptal talebi reddedilirken hata: ' + (err.message || ''));
+      } finally {
+        setUpdatingId(null);
+      }
+    } else if (newStatus === 'cancelled') {
+      // 🌸 2. MÜŞTERİNİN İPTAL TALEBİNİ ONAYLAMA SENARYOSU
+      try {
+        // DB DÜZELTMESİ: previous_status alanına 'cancellation_requested' yazarak 
+        // OrdersPage.tsx'in bunun Müşteri Talebi Onayı olduğunu anlamasını sağlıyoruz.
+        const { error } = await supabase
+          .from('orders')
+          .update({ 
+            status: 'cancelled',
+            previous_status: 'cancellation_requested',
+            cancel_reason: order.cancel_reason || 'Müşteri talebi onaylandı'
+          })
+          .eq('id', orderId);
+
+          if (error) throw error;
+
+          await executeStatusUpdate(orderId, 'cancelled', undefined, order.cancel_reason || 'Müşteri talebi onaylandı');
+  
+          // Müşteriye Onay Maili Gönderimi
+          const clientEmail = order.user_email || order.email;
+          if (clientEmail) {
+            await sendCancellationStatusEmail({
+              toEmail: clientEmail,
+              recipientName: order.recipient_name || 'Değerli Müşterimiz',
+              orderId: String(order.id),
+              cancelReason: order.cancel_reason || 'Müşteri talebi doğrultusunda iptal edildi',
+              totalAmount: Number(order.total_amount || order.total || 0),
+              type: 'ADMIN_APPROVED'
+            });
+          }
+        } catch (emailErr: any) {
+          console.error('Onay maili/güncelleme hatası:', emailErr);
+        }
+      } else {
+        await handleStatusChange(orderId, newStatus);
+      }
+    };
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
