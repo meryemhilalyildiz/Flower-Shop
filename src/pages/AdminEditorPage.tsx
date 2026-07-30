@@ -22,7 +22,7 @@ type Props = {
 type TabType = 'home' | 'about' | 'contact' | 'faq';
 
 export default function AdminEditorPage({ navigate }: Props) {
-  const [activeTab, setActiveTab] = useState<TabType>('contact'); // Varsayılan olarak İletişim sekmesi
+  const [activeTab, setActiveTab] = useState<TabType>('home'); // Varsayılan olarak Anasayfa sekmesi
   const [isEditingMode, setIsEditingMode] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -209,6 +209,9 @@ export default function AdminEditorPage({ navigate }: Props) {
       
       // Yeniden güncel veriyi çek ve ekranı tazele
       await fetchPageContent();
+      
+      // 🌸 Footer ve diğer bileşenleri tetikle
+      window.dispatchEvent(new CustomEvent('pageContentUpdated', { detail: { pageKey: activeTab } }));
     } catch (err: any) {
       console.error('Kaydetme hatası:', err);
       setToastMessage({ text: 'Hata oluştu: ' + (err.message || err), isError: true });
@@ -356,11 +359,12 @@ export default function AdminEditorPage({ navigate }: Props) {
                     onAddToCart={handleAddToCart}
                     isFavorite={isFavorite}
                     onToggleFavorite={onToggleFavorite}
+                    adminContent={pageContent[activeTab]}
                   />
                 )}
-                {activeTab === 'about' && <AboutPage navigate={navigate} />}
-                {activeTab === 'contact' && <ContactPage navigate={navigate} />}
-                {activeTab === 'faq' && <FaqPage navigate={navigate} />}
+                {activeTab === 'about' && <AboutPage navigate={navigate} adminContent={pageContent[activeTab]} />}
+                {activeTab === 'contact' && <ContactPage navigate={navigate} adminContent={pageContent[activeTab]} />}
+                {activeTab === 'faq' && <FaqPage navigate={navigate} adminContent={pageContent[activeTab]} />}
               </div>
             </AdminEditingProvider>
           </div>

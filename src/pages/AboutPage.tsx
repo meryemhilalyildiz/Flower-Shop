@@ -10,21 +10,25 @@ import { supabase } from '../supabaseClient';
 
 type Props = {
   navigate: (r: Route) => void;
+  adminContent?: any;
 };
 
-export default function AboutPage({ navigate }: Props) {
+export default function AboutPage({ navigate, adminContent }: Props) {
   const { content, loading } = usePageContent('about');
   const { isEditing, onTextChange, onImageChange } = useAdminEditing();
   const [savingDirect, setSavingDirect] = useState(false);
+
+  // 🌸 Admin panelinden gelen içerik varsa onu kullan, yoksa veritabanından geleni
+  const displayContent = adminContent || content;
 
   // 🌸 Ekrandaki canlı veriyi anında güncel tutmak için yerel state
   const [localData, setLocalData] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    if (content) {
-      setLocalData(content);
+    if (displayContent) {
+      setLocalData(displayContent);
     }
-  }, [content]);
+  }, [displayContent]);
 
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },

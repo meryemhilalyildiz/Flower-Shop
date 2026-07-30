@@ -18,6 +18,7 @@ type Props = {
   onAddToCart: (p: Product) => void;
   isFavorite: (productId: string) => boolean;
   onToggleFavorite: (p: Product) => void;
+  adminContent?: any;
 };
 
 type Campaign = {
@@ -40,21 +41,24 @@ const features = [
   { icon: Sparkles, title: 'Usta İşçiliği', desc: 'Profesyonel floristler tarafından' },
 ];
 
-export default function HomePage({ categories, featured, discounted, navigate, onAddToCart, isFavorite, onToggleFavorite }: Props) {
+export default function HomePage({ categories, featured, discounted, navigate, onAddToCart, isFavorite, onToggleFavorite, adminContent }: Props) {
   const { content } = usePageContent('home');
   const { isEditing, onTextChange, onImageChange } = useAdminEditing();
+  
+  // 🌸 Admin panelinden gelen içerik varsa onu kullan, yoksa veritabanından geleni
+  const displayContent = adminContent || content;
   const [testimonials, setTestimonials] = useState<FeaturedReview[]>([]);
   const [testimonialsLoading, setTestimonialsLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Varsayılan değerler
-  const heroTitle = content?.hero_title || 'Sevdiklerinize Çiçek Gönderin';
-  const heroSubtitle = content?.hero_subtitle || 'Türkiye\'nin her yerine aynı gün teslimat ile duygularınızı çiçeklerle iletin';
-  const heroCta = content?.hero_cta || 'Hemen Sipariş Ver';
-  const heroImage1 = content?.hero_image_1 || 'https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600';
-  const heroImage2 = content?.hero_image_2 || 'https://images.pexels.com/photos/568685/pexels-photo-568685.jpeg?auto=compress&cs=tinysrgb&w=600';
-  const heroImage3 = content?.hero_image_3 || 'https://images.pexels.com/photos/6340978/pexels-photo-6340978.jpeg?auto=compress&cs=tinysrgb&w=600';
+  const heroTitle = displayContent?.hero_title || 'Sevdiklerinize Çiçek Gönderin';
+  const heroSubtitle = displayContent?.hero_subtitle || 'Türkiye\'nin her yerine aynı gün teslimat ile duygularınızı çiçeklerle iletin';
+  const heroCta = displayContent?.hero_cta || 'Hemen Sipariş Ver';
+  const heroImage1 = displayContent?.hero_image_1 || 'https://images.pexels.com/photos/931796/pexels-photo-931796.jpeg?auto=compress&cs=tinysrgb&w=600';
+  const heroImage2 = displayContent?.hero_image_2 || 'https://images.pexels.com/photos/568685/pexels-photo-568685.jpeg?auto=compress&cs=tinysrgb&w=600';
+  const heroImage3 = displayContent?.hero_image_3 || 'https://images.pexels.com/photos/6340978/pexels-photo-6340978.jpeg?auto=compress&cs=tinysrgb&w=600';
 
   useEffect(() => {
     let cancelled = false;

@@ -7,9 +7,10 @@ type Props = {
   multiline?: boolean;
   className?: string;
   placeholder?: string;
+  onChange?: (newValue: string) => void;
 };
 
-export default function EditableText({ value, onSave, multiline = false, className = '', placeholder = 'Düzenlemek için tıklayın' }: Props) {
+export default function EditableText({ value, onSave, multiline = false, className = '', placeholder = 'Düzenlemek için tıklayın', onChange }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
@@ -28,10 +29,15 @@ export default function EditableText({ value, onSave, multiline = false, classNa
   }, [isEditing]);
 
   const handleSave = () => {
-    if (editValue.trim() !== value.trim()) {
-      onSave(editValue);
-    }
+    onSave(editValue);
     setIsEditing(false);
+  };
+
+  const handleChange = (newValue: string) => {
+    setEditValue(newValue);
+    if (onChange) {
+      onChange(newValue);
+    }
   };
 
   const handleCancel = () => {
@@ -54,7 +60,7 @@ export default function EditableText({ value, onSave, multiline = false, classNa
           <textarea
             ref={inputRef as React.RefObject<HTMLTextAreaElement>}
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
             className={`w-full p-2 border-2 border-pink-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-pink-200 ${className}`}
             rows={3}
@@ -64,7 +70,7 @@ export default function EditableText({ value, onSave, multiline = false, classNa
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="text"
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
             className={`w-full p-2 border-2 border-pink-500 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-pink-200 ${className}`}
           />

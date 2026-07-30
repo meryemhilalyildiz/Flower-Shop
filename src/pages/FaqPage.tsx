@@ -9,6 +9,7 @@ import { supabase } from '../supabaseClient';
 
 type Props = {
   navigate: (r: Route) => void;
+  adminContent?: any;
 };
 
 interface FAQ {
@@ -26,8 +27,11 @@ const CATEGORIES = [
   'Hesap & Sipariş',
 ];
 
-export default function FaqPage({ navigate }: Props) {
+export default function FaqPage({ navigate, adminContent }: Props) {
   const { content, loading: contentLoading } = usePageContent('faq');
+  
+  // 🌸 Admin panelinden gelen içerik varsa onu kullan, yoksa veritabanından geleni
+  const displayContent = adminContent || content;
   const { isEditing, onTextChange } = useAdminEditing();
   const [openId, setOpenId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('Teslimat');
@@ -104,8 +108,8 @@ export default function FaqPage({ navigate }: Props) {
         .map((f) => ({ id: f.id, question: f.question, answer: f.answer }))
     : (defaultCategories.find((c) => c.category === activeCategory)?.questions || []);
 
-  const heroTitle = content?.hero_title || 'Sıkça Sorulan Sorular';
-  const heroDescription = content?.hero_description || 'Merak ettiğiniz soruların cevaplarını burada bulamadıysanız, bize ulaşmaktan çekinmeyin.';
+  const heroTitle = displayContent?.hero_title || 'Sıkça Sorulan Sorular';
+  const heroDescription = displayContent?.hero_description || 'Merak ettiğiniz soruların cevaplarını burada bulamadıysanız, bize ulaşmaktan çekinmeyin.';
 
   if (contentLoading || faqsLoading) {
     return (
@@ -133,6 +137,7 @@ export default function FaqPage({ navigate }: Props) {
                 <EditableText
                   value={heroTitle}
                   onSave={(newValue) => onTextChange('hero_title', newValue)}
+                  onChange={(newValue) => onTextChange('hero_title', newValue)}
                 />
               ) : (
                 heroTitle
@@ -143,6 +148,7 @@ export default function FaqPage({ navigate }: Props) {
                 <EditableText
                   value={heroDescription}
                   onSave={(newValue) => onTextChange('hero_description', newValue)}
+                  onChange={(newValue) => onTextChange('hero_description', newValue)}
                   multiline
                 />
               ) : (

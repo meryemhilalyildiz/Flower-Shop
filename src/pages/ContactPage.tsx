@@ -5,14 +5,19 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import { usePageContent } from '../hooks/usePageContent';
 import { useAdminEditing } from '../contexts/AdminEditingContext';
 import { supabase } from '../supabaseClient';
+import EditableText from '../components/admin/EditableText';
 
 type Props = {
   navigate: (r: Route) => void;
+  adminContent?: any;
 };
 
-export default function ContactPage({ navigate }: Props) {
+export default function ContactPage({ navigate, adminContent }: Props) {
   const { content, loading } = usePageContent('contact');
-  const { isEditing } = useAdminEditing();
+  const { isEditing, onTextChange } = useAdminEditing();
+  
+  // 🌸 Admin panelinden gelen içerik varsa onu kullan, yoksa veritabanından geleni
+  const displayContent = adminContent || content;
   
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [sent, setSent] = useState(false);
@@ -32,17 +37,36 @@ export default function ContactPage({ navigate }: Props) {
 
   // Veritabanından gelen veriler yüklendiğinde state'leri doldur
   useEffect(() => {
-    if (content) {
-      setEditableHeroTitle(content.hero_title || 'İletişime Geçin');
-      setEditableHeroDesc(content.hero_description || 'Sorularınız, özel siparişler veya işbirlikleri için bize ulaşın. Size yardımcı olmaktan mutluluk duyarız.');
+    if (displayContent) {
+      setEditableHeroTitle(displayContent.hero_title || 'İletişime Geçin');
+      setEditableHeroDesc(displayContent.hero_description || 'Sorularınız, özel siparişler veya işbirlikleri için bize ulaşın. Size yardımcı olmaktan mutluluk duyarız.');
       
-      const infoList = content.contact_info || [];
+      const infoList = displayContent.contact_info || [];
       setAddressVal(infoList[0]?.value || 'İstiklal Cd. No:123, Beyoğlu, İstanbul');
       setPhoneVal(infoList[1]?.value || '0850 123 45 67');
       setEmailVal(infoList[2]?.value || 'flowershop.iletisim@gmail.com');
       setHoursVal(infoList[3]?.value || 'Her gün 08:00 - 22:00');
     }
-  }, [content]);
+  }, [displayContent]);
+
+  // 🌸 Admin editing context ile değişiklikleri sync et
+  const handleContactFieldChange = (field: string, value: string) => {
+    if (onTextChange) {
+      onTextChange(field, value);
+    }
+  };
+
+  // 🌸 AdminContent güncellendiğinde local state'leri de güncelle
+  useEffect(() => {
+    if (adminContent) {
+      if (adminContent.address !== undefined) setAddressVal(adminContent.address);
+      if (adminContent.phone !== undefined) setPhoneVal(adminContent.phone);
+      if (adminContent.email !== undefined) setEmailVal(adminContent.email);
+      if (adminContent.working_hours !== undefined) setHoursVal(adminContent.working_hours);
+      if (adminContent.hero_title !== undefined) setEditableHeroTitle(adminContent.hero_title);
+      if (adminContent.hero_description !== undefined) setEditableHeroDesc(adminContent.hero_description);
+    }
+  }, [adminContent]);
 
   const crumbs = [
     { label: 'Anasayfa', route: { name: 'home' } as Route },
@@ -80,7 +104,9 @@ export default function ContactPage({ navigate }: Props) {
       if (error) throw error;
 
       setToastMessage({ text: '🎉 Değişiklikler veritabanına başarıyla kaydedildi!', isError: false });
-      window.location.reload();
+      
+      // 🌸 Footer ve diğer bileşenleri tetikle
+      window.dispatchEvent(new CustomEvent('pageContentUpdated', { detail: { pageKey: 'contact' } }));
     } catch (err: any) {
       console.error('Kaydetme hatası:', err);
       setToastMessage({ text: 'Hata oluştu: ' + (err.message || err), isError: true });
@@ -168,11 +194,17 @@ export default function ContactPage({ navigate }: Props) {
           <Breadcrumbs items={crumbs} />
           <div className="mt-6 text-center space-y-3">
             {isEditing ? (
-              <input
-                type="text"
+              <EditableText
                 value={editableHeroTitle}
-                onChange={(e) => setEditableHeroTitle(e.target.value)}
-                className="font-display text-3xl lg:text-4xl font-bold text-sand-900 text-center bg-white/80 border border-brand-300 rounded-xl px-4 py-2 w-full max-w-lg mx-auto outline-none focus:ring-2 focus:ring-brand-500"
+                onSave={(newValue) => {
+                  setEditableHeroTitle(newValue);
+                  handleContactFieldChange('hero_title', newValue);
+                }}
+                onChange={(newValue) => {
+                  setEditableHeroTitle(newValue);
+                  handleContactFieldChange('hero_title', newValue);
+                }}
+                className="font-display text-3xl lg:text-4xl font-bold text-sand-900 text-center w-full max-w-lg mx-auto"
                 placeholder="Başlık"
               />
             ) : (
@@ -180,11 +212,18 @@ export default function ContactPage({ navigate }: Props) {
             )}
 
             {isEditing ? (
-              <textarea
-                rows={2}
+              <EditableText
                 value={editableHeroDesc}
-                onChange={(e) => setEditableHeroDesc(e.target.value)}
-                className="text-sand-600 text-sm lg:text-base text-center bg-white/80 border border-brand-300 rounded-xl p-3 w-full max-w-xl mx-auto outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                onSave={(newValue) => {
+                  setEditableHeroDesc(newValue);
+                  handleContactFieldChange('hero_description', newValue);
+                }}
+                onChange={(newValue) => {
+                  setEditableHeroDesc(newValue);
+                  handleContactFieldChange('hero_description', newValue);
+                }}
+                multiline={true}
+                className="text-sand-600 text-sm lg:text-base text-center w-full max-w-xl mx-auto"
                 placeholder="Açıklama"
               />
             ) : (
@@ -218,11 +257,18 @@ export default function ContactPage({ navigate }: Props) {
                 <div className="flex-1">
                   <p className="font-semibold text-sand-800">Adres</p>
                   {isEditing ? (
-                    <input
-                      type="text"
+                    <EditableText
                       value={addressVal}
-                      onChange={(e) => setAddressVal(e.target.value)}
-                      className="w-full mt-1 px-3 py-1.5 text-sm bg-brand-50/50 border border-brand-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sand-900"
+                      onSave={(newValue) => {
+                        setAddressVal(newValue);
+                        handleContactFieldChange('address', newValue);
+                      }}
+                      onChange={(newValue) => {
+                        setAddressVal(newValue);
+                        handleContactFieldChange('address', newValue);
+                      }}
+                      className="mt-1 text-sm font-medium text-sand-900"
+                      placeholder="Adres girin"
                     />
                   ) : (
                     <p className="text-sand-600 text-sm mt-0.5">{addressVal}</p>
@@ -238,11 +284,18 @@ export default function ContactPage({ navigate }: Props) {
                 <div className="flex-1">
                   <p className="font-semibold text-sand-800">Telefon</p>
                   {isEditing ? (
-                    <input
-                      type="text"
+                    <EditableText
                       value={phoneVal}
-                      onChange={(e) => setPhoneVal(e.target.value)}
-                      className="w-full mt-1 px-3 py-1.5 text-sm bg-brand-50/50 border border-brand-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sand-900"
+                      onSave={(newValue) => {
+                        setPhoneVal(newValue);
+                        handleContactFieldChange('phone', newValue);
+                      }}
+                      onChange={(newValue) => {
+                        setPhoneVal(newValue);
+                        handleContactFieldChange('phone', newValue);
+                      }}
+                      className="mt-1 text-sm font-medium text-sand-900"
+                      placeholder="Telefon girin"
                     />
                   ) : (
                     <p className="text-sand-600 text-sm mt-0.5">{phoneVal}</p>
@@ -258,11 +311,18 @@ export default function ContactPage({ navigate }: Props) {
                 <div className="flex-1">
                   <p className="font-semibold text-sand-800">E-posta</p>
                   {isEditing ? (
-                    <input
-                      type="text"
+                    <EditableText
                       value={emailVal}
-                      onChange={(e) => setEmailVal(e.target.value)}
-                      className="w-full mt-1 px-3 py-1.5 text-sm bg-brand-50/50 border border-brand-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sand-900"
+                      onSave={(newValue) => {
+                        setEmailVal(newValue);
+                        handleContactFieldChange('email', newValue);
+                      }}
+                      onChange={(newValue) => {
+                        setEmailVal(newValue);
+                        handleContactFieldChange('email', newValue);
+                      }}
+                      className="mt-1 text-sm font-medium text-sand-900"
+                      placeholder="E-posta girin"
                     />
                   ) : (
                     <p className="text-sand-600 text-sm mt-0.5">{emailVal}</p>
@@ -278,11 +338,18 @@ export default function ContactPage({ navigate }: Props) {
                 <div className="flex-1">
                   <p className="font-semibold text-sand-800">Çalışma Saatleri</p>
                   {isEditing ? (
-                    <input
-                      type="text"
+                    <EditableText
                       value={hoursVal}
-                      onChange={(e) => setHoursVal(e.target.value)}
-                      className="w-full mt-1 px-3 py-1.5 text-sm bg-brand-50/50 border border-brand-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sand-900"
+                      onSave={(newValue) => {
+                        setHoursVal(newValue);
+                        handleContactFieldChange('working_hours', newValue);
+                      }}
+                      onChange={(newValue) => {
+                        setHoursVal(newValue);
+                        handleContactFieldChange('working_hours', newValue);
+                      }}
+                      className="mt-1 text-sm font-medium text-sand-900"
+                      placeholder="Çalışma saatleri girin"
                     />
                   ) : (
                     <p className="text-sand-600 text-sm mt-0.5">{hoursVal}</p>
@@ -294,7 +361,7 @@ export default function ContactPage({ navigate }: Props) {
 
             <div className="rounded-3xl overflow-hidden shadow-soft mt-6 aspect-video">
               <img
-                src={content?.contact_image || 'https://images.pexels.com/photos/568685/pexels-photo-568685.jpeg?auto=compress&cs=tinysrgb&w=800'}
+                src={displayContent?.contact_image || 'https://images.pexels.com/photos/568685/pexels-photo-568685.jpeg?auto=compress&cs=tinysrgb&w=800'}
                 alt="Dükkanımız"
                 className="w-full h-full object-cover"
               />

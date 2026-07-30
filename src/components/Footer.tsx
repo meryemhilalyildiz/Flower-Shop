@@ -2,12 +2,30 @@ import { Flower2, Instagram, Facebook, Twitter, Mail, Phone, MapPin } from 'luci
 import { routeToHash } from '../router';
 import type { Route } from '../types';
 import { usePageContent } from '../hooks/usePageContent';
+import { useEffect } from 'react';
 
 export default function Footer() {
   // 🌸 Hakkımızda sayfasının canlı içeriğini çekiyoruz
-  const { content: aboutContent } = usePageContent('about');
+  const { content: aboutContent, refresh: refreshAbout } = usePageContent('about');
   // 🌸 İletişim sayfasının canlı içeriğini çekiyoruz
-  const { content: contactContent } = usePageContent('contact');
+  const { content: contactContent, refresh: refreshContact } = usePageContent('contact');
+
+  // 🌸 Admin panelinden kayıt yapıldığında footer'ı güncelle
+  useEffect(() => {
+    const handlePageUpdate = (event: CustomEvent) => {
+      const { pageKey } = event.detail;
+      if (pageKey === 'contact') {
+        refreshContact();
+      } else if (pageKey === 'about') {
+        refreshAbout();
+      }
+    };
+
+    window.addEventListener('pageContentUpdated', handlePageUpdate as EventListener);
+    return () => {
+      window.removeEventListener('pageContentUpdated', handlePageUpdate as EventListener);
+    };
+  }, [refreshContact, refreshAbout]);
 
   // Hakkımızda Açıklaması
   const footerDescription = 
