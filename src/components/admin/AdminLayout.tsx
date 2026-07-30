@@ -21,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   'admin-coupons': 'Kupon Yönetimi',
   'admin-campaigns': 'Kampanya & Banner',
   'admin-editor': 'Düzenleme',
+  'admin-faq': 'S.S.S Yönetimi',
 };
 
 export default function AdminLayout({ children, currentPage, navigate }: Props) {

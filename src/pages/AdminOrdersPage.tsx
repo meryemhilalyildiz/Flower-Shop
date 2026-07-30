@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Search, Truck, Save, Check, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Search, Truck, Save, Check, AlertTriangle, X } from 'lucide-react';
 import { fetchAllOrders, normalizeOrderStatus, updateOrderStatus } from '../services/adminApi';
 import { supabase } from '../supabaseClient';
 import StatusBadge from '../components/admin/StatusBadge';
@@ -14,6 +14,13 @@ export default function AdminOrdersPageNew() {
   // 📦 Takip Numarası State'leri
   const [trackingInputs, setTrackingInputs] = useState<{ [key: string]: string }>({});
   const [savedTracking, setSavedTracking] = useState<{ [key: string]: boolean }>({});
+
+  // 🌸 MODAL STATE'LERİ
+  const [selectedOrderForCargo, setSelectedOrderForCargo] = useState<any | null>(null);
+  const [trackingInput, setTrackingInput] = useState('');
+
+  const [selectedOrderForCancel, setSelectedOrderForCancel] = useState<any | null>(null);
+  const [cancelReasonInput, setCancelReasonInput] = useState('');
 
   const loadOrders = async () => {
     setLoading(true);
@@ -69,27 +76,48 @@ export default function AdminOrdersPageNew() {
     loadOrders();
   }, []);
 
-  // Durum ve Takip No Güncelleme (Geliştirilmiş)
+  // Durum ve Takip No Güncelleme Fonksiyonu
   const handleStatusChange = async (orderId: string, newStatus: string, trackingNum?: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    
+    // Eğer Kargoda seçildiyse modalı aç
+    if (newStatus === 'shipped' || newStatus === 'Kargoda') {
+      setSelectedOrderForCargo(order);
+      setTrackingInput(trackingInputs[orderId] || order?.tracking_number || '');
+      return;
+    }
+
+    // Eğer İptal Edildi seçildiyse modalı aç
+    if (newStatus === 'cancelled' || newStatus === 'İptal Edildi') {
+      setSelectedOrderForCancel(order);
+      setCancelReasonInput('');
+      return;
+    }
+
+    // Diğer durumlar için doğrudan güncelle
+    await executeStatusUpdate(orderId, newStatus, trackingNum);
+  };
+
+  // Veritabanı ve State Güncellemesini Çalıştıran Yardımcı Fonksiyon
+  const executeStatusUpdate = async (orderId: string, newStatus: string, trackingNum?: string, cancelReason?: string) => {
     setUpdatingId(orderId);
     try {
       const normalizedStatus = normalizeOrderStatus(newStatus);
-      await updateOrderStatus(orderId, normalizedStatus, trackingNum);
+      // adminApi.ts içindeki e-posta atan fonksiyon çalışır:
+      await updateOrderStatus(orderId, normalizedStatus, trackingNum, cancelReason);
 
       setOrders((prevOrders) =>
         prevOrders.map((o) =>
           o.id === orderId
-            ? { ...o, status: normalizedStatus, tracking_number: trackingNum ?? o.tracking_number }
+            ? { 
+                ...o, 
+                status: normalizedStatus, 
+                tracking_number: trackingNum ?? o.tracking_number,
+                cancel_reason: cancelReason ?? o.cancel_reason 
+              }
             : o
         )
       );
-
-      if (trackingNum !== undefined) {
-        setSavedTracking((prev) => ({ ...prev, [orderId]: true }));
-        setTimeout(() => {
-          setSavedTracking((prev) => ({ ...prev, [orderId]: false }));
-        }, 2000);
-      }
     } catch (err) {
       console.error('Durum güncellenirken hata:', err);
       alert(err instanceof Error ? err.message : 'Durum güncellenirken hata oluştu.');
@@ -98,9 +126,36 @@ export default function AdminOrdersPageNew() {
     }
   };
 
-  // 🌸 İptal Talebi Onay/Reddediş Handler Fonksiyonu
+  // 🌸 Kargo Modal Onayı
+  const confirmCargoStatus = async () => {
+    if (!trackingInput.trim()) {
+      alert("Lütfen kargo takip kodunu giriniz.");
+      return;
+    }
+
+    await executeStatusUpdate(selectedOrderForCargo.id, 'shipped', trackingInput);
+
+    setSelectedOrderForCargo(null);
+    setTrackingInput('');
+  };
+
+  // 🌸 İptal Modal Onayı
+  const confirmCancelStatus = async () => {
+    if (!cancelReasonInput.trim()) {
+      alert("Lütfen bir iptal gerekçesi belirtiniz.");
+      return;
+    }
+
+    // 1. Veritabanını güncelle & e-postayı adminApi üzerinden otomatik tetikle
+    await executeStatusUpdate(selectedOrderForCancel.id, 'cancelled', undefined, cancelReasonInput);
+
+    // 2. Modalı kapat ve input'u temizle
+    setSelectedOrderForCancel(null);
+    setCancelReasonInput('');
+  };
+
+  // İptal Talebi Onay/Reddediş Handler
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
-    // İptal reddedilirse önceki duruma dön
     if (newStatus === 'reject_cancellation') {
       const order = orders.find(o => o.id === orderId);
       const previousStatus = order?.previous_status || 'pending';
@@ -215,18 +270,17 @@ export default function AdminOrdersPageNew() {
                       #{order.id.slice(0, 8)}
                     </span>
 
-                    {/* 🌸 İptal veya Mevcut Durum Rozeti */}
-                  {order.status === 'cancelled' ? (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
-                      ❌ İptal Edildi (Müşteri)
-                    </span>
-                  ) : order.status === 'cancellation_requested' ? (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
-                      ⚠️ İptal Talebi Alındı
-                    </span>
-                  ) : (
-                    <StatusBadge status={order.status || 'pending'} />
-                  )}
+                    {order.status === 'cancelled' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200 flex items-center gap-1">
+                        ❌ İptal Edildi
+                      </span>
+                    ) : order.status === 'cancellation_requested' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
+                        ⚠️ İptal Talebi Alındı
+                      </span>
+                    ) : (
+                      <StatusBadge status={order.status || 'pending'} />
+                    )}
                     <span className="text-xs text-sand-500">
                       {new Date(order.created_at).toLocaleString('tr-TR')}
                     </span>
@@ -262,27 +316,27 @@ export default function AdminOrdersPageNew() {
                     )}
                   </div>
 
-                  {/* 🚨 İPTAL TALEBİ UYARI KUTUSU */}
-                {order.status === 'cancellation_requested' && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
-                    <p className="text-xs text-red-700 font-medium flex items-center gap-1">
-                      <AlertTriangle className="w-4 h-4 text-red-600" />
-                      <strong>İptal Nedeni:</strong> {order.cancel_reason || 'Belirtilmedi'}
-                    </p>
-                  </div>
-                )}
+                  {/* İptal Talebi Uyarısı */}
+                  {order.status === 'cancellation_requested' && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
+                      <p className="text-xs text-red-700 font-medium flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <strong>Müşteri İptal Nedeni:</strong> {order.cancel_reason || 'Belirtilmedi'}
+                      </p>
+                    </div>
+                  )}
 
-                  {/* 🌸 İPTAL EDİLMİŞ SİPARİŞ İÇİN MÜŞTERİ İPTAL NEDENİ KUTUSU */}
-                {(order.status === 'cancelled' || order.cancel_reason) && order.status !== 'İptal Talebi Alındı' && (
-                  <div className="p-3 bg-red-50 rounded-xl border border-red-100 text-xs text-red-900 space-y-1">
-                    <p className="font-bold flex items-center gap-1 text-red-700">
-                      ❌ Müşteri İptal Nedeni:
-                    </p>
-                    <p className="text-red-800 font-medium">
-                      {order.cancel_reason || (order as any).cancelReason || 'Neden belirtilmedi.'}
-                    </p>
-                  </div>
-                )}
+                  {/* İptal Edilmiş Siparişte İptal Nedeni Gösterimi */}
+                  {order.status === 'cancelled' && order.cancel_reason && (
+                    <div className="p-3 bg-red-50 rounded-xl border border-red-100 text-xs text-red-900 space-y-1">
+                      <p className="font-bold flex items-center gap-1 text-red-700">
+                        ❌ İptal Nedeni / Gerekçesi:
+                      </p>
+                      <p className="text-red-800 font-medium">
+                        {order.cancel_reason}
+                      </p>
+                    </div>
+                  )}
 
                   {order.order_items && order.order_items.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-sand-100">
@@ -303,7 +357,7 @@ export default function AdminOrdersPageNew() {
                   </p>
                 </div>
 
-                {/* 🚚 Durum Değiştirme & Kargo Takip Kutusu */}
+                {/* Durum Değiştirme & Kargo Takip Kutusu */}
                 <div className="lg:min-w-[240px] space-y-3">
                   <div>
                     <label className="text-xs font-semibold text-sand-600 block mb-1">
@@ -312,7 +366,7 @@ export default function AdminOrdersPageNew() {
                     <select
                       value={order.status || 'pending'}
                       disabled={updatingId === order.id}
-                      onChange={(e) => handleStatusChange(order.id, e.target.value, trackingInputs[order.id])}
+                      onChange={(e) => handleStatusChange(order.id, e.target.value)}
                       className="w-full px-3 py-2 bg-sand-50 border border-sand-300 rounded-xl text-sm font-semibold text-sand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all disabled:opacity-50 cursor-pointer"
                     >
                       <option value="pending">⏳ Beklemede</option>
@@ -324,7 +378,7 @@ export default function AdminOrdersPageNew() {
                     </select>
                   </div>
 
-                  {/* 🚨 İPTAL TALEBİ ONAY/RED BUTONLARI */}
+                  {/* İptal Talebi Onay/Red Butonları */}
                   {order.status === 'cancellation_requested' && (
                     <div className="flex gap-2">
                       <button
@@ -344,8 +398,8 @@ export default function AdminOrdersPageNew() {
                     </div>
                   )}
 
-                  {/* 🚚 KARGO TAKİP NO GİRİŞ ALANI */}
-                  {(order.status === 'shipped' || order.status === 'Kargoda' || order.status === 'shipping' || order.status === 'Yolda') && (
+                  {/* Kargo Takip No Alanı */}
+                  {(order.status === 'shipped' || order.status === 'Kargoda') && (
                     <div className="mt-3 p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
                       <label className="text-xs font-semibold text-blue-900 flex items-center gap-1">
                         <Truck className="w-3.5 h-3.5 text-blue-600" /> Kargo Takip No:
@@ -359,7 +413,7 @@ export default function AdminOrdersPageNew() {
                           className="w-full px-2.5 py-1.5 text-xs bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                         <button
-                          onClick={() => handleStatusChange(order.id, order.status, trackingInputs[order.id])}
+                          onClick={() => executeStatusUpdate(order.id, order.status, trackingInputs[order.id])}
                           disabled={updatingId === order.id}
                           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
                         >
@@ -377,6 +431,92 @@ export default function AdminOrdersPageNew() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 🚚 KARGO TAKİP KODU MODALI */}
+      {selectedOrderForCargo && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 relative">
+            <button 
+              onClick={() => setSelectedOrderForCargo(null)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              🚚 Kargo Bilgisi Girin
+            </h3>
+            <p className="text-sm text-gray-500">
+              #{selectedOrderForCargo.id.slice(0, 8)} numaralı siparişi kargoya vermek üzeresiniz. Müşteriye gönderilecek takip numarasını giriniz:
+            </p>
+            
+            <input
+              type="text"
+              placeholder="Örn: 1234567890"
+              value={trackingInput}
+              onChange={(e) => setTrackingInput(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+            />
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setSelectedOrderForCargo(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={confirmCargoStatus}
+                className="px-5 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 rounded-xl font-medium shadow-sm transition-colors"
+              >
+                Kargoya Ver & Bildir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ❌ İPTAL GEREKÇESİ MODALI */}
+      {selectedOrderForCancel && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 relative">
+            <button 
+              onClick={() => setSelectedOrderForCancel(null)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              ❌ Sipariş İptal Gerekçesi
+            </h3>
+            <p className="text-sm text-gray-500">
+              Siparişi iptal etme nedeninizi yazınız. Bu gerekçe müşteriye bilgilendirme e-postasında iletilecektir:
+            </p>
+            
+            <textarea
+              rows={3}
+              placeholder="Örn: Stok yetersizliği nedeniyle siparişiniz iptal edilmiştir."
+              value={cancelReasonInput}
+              onChange={(e) => setCancelReasonInput(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm resize-none"
+            />
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setSelectedOrderForCancel(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={confirmCancelStatus}
+                className="px-5 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-xl font-medium shadow-sm transition-colors"
+              >
+                İptal Et & Bildir
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

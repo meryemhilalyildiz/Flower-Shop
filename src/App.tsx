@@ -120,33 +120,36 @@ function App() {
 
       // 🌸 1. EKLENEN PARÇA: App.tsx -> handlePlaceOrder içindeki .insert({}) bloğu
       // App.tsx -> handlePlaceOrder içi:
-const { data: insertedOrder, error: orderError } = await supabase
-.from('orders')
-.insert({
-  user_id: validUserId,
-  recipient_name: orderData.recipientName || orderData.recipient_name || 'Alıcı Adı Belirtilmedi',
-  recipient_phone: orderData.recipientPhone || orderData.recipient_phone || '',
-  shipping_address: orderData.address || orderData.shipping_address || 'Adres Belirtilmedi',
-  city: orderData.city || '',
-  delivery_date: orderData.deliveryDate || orderData.delivery_date || '',
-  note: orderData.note || '',
-
-  subtotal_amount: subtotal,
-  delivery_fee: deliveryFee,
-  coupon_discount: couponDiscount,
-  campaign_discount: campaignDiscount,
-
-  // 🌸 İŞTE EKSİK OLAN KISIM BURASI: Kampanya Adını Supabase'e Yazıyoruz!
-  campaign_title: orderData.campaign_title || orderData.campaignTitle || null,
-
-  discount_amount: totalDiscount,
-  total_amount: totalAmount,
-
-  applied_coupon_code: orderData.couponCode || orderData.applied_coupon_code || null,
-  status: 'pending',
-})
-.select()
-.single();
+      const { data: insertedOrder, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        user_id: validUserId,
+        recipient_name: orderData.recipientName || orderData.recipient_name || 'Alıcı Adı Belirtilmedi',
+        recipient_phone: orderData.recipientPhone || orderData.recipient_phone || '',
+        shipping_address: orderData.address || orderData.shipping_address || 'Adres Belirtilmedi',
+        city: orderData.city || '',
+        delivery_date: orderData.deliveryDate || orderData.delivery_date || '',
+        note: orderData.note || '',
+    
+        subtotal_amount: subtotal,
+        delivery_fee: deliveryFee,
+        coupon_discount: couponDiscount,
+        campaign_discount: campaignDiscount,
+    
+        // 🌸 Kampanya Adı
+        campaign_title: orderData.campaign_title || orderData.campaignTitle || null,
+    
+        discount_amount: totalDiscount,
+        total_amount: totalAmount,
+    
+        applied_coupon_code: orderData.couponCode || orderData.applied_coupon_code || null,
+        status: 'pending',
+    
+        // 🌸 BİNGO! İŞTE EKSİK OLAN KISIM: Sepetteki ürün listesini Supabase'e kaydediyoruz
+        items: orderData.items || orderData.order_items || []
+      })
+      .select()
+      .single();
 
       if (orderError) {
         alert(`❌ ORDERS HATASI:\n${orderError.message}`);

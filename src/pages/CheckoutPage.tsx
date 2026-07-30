@@ -447,54 +447,72 @@ export default function CheckoutPage({
         activeCampaign?.campaign_name || 
         'Özel Kampanya İndirimi';
         const campaignTitleToSend = selectedCampaign?.title || selectedCampaign?.name || activeCampaign?.title || activeCampaign?.name || '';
-const createdOrderId = await onPlaceOrder({
-  items: orderItems,
-  subtotal: rawSubtotal,
-  subtotal_amount: rawSubtotal,
-  deliveryFee: dynamicDeliveryFee,
-  delivery_fee: dynamicDeliveryFee,
-  total: finalTotal,
-  total_amount: finalTotal,
-  recipientName: form.recipientName,
-  recipientPhone: form.recipientPhone,
-  address: form.address,
-  city: fullLocation,
-  deliveryDate: form.deliveryDate,
-  note: form.note,
-  couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-  applied_coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
-  coupon_discount: couponDiscount,
-  campaign_discount: campaignDiscount,
-  // 🌸 Aktif kampanyanın başlığını gönderiyoruz:
-  // 🌸 SEÇİLEN KAMPANYANIN ADINI VERİTABANINA GÖNDERİYORUZ:
-  campaign_title: campaignDiscount > 0 ? campaignTitleToSend : undefined,
-  campaignTitle: campaignDiscount > 0 ? campaignTitleToSend : undefined,
+        const createdOrderId = await onPlaceOrder({
+          items: orderItems,
+          subtotal: rawSubtotal,
+          subtotal_amount: rawSubtotal,
+          deliveryFee: dynamicDeliveryFee,
+          delivery_fee: dynamicDeliveryFee,
+          total: finalTotal,
+          total_amount: finalTotal,
+          recipientName: form.recipientName,
+          recipientPhone: form.recipientPhone,
+          address: form.address,
+          city: fullLocation,
+          deliveryDate: form.deliveryDate,
+          note: form.note,
+          couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+          applied_coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
+          coupon_discount: couponDiscount,
+          campaign_discount: campaignDiscount,
+          campaign_title: campaignDiscount > 0 ? campaignTitleToSend : undefined,
+          campaignTitle: campaignDiscount > 0 ? campaignTitleToSend : undefined,
+          discountAmount: totalDiscount,
+          discount_amount: totalDiscount,
+          status: 'pending'
+        } as any);
 
-  discountAmount: totalDiscount,
-  discount_amount: totalDiscount,
-  status: 'pending'
-} as any);
-  
-      await handleSaveAddress();
+        // 🌸 1. BURA: Siparis urunlerini Supabase order_items tablosuna ekliyoruz
+        if (createdOrderId) {
+          try {
+            const orderItemsPayload = items.map((cartItem: any) => {
+              const prod = cartItem.product || cartItem;
+              return {
+                order_id: createdOrderId,
+                product_id: prod.id || cartItem.id,
+                product_name: prod.name || cartItem.name || 'Cicek Urunu',
+                quantity: cartItem.quantity || 1,
+                unit_price: prod.price || cartItem.price || 0,
+                price: (prod.price || cartItem.price || 0) * (cartItem.quantity || 1)
+              };
+            });
 
-      const sessionData = await supabase.auth.getSession();
-      const authToken = sessionData.data.session?.access_token || '';
-      const response = await fetch(
-        'https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/create-checkout',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            price: finalTotalKurus,
-            buyer: buyer,
-            basketItems: basketItems,
-            orderId: createdOrderId // Kapsam içindeki sipariş kimliği
-          })
+            await supabase.from('order_items').insert(orderItemsPayload);
+          } catch (itemErr) {
+            console.error('order_items kaydi esnasinda hata:', itemErr);
+          }
         }
-      );
+  
+        await handleSaveAddress();
+
+        const sessionData = await supabase.auth.getSession();
+        const authToken = sessionData.data.session?.access_token || '';
+        const response = await fetch(
+          'https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/create-checkout',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+              price: finalTotalKurus,
+              buyer: buyer,
+              basketItems: basketItems,
+              orderId: createdOrderId
+            })
+          }
+        );
 
       const checkoutData = await response.json();
 

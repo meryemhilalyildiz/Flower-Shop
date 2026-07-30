@@ -101,6 +101,7 @@ export type Route =
   | { name: 'admin-coupons' }
   | { name: 'admin-campaigns' } // 👈 BURAYI EKLİYORUZ
   | { name: 'admin-editor' }
+  | { name: 'admin-faq' }
   | { name: 'admin-shipping' }
   | { name: 'admin-wiki' };
 // =====================================================================
