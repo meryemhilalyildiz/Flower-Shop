@@ -174,8 +174,8 @@ export default function CartPage({
   // 🌸 4. Toplam İndirim
   const totalDiscountAmount = campaignDiscount + couponDiscount;
 
-  // 💰 5. Genel Toplam
-  const finalTotal = Math.max(0, rawSubtotal - totalDiscountAmount + deliveryFee);
+  // 💰 5. Genel Toplam = (Ürünler + Kargo) - İndirimler
+  const finalTotal = Math.max(0, rawSubtotal + deliveryFee - totalDiscountAmount);
 
   // 🌸 Crumbs tanımı
   const crumbs = [

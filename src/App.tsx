@@ -162,7 +162,6 @@ const { data: insertedOrder, error: orderError } = await supabase
           product_name: item.product?.name || item.product_name || 'Çiçek Ürünü',
           quantity: item.quantity || 1,
           unit_price: item.product?.price || item.unit_price || item.price || 0,
-          price: item.product?.price || item.unit_price || item.price || 0,
         }));
 
         const { error: itemsError } = await supabase
@@ -416,7 +415,7 @@ const { data: insertedOrder, error: orderError } = await supabase
 
       case 'order-success': {
         const order = orders[route.orderId];
-        return <OrderSuccessPage order={order} navigate={navigate} />;
+        return <OrderSuccessPage order={order} navigate={navigate} onPlaceOrder={handlePlaceOrder} />;
       }
 
       case 'orders':
