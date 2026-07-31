@@ -75,6 +75,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
 
             const productImages = productImage ? [productImage] : [];
 
+            // 🌸 Buket Tasarım Bilgilerini Yakalama
+            const isCustom = item.isCustomBouquet || item.is_custom_bouquet || item.product?.isCustomBouquet;
+            const customDetails = item.customBouquetDetails || item.custom_bouquet_details || item.product?.customBouquetDetails;
+
             return {
               id: item.id || item.product_id,
               quantity: Number(item.quantity || item.count || 1),
@@ -83,11 +87,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
               product_name: productName,
               name: productName,
               title: productName,
+              isCustomBouquet: isCustom,
+              customBouquetDetails: customDetails,
               product: item.products || {
                 name: productName,
                 price: effectivePrice,
                 images: productImages,
                 image: productImage,
+                isCustomBouquet: isCustom,
+                customBouquetDetails: customDetails
               },
               images: productImages,
               image: productImage,
@@ -408,6 +416,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
 
                       const quantity = Number(item.quantity || item.count || 1);
 
+                      // 🌸 Buket Detay Kontrolü
+                      const isCustom = item.isCustomBouquet || item.is_custom_bouquet || item.product?.isCustomBouquet;
+                      const details = item.customBouquetDetails || item.custom_bouquet_details || item.product?.customBouquetDetails;
+
                       return (
                         <div key={index} className="py-3 flex items-center justify-between gap-4">
                           <div className="flex items-center gap-4">
@@ -416,10 +428,51 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
                             ) : (
                               <div className="w-14 h-14 bg-pink-50 rounded-lg border flex items-center justify-center text-xl">🌸</div>
                             )}
+
+                            {/* 🟢 DÜZELTİLEN / BUKET DETAYLARININ EKLENDİĞİ ALAN */}
                             <div>
                               <h4 className="font-semibold text-gray-800 text-sm">{fullName}</h4>
                               <p className="text-xs text-gray-500">Adet: {quantity}</p>
+
+                              {/* 🌸 ÖZEL BUKET İÇERİK DETAYLARI */}
+                              {isCustom && details && (
+                                <div className="mt-2 p-3 bg-pink-50/70 rounded-xl border border-pink-100 text-xs text-gray-700 space-y-1.5 max-w-md">
+                                  {/* Çiçekler */}
+                                  {details.items && details.items.length > 0 && (
+                                    <div>
+                                      <span className="font-bold text-pink-700 text-[11px] uppercase tracking-wider block mb-0.5">İçerik:</span>
+                                      <ul className="list-disc list-inside space-y-0.5 pl-1">
+                                        {details.items.map((flower: any, idx: number) => (
+                                          <li key={idx} className="text-gray-800">
+                                            <span className="font-medium">{flower.name}</span>{' '}
+                                            <strong className="text-pink-600 font-bold">x{flower.quantity}</strong>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {/* Ambalaj & Vazo */}
+                                  {(details.wrapper || details.vase) && (
+                                    <div className="pt-1.5 border-t border-pink-200/60 text-[11px] text-gray-600 space-y-0.5">
+                                      {details.wrapper && <p>🎁 <span className="font-medium text-gray-800">Ambalaj:</span> {details.wrapper.name}</p>}
+                                      {details.vase && <p>🏺 <span className="font-medium text-gray-800">Vazo:</span> {details.vase.name}</p>}
+                                    </div>
+                                  )}
+
+                                  {/* Kart Notu */}
+                                  {details.cardNote && (
+                                    <div className="pt-1.5 border-t border-pink-200/60 text-[11px]">
+                                      <span className="font-bold text-pink-700">✉️ Kart Notu:</span>
+                                      <p className="italic text-gray-600 pl-2 border-l-2 border-pink-300 mt-0.5">
+                                        "{details.cardNote}"
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
+
                           </div>
                           <p className="text-sm font-semibold text-gray-800">
                             ₺{(itemUnitPrice * quantity).toFixed(2)}

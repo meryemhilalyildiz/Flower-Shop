@@ -23,7 +23,7 @@ type Props = {
 };
 
 // 🎟️ SUPABASE KUPON SORGULAMA VE DOĞRULAMA FONKSİYONU
-export async function applyCouponCode(code: string, cartTotal: number) {
+async function applyCouponCode(code: string, cartTotal: number) {
   const { data: coupon, error } = await supabase
     .from('coupons')
     .select('*')
@@ -133,7 +133,6 @@ export default function CartPage({
 
         if (data && data.length > 0) {
           setAvailableCampaigns(data);
-          // Varsayılan olarak ilk aktif kampanyayı seç
           setSelectedCampaign(data[0]);
         }
       } catch (err) {
@@ -295,59 +294,103 @@ export default function CartPage({
             </div>
           )}
 
-          {items.map((item) => (
-            <div key={item.product.id} className="card p-4 flex gap-4">
-              <button
-                onClick={() => navigate({ name: 'product', slug: item.product.slug })}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-sand-100 flex-shrink-0"
-              >
-                <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
-              </button>
+          {items.map((item) => {
+            const isCustom = (item.product as any).isCustomBouquet;
+            const customDetails = (item.product as any).customBouquetDetails;
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-sand-800 line-clamp-1">{item.product.name}</h3>
-                    <p className="text-sm text-sand-500 line-clamp-1">{item.product.description}</p>
-                  </div>
-                  <button
-                    onClick={() => onRemove(item.product.id)}
-                    className="p-2 rounded-lg text-sand-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0 cursor-pointer"
-                    aria-label="Sil"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            return (
+              <div key={item.product.id} className="card p-4 flex gap-4">
+                <button
+                  onClick={() => !isCustom && navigate({ name: 'product', slug: item.product.slug })}
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-sand-100 flex-shrink-0"
+                >
+                  <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
+                </button>
 
-                <div className="flex items-end justify-between mt-3">
-                  <div className="flex items-center gap-1 bg-sand-100 rounded-full p-1">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-sand-800 line-clamp-1">{item.product.name}</h3>
+                      
+                      {/* 🌸 ÖZEL BUKET AÇIKLAYICI DETAY KUTUSU */}
+                      {isCustom && customDetails ? (
+                        <div className="mt-2 p-3 bg-pink-50/70 rounded-xl border border-pink-100 text-xs text-sand-700 space-y-2">
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-pink-700 text-[11px] uppercase tracking-wider">Aranjman İçeriği:</p>
+                            <ul className="list-disc list-inside space-y-0.5 pl-1">
+                              {customDetails.items?.map((flower: any, idx: number) => (
+                                <li key={idx} className="text-sand-800">
+                                  <span className="font-medium">{flower.name}</span>{' '}
+                                  <strong className="text-pink-600 font-bold">x{flower.quantity}</strong>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          {(customDetails.wrapper || customDetails.vase) && (
+                            <div className="pt-1.5 border-t border-pink-200/60 text-[11px] text-sand-600 space-y-0.5">
+                              {customDetails.wrapper && (
+                                <p>🎁 <span className="font-semibold text-sand-800">Ambalaj:</span> {customDetails.wrapper.name}</p>
+                              )}
+                              {customDetails.vase && (
+                                <p>🏺 <span className="font-semibold text-sand-800">Vazo:</span> {customDetails.vase.name}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {customDetails.cardNote && (
+                            <div className="pt-1.5 border-t border-pink-200/60 text-[11px]">
+                              <p className="font-bold text-pink-700">✉️ Kart Notu:</p>
+                              <p className="italic text-sand-600 pl-2 border-l-2 border-pink-300 mt-0.5">
+                                "{customDetails.cardNote}"
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-sand-500 line-clamp-1">{item.product.description}</p>
+                      )}
+                    </div>
+
                     <button
-                      onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
-                      className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
-                      aria-label="Azalt"
+                      onClick={() => onRemove(item.product.id)}
+                      className="p-2 rounded-lg text-sand-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0 cursor-pointer"
+                      aria-label="Sil"
                     >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-8 text-center font-semibold text-sm text-sand-800">{item.quantity}</span>
-                    <button
-                      onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
-                      aria-label="Artır"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-brand-700">{item.product.price * item.quantity} TL</p>
-                    {item.quantity > 1 && (
-                      <p className="text-xs text-sand-400">{item.product.price} TL/adet</p>
-                    )}
+                  <div className="flex items-end justify-between mt-3">
+                    <div className="flex items-center gap-1 bg-sand-100 rounded-full p-1">
+                      <button
+                        onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
+                        className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
+                        aria-label="Azalt"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-8 text-center font-semibold text-sm text-sand-800">{item.quantity}</span>
+                      <button
+                        onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
+                        className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-sand-200 transition-colors cursor-pointer"
+                        aria-label="Artır"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-brand-700">{item.product.price * item.quantity} TL</p>
+                      {item.quantity > 1 && (
+                        <p className="text-xs text-sand-400">{item.product.price} TL/adet</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           <button onClick={() => navigate({ name: 'shop' })} className="btn-ghost text-brand-600 mt-2">
             <ArrowRight className="w-4 h-4 rotate-180" />
@@ -471,7 +514,6 @@ export default function CartPage({
                 <span>₺{rawSubtotal.toFixed(2)}</span>
               </div>
 
-              {/* 🎟️ Kupon İndirimi Satırı */}
               {couponDiscount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-semibold">
                   <span>Kupon İndirimi ({appliedCoupon?.code})</span>
@@ -479,7 +521,6 @@ export default function CartPage({
                 </div>
               )}
 
-              {/* 🌸 Kampanya İndirimi Satırı */}
               {campaignDiscount > 0 && selectedCampaign && (
                 <div className="flex justify-between text-emerald-600 font-semibold">
                   <span className="flex items-center gap-1">
@@ -495,7 +536,6 @@ export default function CartPage({
                 <span>{deliveryFee > 0 ? `₺${deliveryFee.toFixed(2)}` : 'Ücretsiz'}</span>
               </div>
 
-              {/* 💰 Genel Toplam */}
               <div className="border-t border-sand-200 pt-3 flex justify-between font-bold text-base text-sand-900">
                 <span>Toplam</span>
                 <span className="text-2xl font-bold text-brand-700">

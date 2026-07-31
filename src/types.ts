@@ -83,6 +83,7 @@ export interface OrderInfo {
 export type Route =
   | { name: 'home' }
   | { name: 'shop'; categorySlug?: string }
+  | { name: 'custom-bouquet' }
   | { name: 'product'; slug: string }
   | { name: 'cart' }
   | { name: 'checkout' }
