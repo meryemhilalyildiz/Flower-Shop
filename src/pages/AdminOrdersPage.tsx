@@ -147,17 +147,15 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      // Admin doğrudan iptal ettiği için previous_status NULL set edilir
       await supabase
         .from('orders')
         .update({ 
           status: 'cancelled',
-          previous_status: null, // 🌸 Müşteri talep etmediği için NULL kalıyor
+          previous_status: null,
           cancel_reason: cancelReasonInput
         })
         .eq('id', selectedOrderForCancel.id);
 
-      // 2. Durumu local state ve adminApi üzerinde güncelliyoruz
       await executeStatusUpdate(selectedOrderForCancel.id, 'cancelled', undefined, cancelReasonInput);
 
       const clientEmail = selectedOrderForCancel.user_email || selectedOrderForCancel.email;
@@ -189,14 +187,12 @@ export default function AdminOrdersPage() {
     if (!order) return;
 
     if (newStatus === 'reject_cancellation') {
-      // 🌸 1. İPTAL TALEBİNİ REDDETME SENARYOSU
       setUpdatingId(orderId);
       try {
         const fallbackStatus = order.previous_status && order.previous_status !== 'cancellation_requested' 
           ? order.previous_status 
           : 'processing';
 
-        // DB güncellemesi: status eski haline dönüyor, previous_status temizleniyor
         const { error } = await supabase
           .from('orders')
           .update({ 
@@ -207,10 +203,8 @@ export default function AdminOrdersPage() {
 
         if (error) throw error;
 
-        // State güncellemesi
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: fallbackStatus, previous_status: null } : o));
 
-        // Müşteriye İptal Reddedildi Maili Gönderimi
         const clientEmail = order.user_email || order.email;
         if (clientEmail) {
           await fetch('https://ftsmqcgzpzjcebrdhysw.supabase.co/functions/v1/send-email', {
@@ -239,10 +233,7 @@ export default function AdminOrdersPage() {
         setUpdatingId(null);
       }
     } else if (newStatus === 'cancelled') {
-      // 🌸 2. MÜŞTERİNİN İPTAL TALEBİNİ ONAYLAMA SENARYOSU
       try {
-        // DB DÜZELTMESİ: previous_status alanına 'cancellation_requested' yazarak 
-        // OrdersPage.tsx'in bunun Müşteri Talebi Onayı olduğunu anlamasını sağlıyoruz.
         const { error } = await supabase
           .from('orders')
           .update({ 
@@ -252,29 +243,28 @@ export default function AdminOrdersPage() {
           })
           .eq('id', orderId);
 
-          if (error) throw error;
+        if (error) throw error;
 
-          await executeStatusUpdate(orderId, 'cancelled', undefined, order.cancel_reason || 'Müşteri talebi onaylandı');
-  
-          // Müşteriye Onay Maili Gönderimi
-          const clientEmail = order.user_email || order.email;
-          if (clientEmail) {
-            await sendCancellationStatusEmail({
-              toEmail: clientEmail,
-              recipientName: order.recipient_name || 'Değerli Müşterimiz',
-              orderId: String(order.id),
-              cancelReason: order.cancel_reason || 'Müşteri talebi doğrultusunda iptal edildi',
-              totalAmount: Number(order.total_amount || order.total || 0),
-              type: 'ADMIN_APPROVED'
-            });
-          }
-        } catch (emailErr: any) {
-          console.error('Onay maili/güncelleme hatası:', emailErr);
+        await executeStatusUpdate(orderId, 'cancelled', undefined, order.cancel_reason || 'Müşteri talebi onaylandı');
+
+        const clientEmail = order.user_email || order.email;
+        if (clientEmail) {
+          await sendCancellationStatusEmail({
+            toEmail: clientEmail,
+            recipientName: order.recipient_name || 'Değerli Müşterimiz',
+            orderId: String(order.id),
+            cancelReason: order.cancel_reason || 'Müşteri talebi doğrultusunda iptal edildi',
+            totalAmount: Number(order.total_amount || order.total || 0),
+            type: 'ADMIN_APPROVED'
+          });
         }
-      } else {
-        await handleStatusChange(orderId, newStatus);
+      } catch (emailErr: any) {
+        console.error('Onay maili/güncelleme hatası:', emailErr);
       }
-    };
+    } else {
+      await handleStatusChange(orderId, newStatus);
+    }
+  };
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
