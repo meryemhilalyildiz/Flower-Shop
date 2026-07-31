@@ -11,6 +11,7 @@ function parseHash(): Route {
     return { name: 'shop' };
   }
   if (parts[0] === 'urun' && parts[1]) return { name: 'product', slug: decodeURIComponent(parts[1]) };
+  if (parts[0] === 'tasarla') return { name: 'custom-bouquet' };
   if (parts[0] === 'sepet') return { name: 'cart' };
   if (parts[0] === 'odeme') return { name: 'checkout' };
   if (parts[0] === 'siparislerim') return { name: 'orders' }; // 🌸 Siparişlerim rotası yakalanıyor
@@ -44,6 +45,8 @@ export function routeToHash(route: Route): string {
       return route.categorySlug ? `#/magaza/${route.categorySlug}` : '#/magaza';
     case 'product':
       return `#/urun/${route.slug}`;
+      case 'custom-bouquet':
+        return '#/tasarla';
     case 'cart':
       return '#/sepet';
     case 'checkout':

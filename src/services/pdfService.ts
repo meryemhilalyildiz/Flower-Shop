@@ -69,70 +69,101 @@ export const generateInvoicePDF = (order: OrderInfo) => {
   if (itemsList.length > 0) {
     itemsHtml = itemsList
       .map((item: any) => {
-        const fullName = 
+        const productName = 
           item.product_name || 
-          item.product?.name || 
           item.name || 
           item.title || 
+          item.product?.name || 
           'Çiçek Ürünü';
 
-        const qty = Number(item.quantity || item.qty || 1);
+          const qty = Number(item.quantity || item.qty || item.count || 1);
 
-        let price = Number(
-          item.price ?? 
-          item.unit_price ?? 
-          item.product?.price ?? 
-          item.product_price ?? 
-          0
-        );
+          let price = Number(
+            item.price ?? 
+            item.unit_price ?? 
+            item.product?.price ?? 
+            item.product_price ?? 
+            0
+          );
 
-        if (price === 0 && rawSubtotal > 0) {
-          price = rawSubtotal / itemsList.length;
-        }
+          if (price === 0 && rawSubtotal > 0) {
+            price = rawSubtotal / itemsList.length;
+          }
+  
+          const total = price * qty;
+  
+          // 🌸 Buket Tasarım Detaylarını Yakalama
+          const isCustom = item.isCustomBouquet || item.is_custom_bouquet || item.product?.isCustomBouquet;
+          const details = item.customBouquetDetails || item.custom_bouquet_details || item.product?.customBouquetDetails;
+  
+          let detailSubHtml = '';
+  
+          if (isCustom && details) {
+            let parts: string[] = [];
+  
+            if (details.items && details.items.length > 0) {
+              const flowers = details.items
+                .map((f: any) => `&bull; ${f.name} <strong style="color:#db2777;">x${f.quantity}</strong>`)
+                .join('<br/>');
+              parts.push(`<div style="margin-bottom: 3px;"><strong style="color: #be185d;">İÇERİK:</strong><br/>${flowers}</div>`);
+            }
+  
+            if (details.wrapper) {
+              parts.push(`<div>🎁 <strong>Ambalaj:</strong> ${details.wrapper.name}</div>`);
+            }
+  
+            if (details.vase) {
+              parts.push(`<div>🏺 <strong>Vazo:</strong> ${details.vase.name}</div>`);
+            }
+  
+            
+  
+            detailSubHtml = `
+              <div style="font-size: 11px; color: #4b5563; margin-top: 6px; padding: 6px 8px; background-color: #fdf2f8; border-radius: 8px; border: 1px solid #fbcfe8; line-height: 1.4;">
+                ${parts.join('')}
+              </div>
+            `;
+          } else {
+            let baseName = productName;
+            let variantSubtext = '';
+  
+            if (productName.includes('(') && productName.includes(')')) {
+              const splitParts = productName.split('(');
+              baseName = splitParts[0].trim();
+              variantSubtext = splitParts[1].replace(')', '').trim();
+            }
+  
+            detailSubHtml = variantSubtext
+              ? `<div style="font-size: 11px; color: #db2777; margin-top: 4px; font-weight: 600;">✨ Varyant / Detay: ${variantSubtext}</div>`
+              : '<div style="font-size: 11px; color: #888; margin-top: 2px;">Standart Boyut</div>';
+          }
 
-        const total = price * qty;
-
-        let baseName = fullName;
-        let variantSubtext = '';
-
-        if (fullName.includes('(') && fullName.includes(')')) {
-          const parts = fullName.split('(');
-          baseName = parts[0].trim();
-          variantSubtext = parts[1].replace(')', '').trim();
-        }
-
-        return `
+          return `
           <tr>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
-              <div style="font-weight: bold; color: #333; font-size: 14px;">${baseName}</div>
-              ${
-                variantSubtext
-                  ? `<div style="font-size: 11px; color: #db2777; margin-top: 4px; font-weight: 600; display: inline-block;">
-                      ✨ Varyant / Detay: ${variantSubtext}
-                     </div>`
-                  : '<div style="font-size: 11px; color: #888; margin-top: 2px;">Standart Boyut</div>'
-              }
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; vertical-align: top;">
+              <div style="font-weight: bold; color: #111827; font-size: 14px;">${productName}</div>
+              ${detailSubHtml}
             </td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500;">${qty} Adet</td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${price.toFixed(2)}</td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827;">₺${total.toFixed(2)}</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500; vertical-align: top;">${qty} Adet</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; vertical-align: top;">₺${price.toFixed(2)}</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827; vertical-align: top;">₺${total.toFixed(2)}</td>
           </tr>
         `;
       })
       .join('');
-  } else {
-    itemsHtml = `
-      <tr>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
-          <div style="font-weight: bold; color: #333; font-size: 14px;">Özel Tasarım Çiçek Aranjmanı</div>
-          <div style="font-size: 11px; color: #888; margin-top: 2px;">Taze Cicek Siparis Urunu</div>
-        </td>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500;">1 Adet</td>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${rawSubtotal.toFixed(2)}</td>
-        <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827;">₺${rawSubtotal.toFixed(2)}</td>
-      </tr>
-    `;
-  }
+    } else {
+      itemsHtml = `
+        <tr>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
+            <div style="font-weight: bold; color: #333; font-size: 14px;">Özel Tasarım Çiçek Aranjmanı</div>
+            <div style="font-size: 11px; color: #888; margin-top: 2px;">Taze Çiçek Sipariş Ürünü</div>
+          </td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500;">1 Adet</td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${rawSubtotal.toFixed(2)}</td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827;">₺${rawSubtotal.toFixed(2)}</td>
+        </tr>
+      `;
+    }
 
   // 🌸 5. HTML Şablon Çıktısı
   const htmlContent = `
@@ -166,7 +197,7 @@ export const generateInvoicePDF = (order: OrderInfo) => {
           </div>
           <div style="text-align: right; font-size: 12px; color: #555;">
             <div><strong>Fatura No:</strong> INV-${String(order.id).slice(0, 8).toUpperCase()}</div>
-            <div><strong>Tarih:</strong> ${new Date(order.createdAt).toLocaleDateString('tr-TR')}</div>
+            <div><strong>Tarih:</strong> ${new Date(order.createdAt || (order as any).created_at || Date.now()).toLocaleDateString('tr-TR')}</div>
             <div><strong>Durum:</strong> ${order.status || 'Hazırlanıyor'}</div>
           </div>
         </div>

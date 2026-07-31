@@ -9,13 +9,14 @@ import { usePageContent } from '../hooks/usePageContent';
 import EditableText from '../components/admin/EditableText';
 import EditableImage from '../components/admin/EditableImage';
 import { useAdminEditing } from '../contexts/AdminEditingContext';
+import CustomBouquetPage from './CustomBouquetPage'; 
 
 type Props = {
   categories: Category[];
   featured: Product[];
   discounted: Product[];
   navigate: (r: Route) => void;
-  onAddToCart: (p: Product) => void;
+  onAddToCart: (p: any, qty?: number) => void;
   isFavorite: (productId: string) => boolean;
   onToggleFavorite: (p: Product) => void;
   adminContent?: any;
@@ -111,60 +112,66 @@ export default function HomePage({ categories, featured, discounted, navigate, o
         <div className="absolute top-20 right-10 w-72 h-72 bg-brand-200/30 rounded-full blur-3xl animate-float" />
         <div className="absolute bottom-10 left-10 w-64 h-64 bg-leaf-200/30 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
 
-        <div className="max-w-7xl mx-auto px-4 py-12 lg:py-16 relative">
+        <div className="max-w-7xl mx-auto px-4 py-12 lg:py-16 relative space-y-12">
+          
+          {/* 1. ÜST KISIM: Sol Metinler + Sağ Çiçek Görselleri */}
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="animate-slide-up">
-              <span className="chip bg-brand-100 text-brand-700 mb-4">
-                <Sparkles className="w-4 h-4" />
-                {isEditing ? (
-                  <EditableText
-                    value="Taze çiçekler her gün"
-                    onSave={(newValue) => onTextChange('hero_badge', newValue)}
-                  />
-                ) : (
-                  'Taze çiçekler her gün'
-                )}
-              </span>
-              <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-sand-900 leading-tight text-balance">
-                {isEditing ? (
-                  <EditableText
-                    value={heroTitle}
-                    onSave={(newValue) => onTextChange('hero_title', newValue)}
-                  />
-                ) : (
-                  heroTitle
-                )}
-              </h1>
-              <p className="text-lg text-sand-600 mt-5 max-w-md leading-relaxed">
-                {isEditing ? (
-                  <EditableText
-                    value={heroSubtitle}
-                    onSave={(newValue) => onTextChange('hero_subtitle', newValue)}
-                    multiline
-                  />
-                ) : (
-                  heroSubtitle
-                )}
-              </p>
-              <div className="flex flex-wrap gap-3 mt-8">
-                <button onClick={() => navigate({ name: 'shop' })} className="btn-primary group">
+            
+            {/* SOL KOLON (Metinler, Butonlar, Puanlar) */}
+            <div className="animate-slide-up space-y-6">
+              <div>
+                <span className="chip bg-brand-100 text-brand-700 mb-4 inline-flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" />
                   {isEditing ? (
                     <EditableText
-                      value={heroCta}
-                      onSave={(newValue) => onTextChange('hero_cta', newValue)}
+                      value="Taze çiçekler her gün"
+                      onSave={(newValue) => onTextChange('hero_badge', newValue)}
                     />
                   ) : (
-                    heroCta
+                    'Taze çiçekler her gün'
                   )}
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
-                <button onClick={() => navigate({ name: 'about' })} className="btn-secondary">
-                  Hikayemiz
-                </button>
+                </span>
+                <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-sand-900 leading-tight text-balance">
+                  {isEditing ? (
+                    <EditableText
+                      value={heroTitle}
+                      onSave={(newValue) => onTextChange('hero_title', newValue)}
+                    />
+                  ) : (
+                    heroTitle
+                  )}
+                </h1>
+                <p className="text-lg text-sand-600 mt-5 max-w-md leading-relaxed">
+                  {isEditing ? (
+                    <EditableText
+                      value={heroSubtitle}
+                      onSave={(newValue) => onTextChange('hero_subtitle', newValue)}
+                      multiline
+                    />
+                  ) : (
+                    heroSubtitle
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-3 mt-8">
+                  <button onClick={() => navigate({ name: 'shop' })} className="btn-primary group">
+                    {isEditing ? (
+                      <EditableText
+                        value={heroCta}
+                        onSave={(newValue) => onTextChange('hero_cta', newValue)}
+                      />
+                    ) : (
+                      heroCta
+                    )}
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                  <button onClick={() => navigate({ name: 'about' })} className="btn-secondary">
+                    Hikayemiz
+                  </button>
+                </div>
               </div>
 
               {/* ⭐ Yıldızlar ve Müşteri Sayısı */}
-              <div className="flex items-center gap-6 mt-10">
+              <div className="flex items-center gap-6 pt-2">
                 <div>
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((i) => (
@@ -206,85 +213,9 @@ export default function HomePage({ categories, featured, discounted, navigate, o
                   </p>
                 </div>
               </div>
-
-              {/* 🌸 🏷️ YILDIZLARIN ALTINA EKLENEN KAMPANYA BANNER SLIDER */}
-              {campaigns.length > 0 && (
-                <div className="mt-8 relative rounded-3xl overflow-hidden bg-white border border-brand-200 shadow-lg group transition-all">
-                  <a
-                    href={`#/magaza/${campaigns[currentSlide].id}`}
-                    className="relative h-44 sm:h-48 w-full block cursor-pointer"
-                  >
-                    <img
-                      src={campaigns[currentSlide].image_url}
-                      alt={campaigns[currentSlide].title}
-                      className="w-full h-full object-cover transition-all duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-sand-900/85 via-sand-900/50 to-transparent flex flex-col justify-center p-6 text-white space-y-1.5">
-                      
-                      {/* 🌸 DİNAMİK KAMPANYA TİPİ ROZETİ */}
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-500 text-white font-bold text-xs rounded-full shadow-sm mb-2 w-fit">
-                        <Tag className="w-3.5 h-3.5" />
-                        {campaigns[currentSlide].discount_type === 'fixed_amount' && `₺${campaigns[currentSlide].discount_value} İNDİRİM`}
-                        {campaigns[currentSlide].discount_type === 'percentage' && `%${campaigns[currentSlide].discount_value || campaigns[currentSlide].discount_percentage} İNDİRİM`}
-                        {campaigns[currentSlide].discount_type === 'buy_x_pay_y' && `${campaigns[currentSlide].buy_x || 2} AL ${campaigns[currentSlide].pay_y || 1} ÖDE`}
-                        {campaigns[currentSlide].discount_type === 'second_item_discount' && `2. ÜRÜNE %${campaigns[currentSlide].discount_value} İNDİRİM`}
-                        {(!campaigns[currentSlide].discount_type || campaigns[currentSlide].discount_type === 'percentage') && !campaigns[currentSlide].discount_value && `%${campaigns[currentSlide].discount_percentage} İNDİRİM`}
-                      </span>
-
-                      <h3 className="font-display text-2xl font-bold">{campaigns[currentSlide].title}</h3>
-                      <p className="text-xs sm:text-sm text-sand-200 line-clamp-2">{campaigns[currentSlide].subtitle}</p>
-                      <p className="text-[10px] text-brand-200 font-semibold pt-1">
-                        * ₺{campaigns[currentSlide].min_order_amount} üzerindeki siparişlerde geçerlidir.
-                      </p>
-                    </div>
-                  </a>
-
-                  {/* Birden fazla kampanya varsa Sol/Sağ Butonları & Noktalar */}
-                  {campaigns.length > 1 && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setCurrentSlide((prev) => (prev === 0 ? campaigns.length - 1 : prev - 1));
-                        }}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer z-10"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setCurrentSlide((prev) => (prev + 1) % campaigns.length);
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer z-10"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-
-                      <div className="absolute bottom-2.5 right-4 flex gap-1.5 z-10">
-                        {campaigns.map((_, idx) => (
-                          <button
-                            key={idx}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              setCurrentSlide(idx);
-                            }}
-                            className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                              idx === currentSlide ? 'w-5 bg-white' : 'w-1.5 bg-white/50'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
             </div>
 
+            {/* SAĞ KOLON (4'lü Çiçek Görselleri Grid'i) */}
             <div className="relative animate-scale-in">
               <div className="relative grid grid-cols-2 gap-4">
                 <div className="space-y-4">
@@ -384,7 +315,110 @@ export default function HomePage({ categories, featured, discounted, navigate, o
                 </div>
               </div>
             </div>
+
           </div>
+
+          {/* 2. ALT KISIM: ÜSTE ORTALI, TAM GENİŞLİKTE BÜYÜK BANNER'LAR */}
+          <div className="space-y-6 pt-6 border-t border-sand-200/60">
+            
+            {/* 🌸 KAMPANYA BANNER SLIDER (TAM GENİŞLİK) */}
+            {campaigns.length > 0 && (
+              <div className="relative rounded-3xl overflow-hidden bg-white border border-brand-200 shadow-xl group transition-all">
+                <a
+                  href={`#/magaza/${campaigns[currentSlide].id}`}
+                  className="relative h-52 sm:h-60 lg:h-64 w-full block cursor-pointer"
+                >
+                  <img
+                    src={campaigns[currentSlide].image_url}
+                    alt={campaigns[currentSlide].title}
+                    className="w-full h-full object-cover transition-all duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-sand-900/90 via-sand-900/50 to-transparent flex flex-col justify-center p-8 text-white space-y-2">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-brand-500 text-white font-bold text-xs sm:text-sm rounded-full shadow-sm mb-2 w-fit">
+                      <Tag className="w-4 h-4" />
+                      {campaigns[currentSlide].discount_type === 'fixed_amount' && `₺${campaigns[currentSlide].discount_value} İNDİRİM`}
+                      {campaigns[currentSlide].discount_type === 'percentage' && `%${campaigns[currentSlide].discount_value || campaigns[currentSlide].discount_percentage} İNDİRİM`}
+                      {campaigns[currentSlide].discount_type === 'buy_x_pay_y' && `${campaigns[currentSlide].buy_x || 2} AL ${campaigns[currentSlide].pay_y || 1} ÖDE`}
+                      {campaigns[currentSlide].discount_type === 'second_item_discount' && `2. ÜRÜNE %${campaigns[currentSlide].discount_value} İNDİRİM`}
+                      {(!campaigns[currentSlide].discount_type || campaigns[currentSlide].discount_type === 'percentage') && !campaigns[currentSlide].discount_value && `%${campaigns[currentSlide].discount_percentage} İNDİRİM`}
+                    </span>
+
+                    <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold">{campaigns[currentSlide].title}</h3>
+                    <p className="text-sm sm:text-base text-sand-200 max-w-xl line-clamp-2">{campaigns[currentSlide].subtitle}</p>
+                    <p className="text-xs text-brand-200 font-semibold pt-1">
+                      * ₺{campaigns[currentSlide].min_order_amount} üzerindeki siparişlerde geçerlidir.
+                    </p>
+                  </div>
+                </a>
+
+                {campaigns.length > 1 && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setCurrentSlide((prev) => (prev === 0 ? campaigns.length - 1 : prev - 1));
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer z-10"
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setCurrentSlide((prev) => (prev + 1) % campaigns.length);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/40 backdrop-blur-md text-white hover:bg-white/70 transition-colors cursor-pointer z-10"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+
+                    <div className="absolute bottom-4 right-6 flex gap-2 z-10">
+                      {campaigns.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setCurrentSlide(idx);
+                          }}
+                          className={`h-2 rounded-full transition-all cursor-pointer ${
+                            idx === currentSlide ? 'w-6 bg-white' : 'w-2 bg-white/50'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* 🌸 KENDİ HİKAYENİN ÇİÇEĞİNİ YARAT BANNER (TAM GENİŞLİK - BÜYÜK & EKRANA YAYILMIŞ) */}
+            <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center md:text-left max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-semibold">
+                  <Sparkles className="w-4 h-4" /> Özel Aranjman Sihirbazı
+                </div>
+                <h3 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">
+                  Kendi Hikayenin Çiçeğini Yarat 💐
+                </h3>
+                <p className="text-sm text-pink-100 leading-relaxed">
+                  Çiçekleri, ambalajı ve vazo tercihini tamamen kendin seç; sevdiklerine imzanı taşıyan unutulmaz bir jest yap!
+                </p>
+              </div>
+
+              <button
+                onClick={() => navigate({ name: 'custom-bouquet' as any })}
+                className="px-8 py-4 bg-white text-pink-600 hover:bg-pink-50 font-bold text-base rounded-2xl shadow-lg hover:shadow-xl transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer transform hover:-translate-y-0.5"
+              >
+                <span>Buketini Tasarla</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+
+          </div>
+
         </div>
       </section>
 

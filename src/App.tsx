@@ -37,6 +37,7 @@ import AdminCouponsPage from './pages/AdminCouponsPage';
 import AdminEditorPage from './pages/AdminEditorPage';
 import AdminCampaignsPage from './pages/AdminCampaignsPage';
 import AdminFaqPage from './pages/AdminFaqPage';
+import CustomBouquetPage from './pages/CustomBouquetPage';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -339,18 +340,41 @@ function App() {
     }
 
     switch (route.name) {
+      case 'custom-bouquet':
+      return <CustomBouquetPage onAddToCart={cart.addItem} />;
+
+      case 'cart':
+      return (
+        <CartPage
+          items={cart.items}
+          subtotal={cart.subtotal}
+          deliveryFee={cart.deliveryFee}
+          total={cart.total}
+          timeRemaining={cart.timeRemaining}
+          navigate={navigate}
+          onUpdateQuantity={cart.updateQuantity}
+          onRemove={cart.removeItem}
+          appliedCoupon={cart.appliedCoupon}
+          discountAmount={cart.discountAmount}
+          onApplyCoupon={cart.applyCoupon}
+          onRemoveCoupon={cart.removeCoupon}
+          selectedCampaign={cart.selectedCampaign}
+          onSelectCampaign={cart.setSelectedCampaign}
+        />
+      );
+
       case 'home':
-        return (
-          <HomePage
-            categories={categories}
-            featured={getFeaturedProducts(products)}
-            discounted={getDiscountedProducts(products)}
-            navigate={navigate}
-            onAddToCart={handleAddToCart}
-            isFavorite={favorites.isFavorite}
-            onToggleFavorite={favorites.toggleFavorite}
-          />
-        );
+      return (
+        <HomePage
+          categories={categories}
+          featured={getFeaturedProducts(products)}
+          discounted={getDiscountedProducts(products)}
+          navigate={navigate}
+          onAddToCart={handleAddToCart}
+          isFavorite={favorites.isFavorite}
+          onToggleFavorite={favorites.toggleFavorite}
+        />
+      );
 
       case 'shop':
         return (
@@ -378,26 +402,6 @@ function App() {
           />
         );
       }
-
-      case 'cart':
-        return (
-          <CartPage
-            items={cart.items}
-            subtotal={cart.subtotal}
-            deliveryFee={cart.deliveryFee}
-            total={cart.total}
-            timeRemaining={cart.timeRemaining}
-            navigate={navigate}
-            onUpdateQuantity={cart.updateQuantity}
-            onRemove={cart.removeItem}
-            appliedCoupon={cart.appliedCoupon}
-            discountAmount={cart.discountAmount}
-            onApplyCoupon={cart.applyCoupon}
-            onRemoveCoupon={cart.removeCoupon}
-            selectedCampaign={cart.selectedCampaign}
-            onSelectCampaign={cart.setSelectedCampaign}
-          />
-        );
 
       case 'checkout':
         return (
