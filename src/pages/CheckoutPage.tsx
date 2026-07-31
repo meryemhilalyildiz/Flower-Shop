@@ -57,7 +57,7 @@ export default function CheckoutPage({
   discountAmount, 
   onApplyCoupon, 
   onRemoveCoupon,
-  selectedCampaign // 🌸 PROPLARA EKLENDİ
+  selectedCampaign
 }: Props) {
   const [form, setForm] = useState<FormState>({
     recipientName: '',
@@ -132,7 +132,7 @@ export default function CheckoutPage({
   // Kampanya İndirimi
   const campaignDiscount = Number(calculateCampaignDiscount(items, activeCampaign) || 0);
 
-  // Kupon İndirimi (Ana paranın %'si olarak bağımsız hesaplama)
+  // Kupon İndirimi
   let couponDiscount = 0;
   if (appliedCoupon) {
     const rawRate = Number(
@@ -157,11 +157,10 @@ export default function CheckoutPage({
   const totalDiscount = campaignDiscount + couponDiscount;
   const dynamicDeliveryFee = shippingInfo ? Number(shippingInfo.shippingFee || 0) : 0;
 
-  // Genel Toplam = (Ana Para + Kargo) - Kampanya - Kupon
-  const finalTotal = Math.max(0, rawSubtotal + dynamicDeliveryFee - totalDiscount);
+  // Genel Toplam
+  const finalTotal = Math.max(0, rawSubtotal - totalDiscount + dynamicDeliveryFee);
 
-
-  // 🌸 Kupon Uygulama (Tam Güvenlikli ve Esnek Yüzde/Tutar Mantığı)
+  // 🌸 Kupon Uygulama
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
 
@@ -180,7 +179,6 @@ export default function CheckoutPage({
 
       const currentSubtotal = Number(subtotal || 0);
 
-      // 1. Kullanım Limiti Kontrolü (usage_limit / max_uses)
       const usageLimit = data.usage_limit ?? data.max_uses ?? 0;
       const usedCount = data.used_count ?? 0;
       if (usageLimit > 0 && usedCount >= usageLimit) {
@@ -188,21 +186,18 @@ export default function CheckoutPage({
         return;
       }
 
-      // 2. Son Geçerlilik Tarihi Kontrolü (valid_until / expires_at)
       const validUntil = data.valid_until ?? data.expires_at;
       if (validUntil && new Date(validUntil) < new Date()) {
         alert('Bu kuponun son kullanma tarihi geçmiştir.');
         return;
       }
 
-      // 3. Minimum Sepet Tutarı Kontrolü
       const minOrderAmount = Number(data.min_order_amount || data.min_amount || 0);
       if (minOrderAmount > 0 && currentSubtotal < minOrderAmount) {
         alert(`Bu kupon en az ₺${minOrderAmount} tutarındaki sepetlerde geçerlidir.`);
         return;
       }
 
-      // 4. İndirim Değeri ve Tipini Esnek Okuma
       const rawDiscount = Number(
         data.discount_value ?? 
         data.discount_amount ?? 
@@ -216,16 +211,14 @@ export default function CheckoutPage({
         rawType.includes('percent') || 
         rawType.includes('yuzde') || 
         data.is_percent === true || 
-        couponInput.toUpperCase().includes('10'); // '10' veya 'WELCOME10' gibi kuponlarda %10 koruması
+        couponInput.toUpperCase().includes('10');
 
       let calculatedDiscount = 0;
 
       if (isPercentage) {
-        // Veritabanında oran varsa onu alır, yoksa ve isimde 10 geçiyorsa %10 varsayar
         const percentRate = rawDiscount > 0 ? rawDiscount : 10;
         calculatedDiscount = (currentSubtotal * percentRate) / 100;
 
-        // Maksimum İndirim Sınırı Var Mı? (Örn: En fazla 200 TL indirim)
         const maxDiscountLimit = Number(data.max_discount_amount || data.max_discount || 0);
         if (maxDiscountLimit > 0 && calculatedDiscount > maxDiscountLimit) {
           calculatedDiscount = maxDiscountLimit;
@@ -234,7 +227,6 @@ export default function CheckoutPage({
         calculatedDiscount = rawDiscount;
       }
 
-      // İndirim tutarı sepet tutarını geçemez
       calculatedDiscount = Math.min(currentSubtotal, calculatedDiscount);
 
       onApplyCoupon(data, calculatedDiscount);
@@ -368,6 +360,101 @@ export default function CheckoutPage({
     }
   };
 
+  // 🌸 📦 VERİTABANINDAN STOK DÜŞME FONKSİYONU
+  // 🌸 📦 VERİTABANINDAN STOK DÜŞME FONKSİYONU (İsim & ID Çift Korumalı)
+  const decreaseStockOnOrder = async (cartItems: CartItem[]) => {
+    console.log('📦 Stok düşme işlemi başlatıldı. Sepet ögeleri:', cartItems);
+
+    try {
+      for (const item of cartItems) {
+        const cartObj = item as any;
+
+        // 1. ÖZEL BUKET İÇERİĞİ (customBouquetDetails / details / items)
+        const isCustom = cartObj.isCustomBouquet || cartObj.is_custom_bouquet || cartObj.product?.isCustomBouquet;
+        const customDetails = cartObj.customBouquetDetails || cartObj.custom_bouquet_details || cartObj.product?.customBouquetDetails;
+
+        if (isCustom && customDetails?.items && Array.isArray(customDetails.items)) {
+          console.log('💐 Özel buket tespit edildi, çiçekler işleniyor:', customDetails.items);
+
+          for (const flower of customDetails.items) {
+            const flowerName = flower.name || flower.title;
+            const flowerId = flower.id || flower.stem_flower_id;
+            const orderedQty = Number(flower.quantity || flower.count || 1) * Number(item.quantity || 1);
+
+            console.log(`🔍 Çiçek aranıyor: ID=[${flowerId}], İsim=[${flowerName}], Düşülecek Miktar=[${orderedQty}]`);
+
+            let currentStem = null;
+
+            // A) Önce ID ile veritabanında ara
+            if (flowerId) {
+              const { data } = await supabase
+                .from('stem_flowers')
+                .select('id, name, stock')
+                .eq('id', flowerId)
+                .maybeSingle();
+              currentStem = data;
+            }
+
+            // B) ID ile bulunamadıysa Çiçek İsmi (Örn: "Ayçiçeği") ile veritabanında ara
+            if (!currentStem && flowerName) {
+              const { data } = await supabase
+                .from('stem_flowers')
+                .select('id, name, stock')
+                .eq('name', flowerName)
+                .maybeSingle();
+              currentStem = data;
+            }
+
+            // C) Çiçek veritabanında bulunduysa Stoğu Güncelle!
+            if (currentStem) {
+              const oldStock = Number(currentStem.stock || 0);
+              const newStock = Math.max(0, oldStock - orderedQty);
+
+              const { error: updateErr } = await supabase
+                .from('stem_flowers')
+                .update({ stock: newStock })
+                .eq('id', currentStem.id);
+
+              if (updateErr) {
+                console.error(`❌ [${currentStem.name}] stoğu güncellenirken hata:`, updateErr);
+              } else {
+                console.log(`✅ [${currentStem.name}] stoğu başarıyla düşürüldü: ${oldStock} ➔ ${newStock}`);
+              }
+            } else {
+              console.warn(`⚠️ Veritabanında [${flowerName || flowerId}] adında tekli çiçek bulunamadı.`);
+            }
+          }
+        } 
+        // 2. STANDART KATALOG ÜRÜNÜ (products Tablosundan Düş)
+        else {
+          const productId = item.product?.id || cartObj.id;
+          const orderedQty = Number(item.quantity || 1);
+
+          if (productId && !String(productId).startsWith('custom-')) {
+            const { data: currentProduct } = await supabase
+              .from('products')
+              .select('id, stock, stock_quantity')
+              .eq('id', productId)
+              .maybeSingle();
+
+            if (currentProduct) {
+              const oldStock = Number(currentProduct.stock ?? currentProduct.stock_quantity ?? 0);
+              const newStock = Math.max(0, oldStock - orderedQty);
+
+              await supabase
+                .from('products')
+                .update({ stock: newStock, stock_quantity: newStock })
+                .eq('id', currentProduct.id);
+
+              console.log(`✅ Katalog Ürünü [${productId}] stoğu düşürüldü: ${oldStock} ➔ ${newStock}`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('💥 Stok düşme sırasında beklenmeyen sistem hatası:', err);
+    }
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -399,7 +486,6 @@ export default function CheckoutPage({
       // 3. Kullanıcı ve Alıcı Bilgileri
       const { data: { user } } = await supabase.auth.getUser();
       
-      
       const buyer = {
         id: user?.id || 'guest_' + crypto.randomUUID(),
         name: form.recipientName,
@@ -412,68 +498,36 @@ export default function CheckoutPage({
       };
 
       // 4. Sepet ve Sipariş Ürün Nesneleri
-      // 🌸 İndirimleri ürün fiyatlarına yansıtarak hesapla
-      const totalDiscount = campaignDiscount + couponDiscount;
-      const itemsTotal = rawSubtotal;
+      const basketItems = items.map((item) => ({
+        id: item.product?.id || (item as any).id || crypto.randomUUID(),
+        name: item.product?.name || 'Çiçek Ürünü',
+        price: Math.round((item.product?.price || 0) * 100),
+        quantity: item.quantity || 1
+      }));
+
+      const campaignTitleToSend = selectedCampaign?.title || selectedCampaign?.name || activeCampaign?.title || activeCampaign?.name || '';
       
-      // İndirim oranını hesapla
-      const discountRatio = itemsTotal > 0 ? totalDiscount / itemsTotal : 0;
-      
-      const basketItems = items.map((item) => {
-        const originalPrice = item.product?.price || 0;
-        const discountedPrice = originalPrice * (1 - discountRatio);
+      const formattedOrderItems = items.map((cartItem: any) => {
+        const prod = cartItem.product || cartItem;
         return {
-          id: item.product?.id || (item as any).id || crypto.randomUUID(),
-          name: item.product?.name || 'Çiçek Ürünü',
-          price: Math.round(discountedPrice * 100),
-          quantity: item.quantity || 1
+          id: prod.id || cartItem.id,
+          product_id: prod.id || cartItem.id,
+          name: prod.name || cartItem.name || 'Çiçek Ürünü',
+          product_name: prod.name || cartItem.name || 'Çiçek Ürünü',
+          price: Number(prod.price || cartItem.price || 0),
+          unit_price: Number(prod.price || cartItem.price || 0),
+          quantity: Number(cartItem.quantity || 1),
+          image: prod.images?.[0] || prod.image || cartItem.image || '',
+          images: prod.images || (prod.image ? [prod.image] : []),
+          isCustomBouquet: cartItem.isCustomBouquet || cartItem.is_custom_bouquet,
+          customBouquetDetails: cartItem.customBouquetDetails || cartItem.custom_bouquet_details
         };
       });
-
-      // 🌸 Kargo ücretini de basketItems'a ekle
-      if (dynamicDeliveryFee > 0) {
-        basketItems.push({
-          id: 'shipping_' + crypto.randomUUID(),
-          name: 'Kargo Ücreti',
-          price: Math.round(dynamicDeliveryFee * 100),
-          quantity: 1
-        });
-      }
-
-      const orderItems = items.map((item) => {
-        const fullProductName = item.product?.name || 'Çiçek Ürünü';
-        const itemPrice = Number(item.product?.price || 0);
-
-        return {
-          ...item,
-          product_id: item.product?.id || (item as any).productId || (item as any).id,
-          product: {
-            ...item.product,
-            name: fullProductName,
-            price: itemPrice,
-          },
-          product_name: fullProductName,
-          title: fullProductName,
-          quantity: item.quantity || 1,
-          price: itemPrice,
-          unit_price: itemPrice,
-          // 🌸 App.tsx için gerekli alanlar
-          id: item.product?.id || (item as any).id,
-        };
-      });
-  
-      // 🌸 SUPABASE'E VERİLERİ AÇIK VE TAM NET KAYDEDİYORUZ
-      // CheckoutPage.tsx -> handleSubmit içi
-      const currentCampaignTitle = 
-        activeCampaign?.title || 
-        activeCampaign?.name || 
-        activeCampaign?.campaign_name || 
-        'Özel Kampanya İndirimi';
-        const campaignTitleToSend = selectedCampaign?.title || selectedCampaign?.name || activeCampaign?.title || activeCampaign?.name || '';
         
-      // 🌸 Sipariş verilerini session storage'a kaydet (ödeme başarılı olursa OrderSuccessPage'te oluşturulacak)
-      const orderData = {
-        items: orderItems,
+      const createdOrderId = await onPlaceOrder({
+        items: formattedOrderItems,
+        order_items: formattedOrderItems,
+        products: formattedOrderItems,
         subtotal: rawSubtotal,
         subtotal_amount: rawSubtotal,
         deliveryFee: dynamicDeliveryFee,
@@ -495,13 +549,29 @@ export default function CheckoutPage({
         discountAmount: totalDiscount,
         discount_amount: totalDiscount,
         status: 'pending'
-      };
-      
-      // 🌸 Geçici order ID oluştur
-      const tempOrderId = 'temp_' + crypto.randomUUID();
-      sessionStorage.setItem('pendingOrderData', JSON.stringify(orderData));
-      sessionStorage.setItem('tempOrderId', tempOrderId);
-      
+      } as any);
+
+      if (createdOrderId) {
+        try {
+          const orderItemsPayload = items.map((cartItem: any) => {
+            const prod = cartItem.product || cartItem;
+            return {
+              order_id: createdOrderId,
+              product_name: prod.name || cartItem.name || 'Çiçek Ürünü',
+              quantity: Number(cartItem.quantity || 1),
+              unit_price: Number(prod.price || cartItem.price || 0),
+              price: Number(prod.price || cartItem.price || 0) * Number(cartItem.quantity || 1)
+            };
+          });
+          await supabase.from('order_items').insert(orderItemsPayload);
+        } catch (itemErr) {
+          console.error('order_items kaydı esnasında hata:', itemErr);
+        }
+
+        // 🌸 📦 STOKLARI VERİTABANINDAN DÜŞÜYORUZ
+        await decreaseStockOnOrder(items);
+      }
+  
       await handleSaveAddress();
 
       const sessionData = await supabase.auth.getSession();
@@ -515,9 +585,10 @@ export default function CheckoutPage({
             'Authorization': `Bearer ${authToken}`
           },
           body: JSON.stringify({
+            price: finalTotalKurus,
             buyer: buyer,
             basketItems: basketItems,
-            orderId: tempOrderId // Geçici sipariş kimliği
+            orderId: createdOrderId
           })
         }
       );
@@ -528,7 +599,6 @@ export default function CheckoutPage({
         throw new Error(checkoutData.error || 'Ödeme başlatılamadı');
       }
 
-      // 8. Ödeme Sayfasına Yönlendirme
       window.location.href = checkoutData.paymentPageUrl;
     } catch (error) {
       console.error('Sipariş verilirken hata oluştu:', error);
@@ -811,7 +881,7 @@ export default function CheckoutPage({
               ))}
             </div>
 
-            {/* 🎟️ Kupon Kodu Girişi */}
+            {/* Kupon Kodu Girişi */}
             <div className="bg-sand-50 p-3.5 rounded-xl border border-sand-200 mb-4">
               <label className="text-xs font-semibold text-sand-700 block mb-1.5">Kupon Kodu</label>
               <div className="flex gap-2">
@@ -847,14 +917,12 @@ export default function CheckoutPage({
               )}
             </div>
 
-            {/* 🧾 DÜZELTİLMİŞ TAM DOĞRU DÖKÜM TABLOSU */}
             <div className="border-t border-sand-100 pt-4 space-y-2 text-sm">
               <div className="flex justify-between text-sand-600">
                 <span>Ara toplam</span>
                 <span>₺{subtotal.toFixed(2)}</span>
               </div>
 
-              {/* Kupon Satırı */}
               {couponDiscount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-semibold">
                   <span>Kupon İndirimi ({appliedCoupon?.code})</span>
@@ -862,18 +930,17 @@ export default function CheckoutPage({
                 </div>
               )}
 
-              {/* Kampanya Satırı */}
               {campaignDiscount > 0 && (
-  <div className="flex justify-between text-emerald-600 font-semibold">
-    <span className="flex items-center gap-1">
-      <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-      {activeCampaign?.title 
-        ? `${activeCampaign.title}` 
-        : 'Kampanya İndirimi'}
-    </span>
-    <span>-₺{campaignDiscount.toFixed(2)}</span>
-  </div>
-)}
+                <div className="flex justify-between text-emerald-600 font-semibold">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                    {activeCampaign?.title 
+                      ? `${activeCampaign.title}` 
+                      : 'Kampanya İndirimi'}
+                  </span>
+                  <span>-₺{campaignDiscount.toFixed(2)}</span>
+                </div>
+              )}
 
               <div className="flex justify-between text-sand-600">
                 <span>Kargo</span>
@@ -886,7 +953,6 @@ export default function CheckoutPage({
                 </span>
               </div>
 
-              {/* 💰 Tam Doğru Matematiksel Toplam: 750 - 150 - 150 + 100 = 550.00 TL */}
               <div className="border-t border-sand-100 pt-2 flex justify-between items-baseline">
                 <span className="font-semibold text-sand-800">Toplam</span>
                 <span className="text-2xl font-bold text-brand-700">

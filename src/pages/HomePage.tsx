@@ -10,6 +10,7 @@ import EditableText from '../components/admin/EditableText';
 import EditableImage from '../components/admin/EditableImage';
 import { useAdminEditing } from '../contexts/AdminEditingContext';
 import CustomBouquetPage from './CustomBouquetPage'; 
+import blueBannerImg from '../assets/blue-banner.png';
 
 type Props = {
   categories: Category[];
@@ -117,7 +118,7 @@ export default function HomePage({ categories, featured, discounted, navigate, o
           {/* 1. ÜST KISIM: Sol Metinler + Sağ Çiçek Görselleri */}
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             
-            {/* SOL KOLON (Metinler, Butonlar, Puanlar) */}
+            {/* SOL KOLON */}
             <div className="animate-slide-up space-y-6">
               <div>
                 <span className="chip bg-brand-100 text-brand-700 mb-4 inline-flex items-center gap-1.5">
@@ -215,7 +216,7 @@ export default function HomePage({ categories, featured, discounted, navigate, o
               </div>
             </div>
 
-            {/* SAĞ KOLON (4'lü Çiçek Görselleri Grid'i) */}
+            {/* SAĞ KOLON */}
             <div className="relative animate-scale-in">
               <div className="relative grid grid-cols-2 gap-4">
                 <div className="space-y-4">
@@ -318,10 +319,10 @@ export default function HomePage({ categories, featured, discounted, navigate, o
 
           </div>
 
-          {/* 2. ALT KISIM: ÜSTE ORTALI, TAM GENİŞLİKTE BÜYÜK BANNER'LAR */}
+          {/* 2. ALT KISIM: KAMPANYALAR + MAVİ BUKET BANNER */}
           <div className="space-y-6 pt-6 border-t border-sand-200/60">
             
-            {/* 🌸 KAMPANYA BANNER SLIDER (TAM GENİŞLİK) */}
+            {/* KAMPANYA BANNER SLIDER */}
             {campaigns.length > 0 && (
               <div className="relative rounded-3xl overflow-hidden bg-white border border-brand-200 shadow-xl group transition-all">
                 <a
@@ -394,31 +395,39 @@ export default function HomePage({ categories, featured, discounted, navigate, o
               </div>
             )}
 
-            {/* 🌸 KENDİ HİKAYENİN ÇİÇEĞİNİ YARAT BANNER (TAM GENİŞLİK - BÜYÜK & EKRANA YAYILMIŞ) */}
-            <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="space-y-2 text-center md:text-left max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-semibold">
-                  <Sparkles className="w-4 h-4" /> Özel Aranjman Sihirbazı
-                </div>
-                <h3 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">
-                  Kendi Hikayenin Çiçeğini Yarat 💐
-                </h3>
-                <p className="text-sm text-pink-100 leading-relaxed">
-                  Çiçekleri, ambalajı ve vazo tercihini tamamen kendin seç; sevdiklerine imzanı taşıyan unutulmaz bir jest yap!
-                </p>
-              </div>
+            {/* 🌸 KENDİ HİKAYENİN ÇİÇEĞİNİ YARAT BANNER */}
+            <div 
+  className="relative w-full rounded-3xl overflow-hidden p-8 md:p-12 shadow-sm border border-slate-200/70 bg-cover bg-right bg-no-repeat transition-all"
+  style={{
+    backgroundImage: `url(${blueBannerImg})`
+  }}
+>
+  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+    <div className="max-w-xl space-y-3">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-900/10 text-slate-800 border border-slate-900/10 backdrop-blur-md">
+        ✨ Özel Aranjman Sihirbazı
+      </span>
 
-              <button
-                onClick={() => navigate({ name: 'custom-bouquet' as any })}
-                className="px-8 py-4 bg-white text-pink-600 hover:bg-pink-50 font-bold text-base rounded-2xl shadow-lg hover:shadow-xl transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer transform hover:-translate-y-0.5"
-              >
-                <span>Buketini Tasarla</span>
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
+      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-serif text-slate-900 leading-tight">
+        Kendi Hikayenin Çiçeğini Yarat 💐
+      </h2>
+
+      <p className="text-sm md:text-base text-slate-700 leading-relaxed font-medium">
+        Çiçekleri, ambalajı ve vazo tercihini tamamen kendin seç; sevdiklerine imzanı taşıyan unutulmaz bir jest yap!
+      </p>
+    </div>
+
+    <button
+      onClick={() => navigate({ name: 'custom-bouquet' })}
+      className="px-6 py-3.5 bg-white hover:bg-slate-50 text-slate-900 font-bold rounded-2xl shadow-md border border-slate-200 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap self-start md:self-auto group"
+    >
+      <span>Buketini Tasarla</span>
+      <span className="group-hover:translate-x-1 transition-transform text-slate-600">→</span>
+    </button>
+  </div>
+</div>
 
           </div>
-
         </div>
       </section>
 
