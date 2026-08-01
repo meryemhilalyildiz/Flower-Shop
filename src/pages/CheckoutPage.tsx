@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect,useRef } from 'react';
 import { ChevronLeft, CreditCard, MapPin, Check, Lock, BookmarkCheck, Calendar, Clock, Info, RefreshCw, Truck, Sparkles } from 'lucide-react';
 import type { CartItem, Route, OrderInfo } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
@@ -11,6 +11,17 @@ import {
 } from '../services/shipping';
 import type { ShippingCalculation } from '../types';
 import { calculateCampaignDiscount } from '../services/campaignCalculator';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 type Props = {
   items: CartItem[];
@@ -69,6 +80,9 @@ export default function CheckoutPage({
     senderName: '',
   });
 
+  const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
+
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [saveForNextTime, setSaveForNextTime] = useState(false);
   const [addressTitle, setAddressTitle] = useState('');
@@ -105,6 +119,85 @@ export default function CheckoutPage({
     }
     fetchActiveCampaign();
   }, []);
+
+  // 🌸 Aktif Kampanyayı Supabase'den Yükle
+  useEffect(() => {
+    async function fetchActiveCampaign() {
+      try {
+        const { data } = await supabase
+          .from('campaigns')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (data) setActiveCampaign(data);
+      } catch (err) {
+        console.error('Aktif kampanya çekilemedi:', err);
+      }
+    }
+    fetchActiveCampaign();
+  }, []);
+
+  // 🗺️ Harita Başlatma ve Tıklama Yönetimi (İl ve İlçe Otomatik Doldurmalı)
+  useEffect(() => {
+    const map = L.map('checkout-map').setView([39.9334, 32.8597], 13);
+    mapRef.current = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    //let marker: L.Marker | null = null;
+
+    map.on('click', async (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+
+      if (markerRef.current) {
+        map.removeLayer(markerRef.current);
+      }
+      markerRef.current = L.marker([lat, lng]).addTo(map);
+
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+          const data = await response.json();
+          
+          const fullAddress = data.display_name || `${lat}, ${lng}`;
+          update('address', fullAddress);
+
+          const addrDetails = data.address || {};
+          const rawCityName = addrDetails.state || addrDetails.province || addrDetails.city || '';
+          const matchedCity = cities.find(c => rawCityName.toLowerCase().includes(c.name.toLowerCase()));
+
+          if (matchedCity) {
+            setSelectedCityId(matchedCity.id);
+            const districtList = await fetchDistrictsByCity(matchedCity.id);
+            setDistricts(districtList);
+
+            const rawDistrictName = addrDetails.town || addrDetails.district || addrDetails.county || addrDetails.suburb || addrDetails.city_district || '';
+            const matchedDistrict = districtList.find(d => rawDistrictName.toLowerCase().includes(d.name.toLowerCase()));
+
+            if (matchedDistrict) {
+              update('city', matchedDistrict.name);
+            }
+
+            calculateShippingForCity(matchedCity.name);
+          }
+        } catch (error) {
+          console.error("Harita adres çözme hatası:", error);
+          update('address', `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        }
+      });
+
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+      };
+    }, [cities]); // cities dependency eklendi ki il listesi hazır olunca eşleşme yapsın
 
   useEffect(() => {
     setCities(CITIES_DATA);
@@ -249,12 +342,44 @@ export default function CheckoutPage({
       const cityObj = CITIES_DATA.find((c) => c.id === cityId);
       const cityName = cityObj ? cityObj.name : '';
 
+      // ✈️ HARİTAYI İLE ODAKLA:
+      if (cityName) {
+        handleLocationSearchForMap(cityName);
+      }
+
       const districtList = await fetchDistrictsByCity(cityId);
       setDistricts(districtList);
 
       await calculateShippingForCity(cityName);
     } else {
       setDistricts([]);
+    }
+  };
+
+  // ✈️ İl veya ilçe değiştiğinde haritayı o bölgeye odaklar ve pin atar
+  const handleLocationSearchForMap = async (cityName: string, districtName?: string) => {
+    const query = districtName ? `${districtName}, ${cityName}, Turkey` : `${cityName}, Turkey`;
+    
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+
+      if (data && data.length > 0 && mapRef.current) {
+        const { lat, lon } = data[0];
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lon);
+
+        // Haritayı o koordinata uçur
+        mapRef.current.setView([latitude, longitude], 13);
+
+        // Mevcut pini kaldırıp yeni konuma pin at
+        if (markerRef.current) {
+          mapRef.current.removeLayer(markerRef.current);
+        }
+        markerRef.current = L.marker([latitude, longitude]).addTo(mapRef.current);
+      }
+    } catch (err) {
+      console.error("Konum arama hatası:", err);
     }
   };
 
@@ -685,6 +810,23 @@ export default function CheckoutPage({
                   placeholder="05XX XXX XX XX"
                 />
               </div>
+
+{/* 🗺️ İNTERAKTİF HARİTA ALANI (BURAYA EKLENİYOR) */}
+<div className="sm:col-span-2 mb-2">
+                <label className="label flex items-center gap-1.5 mb-2">
+                  <MapPin className="w-4 h-4 text-brand-600" />
+                  Haritadan Konum Seçerek Adresi Otomatik Doldur 📍
+                </label>
+                <div 
+                  id="checkout-map" 
+                  style={{ width: '100%', height: '260px', borderRadius: '1rem', zIndex: 1 }} 
+                  className="border border-sand-300 shadow-sm"
+                />
+                <p className="text-[11px] text-sand-500 mt-1.5 italic">
+                  * Harita üzerinde teslimat yapılacak noktaya tıklamanız yeterlidir. Adresiniz ve konumunuz otomatik olarak doldurulacaktır.
+                </p>
+              </div>
+
               <div className="sm:col-span-2">
                 <label className="label">Teslimat Adresi *</label>
                 <textarea
@@ -715,7 +857,16 @@ export default function CheckoutPage({
                 <label className="label">Teslimat İlçesi *</label>
                 <select
                   value={form.city}
-                  onChange={(e) => update('city', e.target.value)}
+                  onChange={(e) => {
+                    const districtName = e.target.value;
+                    update('city', districtName);
+                    
+                    // ✈️ İLÇE SEÇİLİNCE HARİTAYI İLÇEYE ODAKLA:
+                    const selectedCityObj = CITIES_DATA.find((c) => c.id === selectedCityId);
+                    if (selectedCityObj && districtName) {
+                      handleLocationSearchForMap(selectedCityObj.name, districtName);
+                    }
+                  }}
                   className="input cursor-pointer"
                   disabled={!selectedCityId}
                 >
