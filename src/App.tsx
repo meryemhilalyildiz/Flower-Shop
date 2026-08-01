@@ -38,6 +38,7 @@ import AdminEditorPage from './pages/AdminEditorPage';
 import AdminCampaignsPage from './pages/AdminCampaignsPage';
 import AdminFaqPage from './pages/AdminFaqPage';
 import CustomBouquetPage from './pages/CustomBouquetPage';
+import AdminCourierRoutePage from './pages/AdminCourierRoutePage';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -340,6 +341,7 @@ function App() {
     }
 
     switch (route.name) {
+      
       case 'custom-bouquet':
       return <CustomBouquetPage onAddToCart={cart.addItem} />;
 
@@ -375,6 +377,9 @@ function App() {
           onToggleFavorite={favorites.toggleFavorite}
         />
       );
+
+      case 'admin-kargo-rota':
+        return <AdminCourierRoutePage />;
 
       case 'shop':
         return (
