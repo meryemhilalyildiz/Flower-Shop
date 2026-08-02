@@ -21,7 +21,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        setMode('update-password');
+        setMode('update-password'); // 🌸 Oturumu silmeden direkt şifre güncelleme ekranını açıyoruz
       }
     });
 
@@ -326,8 +326,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-{/* 🌸 KVKK ve Üyelik Sözleşmesi Onay Kutucuğu Sadece Kayıt Ol (signup) Modunda Görünür */}
-{mode === 'signup' && (
+            {/* 🌸 KVKK ve Üyelik Sözleşmesi Onay Kutucuğu Sadece Kayıt Ol (signup) Modunda Görünür */}
+            {mode === 'signup' && (
               <div className="flex items-start gap-2.5 pt-1">
                 <input
                   type="checkbox"
@@ -374,7 +374,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   'ni okudum, onaylıyorum.
                 </label>
               </div>
-            )}           
+            )}          
 
             <button
               type="submit"
