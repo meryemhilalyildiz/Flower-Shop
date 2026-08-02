@@ -7,7 +7,6 @@ interface Props {
   children: React.ReactNode;
   currentPage: string;
   navigate: (route: any) => void;
-  subTab?: string;
 }
 
 const PAGE_TITLES: Record<string, string> = {
@@ -16,7 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   'courier-all': 'Toplam Siparişler',
 };
 
-export default function CourierLayout({ children, currentPage, navigate, subTab = 'pending' }: Props) {
+export default function CourierLayout({ children, currentPage, navigate }: Props) {
   const [loading, setLoading] = useState(true);
   const [currentCourier, setCurrentCourier] = useState<{ id: string; name: string; email: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -63,7 +62,6 @@ export default function CourierLayout({ children, currentPage, navigate, subTab 
       <div className="hidden md:block sticky top-0 h-screen">
         <CourierSidebar 
           currentPage={currentPage} 
-          currentSubTab={subTab}
           navigate={navigate} 
           onSignOut={handleSignOut}
         />
@@ -76,7 +74,6 @@ export default function CourierLayout({ children, currentPage, navigate, subTab 
           <div className="absolute left-0 top-0 h-full">
             <CourierSidebar 
               currentPage={currentPage} 
-              currentSubTab={subTab}
               navigate={navigate} 
               onSignOut={handleSignOut}
               onClose={() => setSidebarOpen(false)}

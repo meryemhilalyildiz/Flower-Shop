@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Truck, MapPin, RefreshCw, Car, Bike, Package, ArrowLeft, Clock, CheckCircle, UserPlus, Shield, Trash2, Users, User, Calendar, CheckSquare, Square, ChevronDown, ChevronUp, Map, Mail } from 'lucide-react';
+import { Truck, MapPin, RefreshCw, Car, Bike, Package, ArrowLeft, Clock, CheckCircle, UserPlus, Shield, Trash2, Users, User, Calendar, CheckSquare, Square, ChevronDown, ChevronUp, Map, Mail, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 type Courier = {
@@ -49,6 +49,12 @@ export default function AdminCourierRoutePage() {
   const [newCourierPassword, setNewCourierPassword] = useState('');
   const [newCourierPlate, setNewCourierPlate] = useState('');
   const [newCourierVehicle, setNewCourierVehicle] = useState<'motor' | 'araba'>('motor');
+
+  // 📦 Kargo Modal State'leri
+  const [selectedOrderForCourier, setSelectedOrderForCourier] = useState<Order | null>(null);
+  const [selectedCourierId, setSelectedCourierId] = useState<string>('');
+  const [trackingInput, setTrackingInput] = useState('');
+  const [bulkTrackingInput, setBulkTrackingInput] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -124,25 +130,29 @@ export default function AdminCourierRoutePage() {
   };
 
   const handleAssignCourier = async (orderId: string, courierId: string) => {
-    try {
-      if (courierId) {
-        const currentAssignedCount = orders.filter(o => o.courier_id === courierId && o.status !== 'delivered' && o.id !== orderId).length;
-        if (currentAssignedCount >= 20) {
-          alert('⚠️ Bu kurye maksimum paket sınırına (20 paket) ulaştı! Daha fazla atanamaz.');
-          return;
-        }
+    // Eğer kurye atanıyorsa modal aç
+    if (courierId) {
+      const currentAssignedCount = orders.filter(o => o.courier_id === courierId && o.status !== 'delivered' && o.id !== orderId).length;
+      if (currentAssignedCount >= 20) {
+        alert('⚠️ Bu kurye maksimum paket sınırına (20 paket) ulaştı! Daha fazla atanamaz.');
+        return;
       }
 
-      const updateData: any = { courier_id: courierId ? courierId : null };
-      
-      // Eğer kurye atanıyorsa status'ü processing yap, kaldırılıyorsa pending yap
-      if (courierId) {
-        updateData.status = 'processing';
-      } else {
-        const order = orders.find(o => o.id === orderId);
-        if (order && order.status === 'processing') {
-          updateData.status = 'pending';
-        }
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        setSelectedOrderForCourier(order);
+        setSelectedCourierId(courierId);
+        setTrackingInput(order.tracking_code || '');
+      }
+      return;
+    }
+
+    // Kurye kaldırılıyorsa direkt işlem yap
+    try {
+      const updateData: any = { courier_id: null };
+      const order = orders.find(o => o.id === orderId);
+      if (order && (order.status === 'shipped' || order.status === 'processing')) {
+        updateData.status = 'pending';
       }
 
       const { error } = await supabase
@@ -151,8 +161,41 @@ export default function AdminCourierRoutePage() {
         .eq('id', orderId);
 
       if (error) throw error;
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: courierId, status: updateData.status || o.status } : o));
-      alert('✅ Kurye başarıyla atandı!');
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: undefined, status: updateData.status || o.status } : o));
+      alert('✅ Kurye başarıyla kaldırıldı!');
+    } catch (err: any) {
+      alert('Atama hatası: ' + err.message);
+    }
+  };
+
+  // 📦 Kurye Atama Modal Onayı
+  const confirmCourierAssignment = async () => {
+    if (!trackingInput.trim()) {
+      alert("Lütfen kargo takip kodunu giriniz.");
+      return;
+    }
+
+    if (!selectedOrderForCourier || !selectedCourierId) return;
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          courier_id: selectedCourierId,
+          status: 'shipped',
+          tracking_code: trackingInput,
+          tracking_number: trackingInput
+        })
+        .eq('id', selectedOrderForCourier.id);
+
+      if (error) throw error;
+      
+      setOrders(prev => prev.map(o => o.id === selectedOrderForCourier.id ? { ...o, courier_id: selectedCourierId, status: 'shipped', tracking_code: trackingInput, tracking_number: trackingInput } : o));
+      
+      setSelectedOrderForCourier(null);
+      setSelectedCourierId('');
+      setTrackingInput('');
+      alert('✅ Kurye başarıyla atandı ve sipariş kargoya verildi!');
     } catch (err: any) {
       alert('Atama hatası: ' + err.message);
     }
@@ -174,20 +217,28 @@ export default function AdminCourierRoutePage() {
       return;
     }
 
+    if (!bulkTrackingInput.trim()) {
+      alert("Lütfen kargo takip kodunu giriniz.");
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('orders')
         .update({ 
           courier_id: bulkCourierId,
-          status: 'processing'
+          status: 'shipped',
+          tracking_code: bulkTrackingInput,
+          tracking_number: bulkTrackingInput
         })
         .in('id', selectedOrderIds);
 
       if (error) throw error;
 
-      alert(`✅ Seçilen ${selectedOrderIds.length} sipariş kuryeye başarıyla atandı!`);
+      alert(`✅ Seçilen ${selectedOrderIds.length} sipariş kuryeye başarıyla atandı ve kargoya verildi!`);
       setSelectedOrderIds([]);
       setBulkCourierId('');
+      setBulkTrackingInput('');
       loadData();
     } catch (err: any) {
       alert('Toplu atama hatası: ' + err.message);
@@ -386,7 +437,7 @@ export default function AdminCourierRoutePage() {
                 </div>
 
                 {filteredPendingOrders.length > 0 && (
-                  <div className="flex items-center gap-2 bg-sand-50 p-2.5 rounded-2xl border border-sand-200 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-sand-50 p-2.5 rounded-2xl border border-sand-200 w-full sm:w-auto">
                     <button
                       onClick={() => handleToggleSelectAll(filteredPendingOrders)}
                       className="text-xs font-bold text-brand-700 px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 rounded-xl transition-all cursor-pointer"
@@ -403,6 +454,13 @@ export default function AdminCourierRoutePage() {
                         <option key={c.id} value={c.id}>{c.name} ({c.vehicle_type})</option>
                       ))}
                     </select>
+                    <input
+                      type="text"
+                      placeholder="Kargo Kodu"
+                      value={bulkTrackingInput}
+                      onChange={(e) => setBulkTrackingInput(e.target.value)}
+                      className="input text-xs py-1.5 w-[120px] cursor-pointer font-bold bg-white"
+                    />
                     <button
                       onClick={handleBulkAssignCourier}
                       className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs flex-shrink-0"
@@ -889,6 +947,53 @@ export default function AdminCourierRoutePage() {
 
         </div>
       </main>
+
+      {/* 📦 KURYE ATAMA KARGO KODU MODALI */}
+      {selectedOrderForCourier && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 relative">
+            <button 
+              onClick={() => setSelectedOrderForCourier(null)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              📦 Kurye Atama - Kargo Kodu
+            </h3>
+            <p className="text-sm text-gray-500">
+              #{selectedOrderForCourier.id.slice(0, 8)} numaralı siparişi <strong>{couriers.find(c => c.id === selectedCourierId)?.name || 'seçilen kuryeye'}</strong> atamak üzeresiniz. Kargo takip kodunu giriniz:
+            </p>
+            
+            <input
+              type="text"
+              placeholder="Örn: 1234567890"
+              value={trackingInput}
+              onChange={(e) => setTrackingInput(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+            />
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => {
+                  setSelectedOrderForCourier(null);
+                  setSelectedCourierId('');
+                  setTrackingInput('');
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={confirmCourierAssignment}
+                className="px-5 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 rounded-xl font-medium shadow-sm transition-colors"
+              >
+                Kuryeye Ata & Kargoya Ver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

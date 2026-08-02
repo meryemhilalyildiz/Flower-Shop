@@ -560,15 +560,9 @@ function App() {
       case 'courier-dashboard':
       case 'courier-delivered':
       case 'courier-all': {
-        const subTabMap: Record<string, string> = {
-          'courier-dashboard': 'pending',
-          'courier-delivered': 'delivered',
-          'courier-all': 'all'
-        };
-        const currentSubTab = subTabMap[route.name];
         return (
-          <CourierLayout currentPage={route.name} navigate={navigate} subTab={currentSubTab}>
-            <CourierDashboardPage navigate={navigate} subTab={currentSubTab} />
+          <CourierLayout currentPage={route.name} navigate={navigate}>
+            <CourierDashboardPage navigate={navigate} />
           </CourierLayout>
         );
       }

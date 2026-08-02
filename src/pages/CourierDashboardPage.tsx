@@ -6,16 +6,15 @@ import CourierMap from '../components/courier/CourierMap';
 
 interface Props {
   navigate: (route: any) => void;
-  subTab?: string;
 }
 
-export default function CourierDashboardPage({ navigate, subTab = 'pending' }: Props) {
+export default function CourierDashboardPage({ navigate }: Props) {
   const [orders, setOrders] = useState<CourierOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<RealtimeSubscription | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
-  const [currentTab, setCurrentTab] = useState<'pending' | 'shipped' | 'delivered' | 'all'>(subTab as any || 'pending');
+  const [currentTab, setCurrentTab] = useState<'pending' | 'delivered' | 'all'>('pending');
 
   const loadOrders = async () => {
     const courier = getCurrentCourier();
@@ -57,14 +56,7 @@ export default function CourierDashboardPage({ navigate, subTab = 'pending' }: P
     }
   }, [navigate]);
 
-  // 🌸 Sync tab with sidebar
-  useEffect(() => {
-    if (subTab) {
-      setCurrentTab(subTab as any);
-    }
-  }, [subTab]);
-
-  const handleTabChange = (newTab: 'pending' | 'shipped' | 'delivered' | 'all') => {
+  const handleTabChange = (newTab: 'pending' | 'delivered' | 'all') => {
     setCurrentTab(newTab);
     setSelectedOrderIds([]); // Clear selection when tab changes
   };
@@ -78,9 +70,7 @@ export default function CourierDashboardPage({ navigate, subTab = 'pending' }: P
       await loadOrders();
       
       // 🌸 Auto-move to appropriate tab based on new status
-      if (newStatus === 'shipped') {
-        handleTabChange('shipped');
-      } else if (newStatus === 'delivered') {
+      if (newStatus === 'delivered') {
         handleTabChange('delivered');
       }
     } else {
@@ -138,8 +128,6 @@ export default function CourierDashboardPage({ navigate, subTab = 'pending' }: P
   const getFilteredOrders = () => {
     switch (currentTab) {
       case 'pending':
-        return orders.filter(o => o.status === 'processing');
-      case 'shipped':
         return orders.filter(o => o.status === 'shipped');
       case 'delivered':
         return orders.filter(o => o.status === 'delivered');
@@ -233,19 +221,8 @@ export default function CourierDashboardPage({ navigate, subTab = 'pending' }: P
                   : 'text-sand-600 hover:bg-sand-50'
               }`}
             >
-              <Clock className="h-4 w-4 inline mr-2" />
-              Bekleyen ({orders.filter(o => o.status === 'processing').length})
-            </button>
-            <button
-              onClick={() => handleTabChange('shipped')}
-              className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                currentTab === 'shipped'
-                  ? 'bg-brand-600 text-white'
-                  : 'text-sand-600 hover:bg-sand-50'
-              }`}
-            >
               <Truck className="h-4 w-4 inline mr-2" />
-              Yolda Olan ({orders.filter(o => o.status === 'shipped').length})
+              Aktif Siparişler ({orders.filter(o => o.status === 'shipped').length})
             </button>
             <button
               onClick={() => handleTabChange('delivered')}

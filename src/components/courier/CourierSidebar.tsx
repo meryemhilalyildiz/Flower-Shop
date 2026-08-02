@@ -2,7 +2,6 @@ import { Package, LogOut, Truck, Flower2, Clock, CheckCircle, List } from 'lucid
 
 interface Props {
   currentPage: string;
-  currentSubTab?: string;
   navigate: (route: any) => void;
   onSignOut: () => void;
   onClose?: () => void;
@@ -12,17 +11,13 @@ const menuItems = [
   { 
     id: 'courier-dashboard', 
     label: 'Aktif Siparişler', 
-    icon: Package,
-    subTabs: [
-      { id: 'pending', label: 'Bekleyen', icon: Clock },
-      { id: 'shipped', label: 'Yolda Olan', icon: Truck },
-    ]
+    icon: Truck,
   },
   { id: 'courier-delivered', label: 'Teslim Edilenler', icon: CheckCircle },
   { id: 'courier-all', label: 'Toplam Siparişler', icon: List },
 ];
 
-export default function CourierSidebar({ currentPage, currentSubTab = 'pending', navigate, onSignOut, onClose }: Props) {
+export default function CourierSidebar({ currentPage, navigate, onSignOut, onClose }: Props) {
   return (
     <div className="w-64 bg-white border-r border-sand-200 h-screen flex flex-col">
       {/* Logo */}
@@ -62,33 +57,7 @@ export default function CourierSidebar({ currentPage, currentSubTab = 'pending',
                 {item.label}
               </button>
               
-              {/* 🌸 Alt sekmeler */}
-              {hasSubTabs && isActive && (
-                <div className="ml-8 mt-1 space-y-1">
-                  {item.subTabs!.map((subTab) => {
-                    const SubIcon = subTab.icon;
-                    const isSubActive = currentSubTab === subTab.id;
-                    
-                    return (
-                      <button
-                        key={subTab.id}
-                        onClick={() => {
-                          // Tab değişimi şu an yapılmıyor - sadece styling gösterimi
-                          onClose?.();
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                          isSubActive
-                            ? 'bg-brand-100 text-brand-800'
-                            : 'text-sand-500 hover:bg-sand-50 hover:text-sand-700'
-                        }`}
-                      >
-                        <SubIcon className="h-4 w-4" />
-                        {subTab.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+
             </div>
           );
         })}
