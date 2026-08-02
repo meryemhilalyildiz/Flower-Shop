@@ -133,13 +133,25 @@ export default function AdminCourierRoutePage() {
         }
       }
 
+      const updateData: any = { courier_id: courierId ? courierId : null };
+      
+      // Eğer kurye atanıyorsa status'ü processing yap, kaldırılıyorsa pending yap
+      if (courierId) {
+        updateData.status = 'processing';
+      } else {
+        const order = orders.find(o => o.id === orderId);
+        if (order && order.status === 'processing') {
+          updateData.status = 'pending';
+        }
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({ courier_id: courierId ? courierId : null })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: courierId } : o));
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: courierId, status: updateData.status || o.status } : o));
       alert('✅ Kurye başarıyla atandı!');
     } catch (err: any) {
       alert('Atama hatası: ' + err.message);
@@ -165,7 +177,10 @@ export default function AdminCourierRoutePage() {
     try {
       const { error } = await supabase
         .from('orders')
-        .update({ courier_id: bulkCourierId })
+        .update({ 
+          courier_id: bulkCourierId,
+          status: 'processing'
+        })
         .in('id', selectedOrderIds);
 
       if (error) throw error;
