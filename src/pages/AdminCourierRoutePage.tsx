@@ -23,7 +23,7 @@ type Order = {
   created_at?: string;
   delivery_date?: string;
   tracking_code?: string;
-  courier_id?: string;
+  courier_id?: string | null;
   delivery_order?: number;
   items?: any[];
 };
@@ -161,7 +161,7 @@ export default function AdminCourierRoutePage() {
         .eq('id', orderId);
 
       if (error) throw error;
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: undefined, status: updateData.status || o.status } : o));
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: null, status: updateData.status || o.status } : o));
       alert('✅ Kurye başarıyla kaldırıldı!');
     } catch (err: any) {
       alert('Atama hatası: ' + err.message);
@@ -175,7 +175,10 @@ export default function AdminCourierRoutePage() {
       return;
     }
 
-    if (!selectedOrderForCourier || !selectedCourierId) return;
+    if (!selectedOrderForCourier || !selectedCourierId) {
+      alert('Kurye veya sipariş seçili değil!');
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -191,6 +194,8 @@ export default function AdminCourierRoutePage() {
       if (error) throw error;
       
       setOrders(prev => prev.map(o => o.id === selectedOrderForCourier.id ? { ...o, courier_id: selectedCourierId, status: 'shipped', tracking_code: trackingInput, tracking_number: trackingInput } : o));
+      
+      await loadData();
       
       setSelectedOrderForCourier(null);
       setSelectedCourierId('');
@@ -239,7 +244,7 @@ export default function AdminCourierRoutePage() {
       setSelectedOrderIds([]);
       setBulkCourierId('');
       setBulkTrackingInput('');
-      loadData();
+      await loadData();
     } catch (err: any) {
       alert('Toplu atama hatası: ' + err.message);
     }
