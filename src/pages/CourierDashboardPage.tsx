@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Truck, Package, MapPin, Phone, CheckCircle, Clock, RefreshCw, AlertCircle, Map, CheckSquare, Square, Navigation } from 'lucide-react';
-import { getCurrentCourier, getCourierOrders, updateOrderStatus, subscribeToCourierOrders, type RealtimeSubscription } from '../services/courierApi';
+import { Truck, Package, MapPin, Phone, CheckCircle, Clock, RefreshCw, AlertCircle, Map, CheckSquare, Square, Navigation, Send } from 'lucide-react';
+import { getCurrentCourier, getCourierOrders, updateOrderStatus, updateOrderStatusWithEmail, subscribeToCourierOrders, type RealtimeSubscription } from '../services/courierApi';
 import type { CourierOrder } from '../types';
 import CourierMap from '../components/courier/CourierMap';
 
@@ -14,7 +14,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<RealtimeSubscription | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
-  const [currentTab, setCurrentTab] = useState<'pending' | 'delivered' | 'all'>('pending');
+  const [currentTab, setCurrentTab] = useState<'pending' | 'in_transit' | 'delivered' | 'all'>('pending');
 
   const loadOrders = async () => {
     const courier = getCurrentCourier();
@@ -56,25 +56,53 @@ export default function CourierDashboardPage({ navigate }: Props) {
     }
   }, [navigate]);
 
-  const handleTabChange = (newTab: 'pending' | 'delivered' | 'all') => {
+  const handleTabChange = (newTab: 'pending' | 'in_transit' | 'delivered' | 'all') => {
     setCurrentTab(newTab);
     setSelectedOrderIds([]); // Clear selection when tab changes
   };
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     setUpdatingOrderId(orderId);
-    const result = await updateOrderStatus(orderId, newStatus);
     
-    if (result.success) {
-      // Refresh orders
-      await loadOrders();
+    const order = orders.find(o => o.id === orderId);
+    if (!order) {
+      setUpdatingOrderId(null);
+      return;
+    }
+
+    // 🌸 For in_transit status, send email notification
+    if (newStatus === 'in_transit') {
+      const result = await updateOrderStatusWithEmail(
+        orderId, 
+        newStatus,
+        {
+          customerName: order.recipient_name || order.recipientName || 'Değerli Müşterimiz',
+          customerEmail: order.user_email || order.email,
+          trackingNumber: order.tracking_number || order.tracking_code,
+          totalAmount: Number(order.total_amount || 0)
+        }
+      );
       
-      // 🌸 Auto-move to appropriate tab based on new status
-      if (newStatus === 'delivered') {
-        handleTabChange('delivered');
+      if (result.success) {
+        await loadOrders();
+        handleTabChange('in_transit');
+      } else {
+        alert('Durum güncellenemedi: ' + result.error);
       }
     } else {
-      alert('Durum güncellenemedi: ' + result.error);
+      // For other statuses, use simple update
+      const result = await updateOrderStatus(orderId, newStatus);
+      
+      if (result.success) {
+        await loadOrders();
+        
+        // 🌸 Auto-move to appropriate tab based on new status
+        if (newStatus === 'delivered') {
+          handleTabChange('delivered');
+        }
+      } else {
+        alert('Durum güncellenemedi: ' + result.error);
+      }
     }
     
     setUpdatingOrderId(null);
@@ -129,6 +157,8 @@ export default function CourierDashboardPage({ navigate }: Props) {
     switch (currentTab) {
       case 'pending':
         return orders.filter(o => o.status === 'shipped');
+      case 'in_transit':
+        return orders.filter(o => o.status === 'in_transit');
       case 'delivered':
         return orders.filter(o => o.status === 'delivered');
       case 'all':
@@ -147,7 +177,8 @@ export default function CourierDashboardPage({ navigate }: Props) {
     const statusConfig: Record<string, { color: string; label: string; icon: any }> = {
       pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Beklemede', icon: Clock },
       processing: { color: 'bg-blue-100 text-blue-800', label: 'Hazırlanıyor', icon: Package },
-      shipped: { color: 'bg-purple-100 text-purple-800', label: 'Yolda', icon: Truck },
+      shipped: { color: 'bg-purple-100 text-purple-800', label: 'Kargoda', icon: Package },
+      in_transit: { color: 'bg-orange-100 text-orange-800', label: 'Yolda', icon: Navigation },
       delivered: { color: 'bg-green-100 text-green-800', label: 'Teslim Edildi', icon: CheckCircle },
       cancelled: { color: 'bg-red-100 text-red-800', label: 'İptal', icon: AlertCircle },
     };
@@ -221,8 +252,19 @@ export default function CourierDashboardPage({ navigate }: Props) {
                   : 'text-sand-600 hover:bg-sand-50'
               }`}
             >
-              <Truck className="h-4 w-4 inline mr-2" />
-              Aktif Siparişler ({orders.filter(o => o.status === 'shipped').length})
+              <Package className="h-4 w-4 inline mr-2" />
+              Kargoda ({orders.filter(o => o.status === 'shipped').length})
+            </button>
+            <button
+              onClick={() => handleTabChange('in_transit')}
+              className={`flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                currentTab === 'in_transit'
+                  ? 'bg-brand-600 text-white'
+                  : 'text-sand-600 hover:bg-sand-50'
+              }`}
+            >
+              <Navigation className="h-4 w-4 inline mr-2" />
+              Yolda ({orders.filter(o => o.status === 'in_transit').length})
             </button>
             <button
               onClick={() => handleTabChange('delivered')}
@@ -250,7 +292,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
         </div>
 
         {/* 🌸 Multi-select and Route Optimization */}
-        {currentTab !== 'delivered' && currentTab !== 'all' && filteredOrders.length > 0 && (
+        {(currentTab === 'pending' || currentTab === 'in_transit') && filteredOrders.length > 0 && (
           <div className="bg-white rounded-2xl p-4 border border-sand-200 mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -316,17 +358,17 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
 }) {
   // 🌸 Kurye yetkileri: Sadece "processing" -> "shipped" ve "shipped" -> "delivered" yapabilir
   const getNextStatus = (currentStatus: string) => {
-    if (currentStatus === 'processing') return 'shipped';
-    if (currentStatus === 'shipped') return 'delivered';
+    if (currentStatus === 'shipped') return 'in_transit';
+    if (currentStatus === 'in_transit') return 'delivered';
     return currentStatus;
   };
 
-  const canUpdate = (order.status === 'processing' || order.status === 'shipped') && order.status !== 'delivered' && order.status !== 'cancelled';
+  const canUpdate = (order.status === 'shipped' || order.status === 'in_transit') && order.status !== 'delivered' && order.status !== 'cancelled';
   const nextStatus = getNextStatus(order.status);
   
   const getNextStatusLabel = (currentStatus: string) => {
-    if (currentStatus === 'processing') return 'Yola Çıktı';
-    if (currentStatus === 'shipped') return 'Teslim Edildi';
+    if (currentStatus === 'shipped') return 'Yola Çıktı';
+    if (currentStatus === 'in_transit') return 'Teslim Edildi';
     return '';
   };
 

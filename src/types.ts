@@ -135,13 +135,17 @@ export type CourierOrder = {
   shipping_address: string;
   city: string;
   district: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'shipped' | 'in_transit' | 'delivered' | 'cancelled';
   total_amount: number;
   tracking_code?: string;
   delivery_order?: number;
   estimated_delivery_time?: string;
   items: any[];
   created_at: string;
+  user_email?: string;
+  email?: string;
+  recipientName?: string;
+  tracking_number?: string;
 };
 
 // =====================================================================

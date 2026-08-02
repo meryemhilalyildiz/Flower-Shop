@@ -150,6 +150,57 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   }
 }
 
+// Update order status with email notification
+export async function updateOrderStatusWithEmail(
+  orderId: string, 
+  status: string,
+  orderDetails?: {
+    customerName: string;
+    customerEmail: string;
+    trackingNumber?: string;
+    totalAmount: number;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status })
+      .eq('id', orderId);
+
+    if (error) throw error;
+
+    // Send email notification if order details provided
+    if (orderDetails && orderDetails.customerEmail) {
+      try {
+        const { generateOrderEmailHtml } = await import('./emailService');
+        const { emailSubject, html } = generateOrderEmailHtml({
+          customerName: orderDetails.customerName,
+          orderNumber: orderId,
+          totalAmount: orderDetails.totalAmount,
+          status: status,
+          trackingNumber: orderDetails.trackingNumber
+        });
+
+        await supabase.functions.invoke('send-email', {
+          body: {
+            to: orderDetails.customerEmail,
+            subject: emailSubject,
+            html: html
+          }
+        });
+      } catch (emailError) {
+        console.error('Email gönderilirken hata:', emailError);
+        // Don't fail the status update if email fails
+      }
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Sipariş durumu güncellenirken hata:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 // Get all couriers (for admin)
 export async function getAllCouriers(): Promise<Courier[]> {
   try {
