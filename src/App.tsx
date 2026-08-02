@@ -13,6 +13,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
 import HomePage from './pages/HomePage';
+import ProfilePage from './pages/ProfilePage';
 import ShopPage from './pages/ShopPage';
 import { OrdersPage } from './pages/OrdersPage';
 import ProductPage from './pages/ProductPage';
@@ -344,6 +345,9 @@ function App() {
       
       case 'custom-bouquet':
       return <CustomBouquetPage onAddToCart={cart.addItem} />;
+
+      case 'profile':
+        return <ProfilePage />;
 
       case 'cart':
       return (
