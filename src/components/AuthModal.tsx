@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Mail, Lock, User, X, Flower2, KeyRound } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Lock, User, X, Flower2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 interface AuthModalProps {
@@ -8,19 +8,32 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'verify'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'update-password'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [code, setCode] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // 🌸 Supabase'den gelen şifre sıfırlama (Recovery) yönlendirmesini yakalıyoruz
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('update-password');
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   if (!isOpen) return null;
 
-  // 1. Adım: 6 Haneli Kod Gönderme Akışı
-  const handleSendCode = async (e: React.FormEvent) => {
+  // 1. Adım: Şifre Sıfırlama E-postası Gönderme
+  const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setMessage('❌ Lütfen e-posta adresinizi girin.');
@@ -31,12 +44,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
 
     try {
-      // Supabase'in yerleşik recovery token akışı (veya özel OTP)
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-        },
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
       });
 
       setLoading(false);
@@ -44,8 +53,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       if (error) {
         setMessage('❌ ' + error.message);
       } else {
-        setMessage('✅ 🌸 6 haneli doğrulama kodunuz e-posta adresinize gönderildi!');
-        setMode('verify'); // Kod ve yeni şifre ekranına geç
+        setMessage('✅ Şifre sıfırlama bağlantısı e-posta adresinize gönderildi!');
       }
     } catch (err: any) {
       setLoading(false);
@@ -53,12 +61,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // 2. Adım: 6 Haneli Kodu Doğrulayıp Yeni Şifreyi Kaydetme
-  // 🌸 Şifremi Unuttum Sonrası Yeni Şifreyi Kaydetme
-  const handleVerifyAndSave = async (e: React.FormEvent) => {
+  // 2. Adım: Yeni Şifreyi Kaydetme (Maildeki linke tıklandığında açılan ekran)
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code || !newPassword) {
-      setMessage('❌ Lütfen kodu ve yeni şifrenizi girin.');
+    if (!newPassword || !confirmPassword) {
+      setMessage('❌ Lütfen yeni şifre alanlarını doldurun.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setMessage('❌ Şifreler birbiriyle eşleşmiyor.');
       return;
     }
 
@@ -66,35 +78,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
 
     try {
-      // 1. Kodu doğrula
-      const { error: otpError } = await supabase.auth.verifyOtp({
-        email,
-        token: code.trim(),
-        type: 'recovery',
-      });
-
-      if (otpError) {
-        setLoading(false);
-        setMessage('❌ Kod hatalı veya süresi dolmuş: ' + otpError.message);
-        return;
-      }
-
-      // 2. Yeni şifreyi kesin olarak güncelle
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
       setLoading(false);
 
-      if (updateError) {
-        setMessage('❌ Şifre güncellenemedi: ' + updateError.message);
+      if (error) {
+        setMessage('❌ Şifre güncellenemedi: ' + error.message);
       } else {
-        setMessage('✅ Şifreniz başarıyla değiştirildi! Yeni şifrenizle giriş yapabilirsiniz.');
+        setMessage('✅ Şifreniz başarıyla güncellendi! Giriş yapabilirsiniz.');
         setTimeout(() => {
           setMode('signin');
-          setPassword(newPassword);
-          setCode('');
           setNewPassword('');
+          setConfirmPassword('');
           setMessage('');
         }, 2000);
       }
@@ -179,21 +176,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </div>
           <h2 className="font-display text-2xl font-bold text-sand-900">
             {mode === 'forgot' && 'Şifremi Unuttum'}
-            {mode === 'verify' && 'Yeni Şifre Belirleme'}
+            {mode === 'update-password' && 'Yeni Şifre Belirleme'}
             {mode === 'signup' && 'Hesap Oluştur'}
             {mode === 'signin' && 'Giriş Yap'}
           </h2>
           <p className="text-xs text-sand-500 mt-1">
-            {mode === 'forgot' && 'E-postanıza 6 haneli doğrulama kodu gönderelim'}
-            {mode === 'verify' && 'E-postanıza gelen 6 haneli kodu ve yeni şifrenizi girin'}
+            {mode === 'forgot' && 'E-postanıza şifre sıfırlama bağlantısı gönderelim'}
+            {mode === 'update-password' && 'Lütfen yeni şifrenizi belirleyin'}
             {mode === 'signup' && 'Taze çiçekler dünyasına katılın'}
             {mode === 'signin' && 'Flower Shop — Hoş Geldiniz'}
           </p>
         </div>
 
-        {/* 1. E-posta İsteme Formu */}
+        {/* 1. Şifremi Unuttum Formu */}
         {mode === 'forgot' && (
-          <form onSubmit={handleSendCode} className="space-y-4">
+          <form onSubmit={handleForgotSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-sand-700 ml-1">E-posta Adresiniz</label>
               <div className="relative">
@@ -201,6 +198,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="email"
                   required
+                  autoComplete="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="ornek@email.com"
@@ -214,30 +212,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               disabled={loading}
               className="w-full py-3.5 mt-2 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-semibold rounded-2xl shadow-lg shadow-brand-500/25 transition-all cursor-pointer disabled:opacity-50"
             >
-              {loading ? 'Kod Gönderiliyor...' : '6 Haneli Kod Gönder'}
+              {loading ? 'Gönderiliyor...' : 'Sıfırlama Bağlantısı Gönder'}
             </button>
           </form>
         )}
 
-        {/* 2. 6 Haneli Kod ve Yeni Şifre Giriş Formu */}
-        {mode === 'verify' && (
-          <form onSubmit={handleVerifyAndSave} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-sand-700 ml-1">E-postanıza Gelen 6 Haneli Kod</label>
-              <div className="relative">
-                <KeyRound className="w-5 h-5 text-sand-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="123456"
-                  className="w-full pl-11 pr-4 py-3 bg-brand-50/50 border border-brand-100 rounded-2xl text-sand-900 text-sm tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                />
-              </div>
-            </div>
-
+        {/* 2. Yeni Şifre Belirleme Formu (Maildeki linke tıklanınca açılır) */}
+        {mode === 'update-password' && (
+          <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-sand-700 ml-1">Yeni Şifre</label>
               <div className="relative">
@@ -245,8 +227,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="password"
                   required
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-11 pr-4 py-3 bg-brand-50/50 border border-brand-100 rounded-2xl text-sand-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-sand-700 ml-1">Yeni Şifre (Tekrar)</label>
+              <div className="relative">
+                <Lock className="w-5 h-5 text-sand-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                   className="w-full pl-11 pr-4 py-3 bg-brand-50/50 border border-brand-100 rounded-2xl text-sand-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 />
@@ -258,7 +257,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               disabled={loading}
               className="w-full py-3.5 mt-2 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-semibold rounded-2xl shadow-lg shadow-brand-500/25 transition-all cursor-pointer disabled:opacity-50"
             >
-              {loading ? 'Kaydediliyor...' : 'Yeni Şifreyi Kaydet'}
+              {loading ? 'Güncelleniyor...' : 'Yeni Şifreyi Kaydet'}
             </button>
           </form>
         )}
@@ -274,6 +273,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <input
                     type="text"
                     required
+                    autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Adınız Soyadınız"
@@ -290,6 +290,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="ornek@email.com"
@@ -316,6 +317,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -323,6 +325,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 />
               </div>
             </div>
+
+{/* 🌸 KVKK ve Üyelik Sözleşmesi Onay Kutucuğu Sadece Kayıt Ol (signup) Modunda Görünür */}
+{mode === 'signup' && (
+              <div className="flex items-start gap-2.5 pt-1">
+                <input
+                  type="checkbox"
+                  id="kvkk-check"
+                  required
+                  className="mt-0.5 w-4 h-4 text-brand-600 rounded border-sand-300 focus:ring-brand-500 cursor-pointer"
+                />
+                <label htmlFor="kvkk-check" className="text-[11px] text-sand-600 leading-tight">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      // @ts-ignore
+                      window.location.hash = '#/legal?tab=kvkk';
+                    }}
+                    className="text-brand-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    KVKK Metni
+                  </button>
+                  ,{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      // @ts-ignore
+                      window.location.hash = '#/legal?tab=gizlilik';
+                    }}
+                    className="text-brand-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    Gizlilik Politikası
+                  </button>{' '}
+                  ve{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      // @ts-ignore
+                      window.location.hash = '#/legal?tab=sozlesme';
+                    }}
+                    className="text-brand-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    Üyelik Sözleşmesi
+                  </button>
+                  'ni okudum, onaylıyorum.
+                </label>
+              </div>
+            )}           
 
             <button
               type="submit"

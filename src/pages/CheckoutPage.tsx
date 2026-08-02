@@ -100,6 +100,15 @@ export default function CheckoutPage({
   const [submitting, setSubmitting] = useState(false);
   const [couponInput, setCouponInput] = useState('');
 
+  const [acceptedContract, setAcceptedContract] = useState(false);
+
+const handleOpenCheckout = () => {
+  if (!acceptedContract) {
+    alert("Lütfen devam etmeden önce Mesafeli Satış Sözleşmesi'ni onaylayın.");
+    return;
+  }};
+
+
   // 🌸 Aktif Kampanyayı Supabase'den Yükle
   useEffect(() => {
     async function fetchActiveCampaign() {
@@ -826,8 +835,7 @@ export default function CheckoutPage({
                   placeholder="05XX XXX XX XX"
                 />
               </div>
-
-{/* 🗺️ İNTERAKTİF HARİTA ALANI (BURAYA EKLENİYOR) */}
+              {/* 🗺️ İNTERAKTİF HARİTA ALANI (BURAYA EKLENİYOR) */}
 <div className="sm:col-span-2 mb-2">
                 <label className="label flex items-center gap-1.5 mb-2">
                   <MapPin className="w-4 h-4 text-brand-600" />
@@ -1128,7 +1136,30 @@ export default function CheckoutPage({
               </div>
             </div>
 
-            <button type="submit" disabled={submitting} className="btn-primary w-full mt-6 cursor-pointer">
+            {/* 🌸 Mesafeli Satış Sözleşmesi Onay Kutucuğu */}
+            <div className="flex items-start gap-2.5 pt-4 mb-4">
+              <input
+                type="checkbox"
+                id="mesafeli-check"
+                required
+                className="mt-0.5 w-4 h-4 text-brand-600 rounded border-sand-300 focus:ring-brand-500 cursor-pointer"
+              />
+              <label htmlFor="mesafeli-check" className="text-xs text-sand-600 leading-tight">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // @ts-ignore
+                    window.location.hash = '#/legal?tab=mesafeli';
+                  }}
+                  className="text-brand-600 font-semibold hover:underline cursor-pointer"
+                >
+                  Mesafeli Satış Sözleşmesi
+                </button>
+                'ni ve ön bilgilendirme koşullarını okudum, onaylıyorum.
+              </label>
+            </div>
+
+            <button type="submit" disabled={submitting} className="btn-primary w-full cursor-pointer">
               {submitting ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

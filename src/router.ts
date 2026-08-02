@@ -3,10 +3,23 @@ import type { Route } from './types';
 
 function parseHash(): Route {
   const hash = window.location.hash.replace(/^#\/?/, '');
-  const parts = hash.split('/').filter(Boolean);
+  const [path, queryString] = hash.split('?');
+  const parts = path.split('/').filter(Boolean);
 
   if (parts.length === 0) return { name: 'home' };
   if (parts[0] === 'profil') return { name: 'profile' }; // 👈 'profile' yerine 'profil' yaptık
+  // 🌸 Legal (Yasal Metinler) rotasını ve sekmeyi (?tab=...) buradan yakalıyoruz
+  if (parts[0] === 'legal') {
+    let tab: 'kvkk' | 'gizlilik' | 'sozlesme' = 'kvkk';
+    if (queryString) {
+      const params = new URLSearchParams(queryString);
+      const tabParam = params.get('tab');
+      if (tabParam === 'gizlilik' || tabParam === 'sozlesme' || tabParam === 'kvkk') {
+        tab = tabParam;
+      }
+    }
+    return { name: 'legal', tab };
+  }
   if (parts[0] === 'magaza') {
     if (parts.length >= 2) return { name: 'shop', categorySlug: decodeURIComponent(parts[1]) };
     return { name: 'shop' };
@@ -46,6 +59,8 @@ export function routeToHash(route: Route): string {
   switch (route.name) {
     case 'home':
       return '#/';
+      case 'legal':
+        return route.tab ? `#/legal?tab=${route.tab}` : '#/legal';
     case 'shop':
       return route.categorySlug ? `#/magaza/${route.categorySlug}` : '#/magaza';
       case 'profile': return '#/profil';

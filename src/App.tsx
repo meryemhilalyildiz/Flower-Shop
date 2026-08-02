@@ -40,6 +40,7 @@ import AdminCampaignsPage from './pages/AdminCampaignsPage';
 import AdminFaqPage from './pages/AdminFaqPage';
 import CustomBouquetPage from './pages/CustomBouquetPage';
 import AdminCourierRoutePage from './pages/AdminCourierRoutePage';
+import LegalPages from './pages/LegalPages';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -342,7 +343,9 @@ function App() {
     }
 
     switch (route.name) {
-      
+      case 'legal':
+        return <LegalPages navigate={navigate} />;
+         
       case 'custom-bouquet':
       return <CustomBouquetPage onAddToCart={cart.addItem} />;
 

@@ -84,6 +84,7 @@ export type Route =
   | { name: 'home' }
   | { name: 'shop'; categorySlug?: string }
   |{name: 'profile'}
+  | { name: 'legal'; tab?: 'kvkk' | 'gizlilik' | 'sozlesme' } // 🌸 Burayı ekliyoruz
   | { name: 'custom-bouquet' }
   | { name: 'product'; slug: string }
   | { name: 'cart' }
