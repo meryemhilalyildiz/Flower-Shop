@@ -6,6 +6,7 @@ function parseHash(): Route {
   const parts = hash.split('/').filter(Boolean);
 
   if (parts.length === 0) return { name: 'home' };
+  if (parts[0] === 'profil') return { name: 'profile' }; // 👈 'profile' yerine 'profil' yaptık
   if (parts[0] === 'magaza') {
     if (parts.length >= 2) return { name: 'shop', categorySlug: decodeURIComponent(parts[1]) };
     return { name: 'shop' };
@@ -47,6 +48,7 @@ export function routeToHash(route: Route): string {
       return '#/';
     case 'shop':
       return route.categorySlug ? `#/magaza/${route.categorySlug}` : '#/magaza';
+      case 'profile': return '#/profil';
     case 'product':
       return `#/urun/${route.slug}`;
       case 'custom-bouquet':

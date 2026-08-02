@@ -446,45 +446,49 @@ export default function CheckoutPage({
     const selected = savedAddresses.find((a) => a.id === addressId);
     if (!selected) return;
 
-    setForm((f) => ({
+    // 1. Temel alıcı ve adres metnini güncelliyoruz
+    setForm((f: any) => ({
       ...f,
       recipientName: selected.recipient_name || '',
       recipientPhone: selected.recipient_phone || '',
       address: selected.address || '',
     }));
 
-    let cityIdToUse = selected.city_id;
-    let districtName = selected.district || '';
+    // 2. Veritabanındaki 'district' kolonundan ilçe adını alıyoruz (Örn: Altındağ, Bozüyük, Merkez)
+    const districtNameFromDb = selected.district || '';
 
-    if (districtName.includes('/')) {
-      const parts = districtName.split('/');
-      const cityNameFromStr = parts[0]?.trim();
-      districtName = parts[1]?.trim() || districtName;
-
-      if (!cityIdToUse && cityNameFromStr) {
-        const cityObj = CITIES_DATA.find((c) => c.name.toLowerCase() === cityNameFromStr.toLowerCase());
-        if (cityObj) cityIdToUse = cityObj.id;
-      }
+    // 3. Adres metninden ili bulalım (Örn: "... - Altındağ / Ankara" -> Ankara)
+    let foundCityName = '';
+    const fullAddrText = selected.address || '';
+    if (fullAddrText.includes('/')) {
+      const parts = fullAddrText.split('/');
+      foundCityName = parts[parts.length - 1]?.trim();
     }
 
-    if (cityIdToUse) {
-      setSelectedCityId(cityIdToUse);
-      const cityObj = CITIES_DATA.find((c) => c.id === cityIdToUse);
-      const cityName = cityObj ? cityObj.name : '';
+   // 4. CITIES_DATA içerisinden il objesini ve ID'sini bulalım
+   let cityObj = CITIES_DATA.find((c) => c.name.toLowerCase() === foundCityName.toLowerCase());
 
-      const districtList = await fetchDistrictsByCity(cityIdToUse);
-      setDistricts(districtList);
+   if (cityObj) {
+     // 5. İl ID'sini set ediyoruz
+     setSelectedCityId(cityObj.id);
+     
+     // 6. O ile ait ilçeleri API'den çekip yüklüyoruz ve DÖNEN LİSTEYİ DOĞRUDAN KULLANIYORUZ
+     const districtList = await fetchDistrictsByCity(cityObj.id);
+     setDistricts(districtList);
 
-      setForm((f) => ({ ...f, city: districtName }));
+     // 7. İl ve ilçeyi form state'ine işliyoruz (İlçe adını form.city alanına yazıyoruz)
+     setForm((f: any) => ({
+       ...f,
+       city: districtNameFromDb,
+     }));
 
-      if (cityName) {
-        await calculateShippingForCity(cityName);
-      }
-    } else {
-      setForm((f) => ({ ...f, city: districtName }));
-    }
+     // 8. Kargo ücretini hesaplatıyoruz
+     await calculateShippingForCity(cityObj.name);
+
+     // 9. ✈️ Haritayı seçilen İl ve İlçeye odaklayıp pin atıyoruz
+     handleLocationSearchForMap(cityObj.name, districtNameFromDb);
+   }
   };
-
   // 🌸 📦 VERİTABANINDAN STOK DÜŞME FONKSİYONU
   // 🌸 📦 VERİTABANINDAN STOK DÜŞME FONKSİYONU (İsim & ID Çift Korumalı)
   const decreaseStockOnOrder = async (cartItems: CartItem[]) => {

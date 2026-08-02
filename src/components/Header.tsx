@@ -103,8 +103,9 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
       return;
     }
 
-    window.location.hash = '#/siparislerim';
-    navigate({ name: 'orders' as any });
+    // 🌸 Değişiklik burada: Artık siparişler yerine profil sayfasına gidiyor
+    window.location.hash = '#/profil';
+    navigate({ name: 'profile' as any });
   };
 
   const handleSearch = async (query: string) => {
@@ -314,12 +315,13 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
                   </button>
 
                   <button
-                    onClick={handleAccountClick}
-                    className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200 hover:bg-brand-100 transition-all"
-                  >
-                    {user.user_metadata?.full_name || user.email?.split('@')[0]}
-                  </button>
-
+  onClick={() => {
+    window.location.hash = '#/profil';
+  }}
+  className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200 hover:bg-brand-100 transition-all cursor-pointer"
+>
+  {user.user_metadata?.full_name || user.email?.split('@')[0]}
+</button>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-red-500 text-red-600 hover:bg-red-50 text-sm font-semibold transition-all ml-1"
