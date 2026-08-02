@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Truck, MapPin, RefreshCw, Car, Bike, Package, ArrowLeft, Clock, CheckCircle, UserPlus, Shield, Trash2, Users, User, Calendar, CheckSquare, Square, ChevronDown, ChevronUp, Map } from 'lucide-react';
+import { Truck, MapPin, RefreshCw, Car, Bike, Package, ArrowLeft, Clock, CheckCircle, UserPlus, Shield, Trash2, Users, User, Calendar, CheckSquare, Square, ChevronDown, ChevronUp, Map, Mail } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 type Courier = {
@@ -7,7 +7,9 @@ type Courier = {
   name: string;
   vehicle_type: 'motor' | 'araba';
   phone: string;
+  email: string;
   plate: string;
+  password_hash?: string;
   is_active: boolean;
 };
 
@@ -43,6 +45,8 @@ export default function AdminCourierRoutePage() {
 
   const [newCourierName, setNewCourierName] = useState('');
   const [newCourierPhone, setNewCourierPhone] = useState('');
+  const [newCourierEmail, setNewCourierEmail] = useState('');
+  const [newCourierPassword, setNewCourierPassword] = useState('');
   const [newCourierPlate, setNewCourierPlate] = useState('');
   const [newCourierVehicle, setNewCourierVehicle] = useState<'motor' | 'araba'>('motor');
 
@@ -68,16 +72,25 @@ export default function AdminCourierRoutePage() {
 
   const handleAddCourier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCourierName || !newCourierPhone) {
-      alert('Lütfen kurye adı ve telefonunu giriniz.');
+    if (!newCourierName || !newCourierPhone || !newCourierEmail || !newCourierPassword) {
+      alert('Lütfen kurye adı, telefon, e-posta ve şifre alanlarını doldurunuz.');
       return;
     }
 
     try {
+      // Simple password hashing (in production, do this on backend)
+      const encoder = new TextEncoder();
+      const data = encoder.encode(newCourierPassword);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
       const { error } = await supabase.from('couriers').insert([
         {
           name: newCourierName,
           phone: newCourierPhone,
+          email: newCourierEmail,
+          password_hash: passwordHash,
           plate: newCourierPlate,
           vehicle_type: newCourierVehicle,
           is_active: true
@@ -87,6 +100,10 @@ export default function AdminCourierRoutePage() {
       if (error) throw error;
       alert('✅ Kurye başarıyla eklendi!');
       setNewCourierName('');
+      setNewCourierPhone('');
+      setNewCourierEmail('');
+      setNewCourierPassword('');
+      setNewCourierPlate('');
       setNewCourierPhone('');
       setNewCourierPlate('');
       loadData();
@@ -557,8 +574,16 @@ export default function AdminCourierRoutePage() {
                     <input type="text" value={newCourierName} onChange={e => setNewCourierName(e.target.value)} placeholder="Ahmet Yılmaz" className="input text-xs w-full" />
                   </div>
                   <div>
+                    <label className="block text-xs font-semibold text-sand-600 mb-1">E-posta</label>
+                    <input type="email" value={newCourierEmail} onChange={e => setNewCourierEmail(e.target.value)} placeholder="ahmet@flowershop.com" className="input text-xs w-full" />
+                  </div>
+                  <div>
                     <label className="block text-xs font-semibold text-sand-600 mb-1">Telefon</label>
                     <input type="text" value={newCourierPhone} onChange={e => setNewCourierPhone(e.target.value)} placeholder="0555..." className="input text-xs w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-sand-600 mb-1">Şifre</label>
+                    <input type="password" value={newCourierPassword} onChange={e => setNewCourierPassword(e.target.value)} placeholder="••••••••" className="input text-xs w-full" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-sand-600 mb-1">Plaka</label>
@@ -591,6 +616,12 @@ export default function AdminCourierRoutePage() {
                           <div>
                             <h4 className="font-bold text-sand-900 text-sm">{c.name}</h4>
                             <p className="text-[11px] text-sand-500">{c.plate || 'Plakasız'} · {c.phone}</p>
+                            {c.email && (
+                              <p className="text-[11px] text-sand-400 flex items-center gap-1">
+                                <Mail className="w-3 h-3" />
+                                {c.email}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
