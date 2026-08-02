@@ -583,7 +583,6 @@ export default function CheckoutPage({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 1. Form Doğrulama
     if (
       !form.recipientName.trim() || 
       !form.recipientPhone.trim() || 
@@ -662,7 +661,7 @@ export default function CheckoutPage({
         recipientName: form.recipientName,
         recipientPhone: form.recipientPhone,
         address: form.address,
-        city: fullLocation,
+        city: fullLocation, // Örn: "Ankara / Polatlı" olarak temiz kaydedilir
         deliveryDate: form.deliveryDate,
         note: form.note,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
@@ -673,7 +672,11 @@ export default function CheckoutPage({
         campaignTitle: campaignDiscount > 0 ? campaignTitleToSend : undefined,
         discountAmount: totalDiscount,
         discount_amount: totalDiscount,
-        status: 'pending'
+        status: 'pending',
+        
+        // 🌸 Kargo Yönetimi için başlangıç alanları (Admin panelinden doldurulacak)
+        courier_id: null,
+        tracking_code: null
       } as any);
 
       if (createdOrderId) {
@@ -693,7 +696,6 @@ export default function CheckoutPage({
           console.error('order_items kaydı esnasında hata:', itemErr);
         }
 
-        // 🌸 📦 STOKLARI VERİTABANINDAN DÜŞÜYORUZ
         await decreaseStockOnOrder(items);
       }
   

@@ -104,7 +104,10 @@ export type Route =
   | { name: 'admin-editor' }
   | { name: 'admin-faq' }
   | { name: 'admin-shipping' }
-  | { name: 'admin-wiki' };
+  | { name: 'admin-wiki' }
+  |{name: 'admin-kargo-rota'}  
+  | { name: 'courier-portal', courierId?: string };
+
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri
 // =====================================================================

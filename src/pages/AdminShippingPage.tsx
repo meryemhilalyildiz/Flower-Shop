@@ -290,6 +290,8 @@ export function AdminShippingPage() {
         </div>
       </div>
 
+      
+
       {/* ===================================================================== */}
       {/* 🏪 Mağaza Ayarları Kartı */}
       {/* ===================================================================== */}
@@ -360,6 +362,29 @@ export function AdminShippingPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ===================================================================== */}
+      {/* 🚀 Kargo & Rota Paneli Hızlı Erişim Kartı (İstediğin Noktaya Eklendi) */}
+      {/* ===================================================================== */}
+      <div className="bg-gradient-to-r from-brand-900 to-brand-800 text-white p-6 rounded-3xl shadow-md flex flex-col sm:flex-row justify-between items-center gap-4 border border-brand-700/50">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
+            <Truck className="w-6 h-6 text-brand-200" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold font-display">Kurye Dağıtım & Rota Optimizasyon Paneli</h2>
+            <p className="text-brand-100 text-xs mt-0.5">
+              Siparişleri kuryelere atayın, motor/araba rotalarını optimize edin ve canlı takip edin.
+            </p>
+          </div>
+        </div>
+        <button
+        onClick={() => { window.location.hash = '#/admin/kargo-rota'; }}
+          className="px-5 py-3 bg-white text-brand-900 hover:bg-brand-50 rounded-2xl text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-2 flex-shrink-0"
+        >
+          <Truck className="w-4 h-4 text-brand-600" /> Kargo Paneline Git ➔
+        </button>
       </div>
 
       {/* ===================================================================== */}

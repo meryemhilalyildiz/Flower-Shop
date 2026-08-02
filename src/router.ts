@@ -20,6 +20,9 @@ function parseHash(): Route {
   if (parts[0] === 'hakkimizda') return { name: 'about' };
   if (parts[0] === 'iletisim') return { name: 'contact' };
   if (parts[0] === 'sss') return { name: 'faq' };
+  if (parts[0] === 'kurye') {
+    return { name: 'courier-portal', courierId: parts[1] };
+  }
   if (parts[0] === 'admin') {
     if (parts[1] === 'login') return { name: 'admin-login' };
     if (parts[1] === 'dashboard' || parts.length === 1) return { name: 'admin-dashboard' };
@@ -27,6 +30,7 @@ function parseHash(): Route {
     if (parts[1] === 'kategoriler') return { name: 'admin-categories' };
     if (parts[1] === 'siparisler') return { name: 'admin-orders' };
     if (parts[1] === 'kargo') return { name: 'admin-shipping' };
+    if (parts[1] === 'kargo-rota') return { name: 'admin-kargo-rota' };
     if (parts[1] === 'wiki') return { name: 'admin-wiki' };
     if (parts[1] === 'yorumlar') return { name: 'admin-reviews' };
     if (parts[1] === 'kuponlar') return { name: 'admin-coupons' };
@@ -75,6 +79,10 @@ export function routeToHash(route: Route): string {
       return '#/admin/siparisler';
     case 'admin-shipping':
       return '#/admin/kargo';
+      case 'admin-kargo-rota':
+        return '#/admin/kargo-rota';
+        case 'courier-portal':
+          return route.courierId ? `#/kurye/${route.courierId}` : '#/kurye';
     case 'admin-wiki':
       return '#/admin/wiki';
     case 'admin-reviews':
