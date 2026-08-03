@@ -282,6 +282,7 @@ export default function AdminOrdersPage() {
     pending: orders.filter((o) => o.status === 'pending').length,
     processing: orders.filter((o) => o.status === 'processing').length,
     shipped: orders.filter((o) => o.status === 'shipped').length,
+    in_transit: orders.filter((o) => o.status === 'in_transit').length,
     delivered: orders.filter((o) => o.status === 'delivered').length,
     cancellation_requested: orders.filter((o) => o.status === 'cancellation_requested').length,
     cancelled: orders.filter((o) => o.status === 'cancelled').length,
@@ -331,6 +332,7 @@ export default function AdminOrdersPage() {
               pending: 'Beklemede',
               processing: 'İşleniyor',
               shipped: 'Kargoda',
+              in_transit: 'Yolda',
               delivered: 'Teslim Edildi',
               cancellation_requested: 'İptal Talepleri',
               cancelled: 'İptal',
@@ -473,6 +475,7 @@ export default function AdminOrdersPage() {
                       <option value="pending">⏳ Beklemede</option>
                       <option value="processing">⚙️ İşleniyor</option>
                       <option value="shipped">🚚 Kargoda</option>
+                      <option value="in_transit">🚀 Yolda</option>
                       <option value="delivered">✅ Teslim Edildi</option>
                       <option value="cancellation_requested">⚠️ İptal Talebi Var</option>
                       <option value="cancelled">❌ İptal Edildi</option>

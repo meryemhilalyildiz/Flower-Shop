@@ -53,6 +53,7 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
     async function loadData() {

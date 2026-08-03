@@ -66,7 +66,7 @@ export interface OrderInfo {
   delivery_fee?: number;   // Supabase sütun uyumluluğu için
   total: number;           // Genel Toplam
 
-  status?: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | string;
+  status?: 'Hazırlanıyor' | 'Yola Çıktı' | 'Yolda' | 'Teslim Edildi' | 'pending' | 'processing' | 'shipped' | 'in_transit' | 'delivered' | 'cancelled' | string;
   tracking_number?: string; // Kargo takip numarası
   cancel_reason?: string;
   couponCode?: string;

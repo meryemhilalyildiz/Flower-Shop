@@ -283,7 +283,8 @@ export function normalizeOrderStatus(status: string): string {
 
   if (['pending', 'beklemede', 'bekliyor'].includes(value)) return 'pending';
   if (['processing', 'işleniyor', 'hazırlanıyor'].includes(value)) return 'processing';
-  if (['shipped', 'kargoda', 'yolda'].includes(value)) return 'shipped';
+  if (['shipped', 'kargoda'].includes(value)) return 'shipped';
+  if (['in_transit', 'yolda', 'yola çıktı'].includes(value)) return 'in_transit';
   if (['delivered', 'teslim', 'teslim edildi'].includes(value)) return 'delivered';
   if (['cancelled', 'iptal', 'iptal edildi'].includes(value)) return 'cancelled';
   if (['cancellation_requested', 'iptal talebi alındı', 'iptal talebi', 'iptal talepleri', 'iptal istendi'].includes(value)) return 'cancellation_requested';
@@ -295,11 +296,12 @@ export function normalizeOrderStatus(status: string): string {
  * Supabase'de İngilizce olarak saklanan sipariş durumunu
  * Türkçe'ye çevirir. (pending → Hazırlanıyor, delivered → Teslim Edildi, vb.)
  */
-export function normalizeOrderStatusToTurkish(status: string): 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'İptal Edildi' {
+export function normalizeOrderStatusToTurkish(status: string): 'Hazırlanıyor' | 'Yola Çıktı' | 'Yolda' | 'Teslim Edildi' | 'İptal Edildi' {
   const value = (status || '').toLowerCase();
 
   if (['pending', 'beklemede', 'bekliyor', 'hazırlanıyor', 'preparing', 'processing', 'işleniyor'].includes(value)) return 'Hazırlanıyor';
-  if (['shipped', 'kargoda', 'yolda', 'yola çıktı'].includes(value)) return 'Yola Çıktı';
+  if (['shipped', 'kargoda'].includes(value)) return 'Yola Çıktı';
+  if (['in_transit', 'yolda', 'yola çıktı'].includes(value)) return 'Yolda';
   if (['delivered', 'teslim', 'teslim edildi'].includes(value)) return 'Teslim Edildi';
   if (['cancelled', 'iptal', 'iptal edildi'].includes(value)) return 'İptal Edildi';
 

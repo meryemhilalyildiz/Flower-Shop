@@ -107,7 +107,7 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
       return;
     }
 
-    console.log('Updating order status:', { orderId, currentStatus: order.status, newStatus });
+    console.log('Status güncelleniyor:', orderId, 'yeni status:', newStatus, 'mevcut status:', order.status);
 
     // 🌸 For in_transit status, send email notification
     if (newStatus === 'in_transit') {
@@ -123,10 +123,14 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
         }
       );
 
-      console.log('Update result:', result);
-
       if (result.success) {
-        await loadOrders();
+        console.log('Status güncelleme başarılı, local state güncelleniyor');
+        // 🌸 Manually update local state immediately
+        setOrders(prevOrders =>
+          prevOrders.map(o =>
+            o.id === orderId ? { ...o, status: newStatus } : o
+          )
+        );
         handleTabChange('in_transit');
       } else {
         console.error('Update failed:', result.error);
@@ -137,10 +141,14 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
       console.log('Attempting simple status update');
       const result = await updateOrderStatus(orderId, newStatus);
 
-      console.log('Simple update result:', result);
-
       if (result.success) {
-        await loadOrders();
+        console.log('Status güncelleme başarılı, local state güncelleniyor');
+        // 🌸 Manually update local state immediately
+        setOrders(prevOrders =>
+          prevOrders.map(o =>
+            o.id === orderId ? { ...o, status: newStatus } : o
+          )
+        );
 
         // 🌸 Auto-move to appropriate tab based on new status
         if (newStatus === 'delivered') {
@@ -224,7 +232,7 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
   };
 
   const filteredOrders = getFilteredOrders();
-  const activeOrders = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
+  const activeOrders = orders.filter(o => (o.status === 'shipped' || o.status === 'in_transit') && o.status !== 'cancelled');
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
   const cancelledOrders = orders.filter(o => o.status === 'cancelled');
 
@@ -233,7 +241,7 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
       pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Beklemede', icon: Clock },
       processing: { color: 'bg-blue-100 text-blue-800', label: 'Hazırlanıyor', icon: Package },
       shipped: { color: 'bg-purple-100 text-purple-800', label: 'Kargoda', icon: Package },
-      in_transit: { color: 'bg-orange-100 text-orange-800', label: 'Yolda', icon: Navigation },
+      in_transit: { color: 'bg-cyan-100 text-cyan-800', label: 'Yolda', icon: Navigation },
       delivered: { color: 'bg-green-100 text-green-800', label: 'Teslim Edildi', icon: CheckCircle },
       cancelled: { color: 'bg-red-100 text-red-800', label: 'İptal', icon: AlertCircle },
     };
