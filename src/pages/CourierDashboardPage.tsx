@@ -24,6 +24,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
     }
 
     const courierOrders = await getCourierOrders(courier.id);
+    console.log('Yüklenen siparişler:', courierOrders.map(o => ({ id: o.id, status: o.status })));
     setOrders(courierOrders);
     setLoading(false);
   };
@@ -37,23 +38,23 @@ export default function CourierDashboardPage({ navigate }: Props) {
 
     // Load initial orders
     loadOrders();
-    
-    // 🌸 Setup realtime subscription
-    try {
-      const sub = subscribeToCourierOrders(courier.id, (updatedOrders) => {
-        setOrders(updatedOrders);
-      });
-      setSubscription(sub);
-      
-      // 🌸 Cleanup subscription on unmount
-      return () => {
-        sub.unsubscribe();
-      };
-    } catch (error) {
-      console.error('Failed to setup realtime subscription:', error);
-      // Continue without realtime if it fails
-      return () => {};
-    }
+
+    // 🌸 Realtime subscription temporarily disabled to fix status update issues
+    // try {
+    //   const sub = subscribeToCourierOrders(courier.id, (updatedOrders) => {
+    //     setOrders(updatedOrders);
+    //   });
+    //   setSubscription(sub);
+    //
+    //   // 🌸 Cleanup subscription on unmount
+    //   return () => {
+    //     sub.unsubscribe();
+    //   };
+    // } catch (error) {
+    //   console.error('Failed to setup realtime subscription:', error);
+    //   // Continue without realtime if it fails
+    //   return () => {};
+    // }
   }, [navigate]);
 
   const handleTabChange = (newTab: 'pending' | 'in_transit' | 'delivered' | 'all') => {
@@ -74,16 +75,26 @@ export default function CourierDashboardPage({ navigate }: Props) {
 
     // 🌸 For in_transit status, send email notification
     if (newStatus === 'in_transit') {
+      const customerEmail = order.user_email || order.email || order.recipient_email;
+      console.log('Customer email bilgisi:', {
+        user_email: order.user_email,
+        email: order.email,
+        recipient_email: order.recipient_email,
+        final: customerEmail
+      });
+
       const result = await updateOrderStatusWithEmail(
         orderId,
         newStatus,
         {
           customerName: order.recipient_name || order.recipientName || 'Değerli Müşterimiz',
-          customerEmail: order.user_email || order.email,
+          customerEmail: customerEmail,
           trackingNumber: order.tracking_number || order.tracking_code,
           totalAmount: Number(order.total_amount || 0)
         }
       );
+
+      console.log('updateOrderStatusWithEmail sonucu:', result);
 
       if (result.success) {
         console.log('Status güncelleme başarılı, local state güncelleniyor');
@@ -100,6 +111,8 @@ export default function CourierDashboardPage({ navigate }: Props) {
     } else {
       // For other statuses, use simple update
       const result = await updateOrderStatus(orderId, newStatus);
+
+      console.log('updateOrderStatus sonucu:', result);
 
       if (result.success) {
         console.log('Status güncelleme başarılı, local state güncelleniyor');
