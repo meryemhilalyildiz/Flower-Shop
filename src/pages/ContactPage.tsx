@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, Mail, Clock, Send, Check, Save, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Send, Check, Save, RefreshCw, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 import type { Route } from '../types';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { usePageContent } from '../hooks/usePageContent';
 import { useAdminEditing } from '../contexts/AdminEditingContext';
 import { supabase } from '../supabaseClient';
 import EditableText from '../components/admin/EditableText';
+import StoreLocationMap from '../components/admin/StoreLocationMap';
 
 type Props = {
   navigate: (r: Route) => void;
@@ -405,12 +406,45 @@ export default function ContactPage({ navigate, adminContent }: Props) {
 
             </div>
 
-            <div className="rounded-3xl overflow-hidden shadow-soft mt-6 aspect-video">
-              <img
-                src={displayContent?.contact_image || 'https://images.pexels.com/photos/568685/pexels-photo-568685.jpeg?auto=compress&cs=tinysrgb&w=800'}
-                alt="Dükkanımız"
-                className="w-full h-full object-cover"
+            {/* 🌸 Mağaza Konumu Haritası */}
+            <div className="rounded-3xl overflow-hidden shadow-soft mt-6">
+              <div className="bg-white p-4 border-b border-sand-200">
+                <h3 className="font-display text-lg font-semibold text-sand-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-brand-600" />
+                  Mağaza Konumu
+                </h3>
+              </div>
+              <StoreLocationMap
+                city={storeSettings?.city}
+                district={storeSettings?.district}
+                neighborhood={storeSettings?.neighborhood}
+                street={storeSettings?.street}
+                address={storeSettings?.address}
+                initialLocation={storeSettings?.latitude && storeSettings?.longitude ? {
+                  lat: storeSettings.latitude,
+                  lng: storeSettings.longitude
+                } : undefined}
+                onLocationSelect={() => {}}
+                onAddressUpdate={() => {}}
               />
+              <div className="bg-white p-4 border-t border-sand-200">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([
+                    storeSettings?.address,
+                    storeSettings?.street,
+                    storeSettings?.neighborhood,
+                    storeSettings?.district,
+                    storeSettings?.city,
+                    'Türkiye'
+                  ].filter(Boolean).join(', '))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 text-white py-3 px-4 rounded-xl font-semibold transition-all"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Haritalarda Aç
+                </a>
+              </div>
             </div>
           </div>
 
