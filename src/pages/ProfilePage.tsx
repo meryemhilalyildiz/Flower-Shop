@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, Mail, Lock, Package, ArrowRight, Trash2, Plus } from 'lucide-react';
+import { MapPin, Phone, Mail, Lock, Package, ArrowRight, Trash2, Plus, Shield } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 // 🗺️ Leaflet Harita Importları
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+
 import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -310,7 +311,18 @@ export default function ProfilePage() {
               <Package className="w-4 h-4" /> Siparişlerim Geçmişi <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
+
+          {/* 🌸 Sadece Admin ise Admin Paneline Giriş Görünür */}
+          {isAdmin && (
+            <button
+              onClick={() => { window.location.hash = '#/admin/login'; }}
+              className="px-5 py-2.5 bg-white text-brand-800 rounded-2xl text-xs font-bold shadow-sm hover:bg-brand-50 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Shield className="w-4 h-4" /> Admin Paneline Git <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
+
 
         <div className={isAdmin ? "space-y-6" : "grid lg:grid-cols-3 gap-8"}>
           
