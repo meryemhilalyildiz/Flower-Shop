@@ -24,7 +24,6 @@ export default function CourierDashboardPage({ navigate }: Props) {
     }
 
     const courierOrders = await getCourierOrders(courier.id);
-    console.log('Yüklenen siparişler:', courierOrders.map(o => ({ id: o.id, status: o.status })));
     setOrders(courierOrders);
     setLoading(false);
   };
@@ -71,17 +70,9 @@ export default function CourierDashboardPage({ navigate }: Props) {
       return;
     }
 
-    console.log('Status güncelleniyor:', orderId, 'yeni status:', newStatus, 'mevcut status:', order.status);
-
     // 🌸 For in_transit status, send email notification
     if (newStatus === 'in_transit') {
       const customerEmail = order.user_email || order.email || order.recipient_email;
-      console.log('Customer email bilgisi:', {
-        user_email: order.user_email,
-        email: order.email,
-        recipient_email: order.recipient_email,
-        final: customerEmail
-      });
 
       const result = await updateOrderStatusWithEmail(
         orderId,
@@ -94,10 +85,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
         }
       );
 
-      console.log('updateOrderStatusWithEmail sonucu:', result);
-
       if (result.success) {
-        console.log('Status güncelleme başarılı, local state güncelleniyor');
         // 🌸 Manually update local state immediately
         setOrders(prevOrders =>
           prevOrders.map(o =>
@@ -112,10 +100,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
       // For other statuses, use simple update
       const result = await updateOrderStatus(orderId, newStatus);
 
-      console.log('updateOrderStatus sonucu:', result);
-
       if (result.success) {
-        console.log('Status güncelleme başarılı, local state güncelleniyor');
         // 🌸 Manually update local state immediately
         setOrders(prevOrders =>
           prevOrders.map(o =>

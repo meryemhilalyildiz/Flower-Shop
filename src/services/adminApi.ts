@@ -342,7 +342,7 @@ export async function fetchProductReviews(productId: string): Promise<Review[]> 
 
   if (error) {
     if (error.code === 'PGRST205') {
-      console.log('Reviews tablosu henüz oluşturulmadı');
+
       return [];
     }
     console.error('Yorumlar çekilirken hata:', error);
@@ -412,7 +412,7 @@ export async function fetchAllProductReviewStats(): Promise<Map<string, ProductR
 
   if (error) {
     if (error.code === 'PGRST205') {
-      console.log('Reviews tablosu henüz oluşturulmadı');
+
       return new Map();
     }
     console.error('Yorum istatistikleri çekilirken hata:', error);
@@ -475,7 +475,7 @@ export async function fetchAllReviews(): Promise<Review[]> {
 
   if (error) {
     if (error.code === 'PGRST205') {
-      console.log('Reviews tablosu henüz oluşturulmadı');
+
       return [];
     }
     throw error;

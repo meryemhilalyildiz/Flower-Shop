@@ -13,11 +13,12 @@ interface OrdersPageProps {
   onNavigateToShop?: () => void;
 }
 
-export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders }) => {
+export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders, navigate }) => {
   const [dbOrders, setDbOrders] = useState<OrderInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
   const [reviewProductSelection, setReviewProductSelection] = useState<{ order: OrderInfo; products: Product[] } | null>(null);
+  const [productsCache, setProductsCache] = useState<Record<string, any>>({});
 
   const fetchUserOrders = async () => {
     setLoading(true);
@@ -35,7 +36,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
           *,
           order_items (
             *,
-            products (*)
+            products (id, name, slug, price, original_price, image)
           )
         `)
         .eq('user_id', user.id)
@@ -50,13 +51,35 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
             : (o.order_items || o.products || []);
 
           const mappedItems = rawItems.map((item: any) => {
-            const effectivePrice = Number(
+            const rawPrice = Number(
               item.price ??
               item.unit_price ??
               item.products?.price ??
               item.product_price ??
               0
             );
+
+            // Fiyat doğrulama - çok büyük değerleri düzelt
+            const effectivePrice = rawPrice > 10000 ? rawPrice / 100 : rawPrice;
+
+            // Orjinal fiyat (indirimli değil) - products.original_price orjinal fiyatı içeriyor
+            let rawOriginalPrice = Number(
+              item.products?.original_price ||
+              item.products?.price ||
+              0
+            );
+            
+            // Eğer products bilgisi yoksa, cache'den veya unit_price'dan al
+            if (rawOriginalPrice === 0 && item.product_id) {
+              const cachedProduct = productsCache[item.product_id];
+              if (cachedProduct) {
+                rawOriginalPrice = Number(cachedProduct.original_price || cachedProduct.price || 0);
+              } else {
+                rawOriginalPrice = Number(item.unit_price || 0);
+              }
+            }
+            
+            const originalPrice = rawOriginalPrice > 10000 ? rawOriginalPrice / 100 : rawOriginalPrice;
 
             const productName =
               item.title ||
@@ -79,23 +102,31 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
             const isCustom = item.isCustomBouquet || item.is_custom_bouquet || item.product?.isCustomBouquet;
             const customDetails = item.customBouquetDetails || item.custom_bouquet_details || item.product?.customBouquetDetails;
 
+            // 🌸 Ürün slug - ürün sayfasına gitmek için
+            const productSlug = item.products?.slug || item.slug || item.product?.slug;
+
             return {
               id: item.id || item.product_id,
+              product_id: item.product_id || item.products?.id,
               quantity: Number(item.quantity || item.count || 1),
               price: effectivePrice,
-              unit_price: effectivePrice,
+              unit_price: originalPrice, // Orjinal fiyat
+              original_price: originalPrice,
               product_name: productName,
               name: productName,
               title: productName,
               isCustomBouquet: isCustom,
               customBouquetDetails: customDetails,
+              slug: productSlug,
               product: item.products || {
                 name: productName,
                 price: effectivePrice,
+                oldPrice: originalPrice,
                 images: productImages,
                 image: productImage,
                 isCustomBouquet: isCustom,
-                customBouquetDetails: customDetails
+                customBouquetDetails: customDetails,
+                slug: productSlug
               },
               images: productImages,
               image: productImage,
@@ -141,6 +172,47 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
   useEffect(() => {
     fetchUserOrders();
   }, []);
+
+  // Products cache için - eski siparişlerde products ilişkisi yoksa product_id ile ürün bilgilerini çek
+  useEffect(() => {
+    const fetchProductDetails = async () => {
+      const productIds = new Set<string>();
+      
+      // Tüm siparişlerdeki product_id'leri topla
+      dbOrders.forEach(order => {
+        (order.items || []).forEach((item: any) => {
+          if (item.product_id && !item.products) {
+            productIds.add(item.product_id);
+          }
+        });
+      });
+
+      if (productIds.size === 0) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, price, original_price')
+          .in('id', Array.from(productIds));
+
+        if (error) throw error;
+
+        if (data) {
+          const cache: Record<string, any> = {};
+          data.forEach(product => {
+            cache[product.id] = product;
+          });
+          setProductsCache(cache);
+        }
+      } catch (err) {
+        console.error('Ürün bilgileri çekilirken hata:', err);
+      }
+    };
+
+    if (dbOrders.length > 0) {
+      fetchProductDetails();
+    }
+  }, [dbOrders]);
 
   const orderList = dbOrders.length > 0
     ? dbOrders
@@ -410,15 +482,50 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
                         item.product?.name ||
                         'Çiçek Ürünü';
 
-                      const itemUnitPrice = Number(
-                        item.price || item.unit_price || item.product?.price || 0
+                      // Orjinal fiyat (indirimsiz fiyat) - products.original_price orjinal fiyatı içeriyor
+                      let rawOriginalPrice = Number(
+                        item.products?.original_price ||
+                        item.products?.price ||
+                        0
                       );
+                      
+                      // Eğer products bilgisi yoksa, cache'den veya unit_price'dan al
+                      if (rawOriginalPrice === 0 && item.product_id) {
+                        const cachedProduct = productsCache[item.product_id];
+                        if (cachedProduct) {
+                          rawOriginalPrice = Number(cachedProduct.original_price || cachedProduct.price || 0);
+                        } else {
+                          rawOriginalPrice = Number(item.unit_price || 0);
+                        }
+                      }
+                      
+                      const originalPrice = rawOriginalPrice > 10000 ? rawOriginalPrice / 100 : rawOriginalPrice;
+
+                      const itemUnitPrice = Number(
+                        item.price || item.unit_price || item.product?.price || item.product_price || 0
+                      );
+
+                      // Fiyat doğrulama - çok büyük değerleri düzelt
+                      const normalizedPrice = itemUnitPrice > 10000 ? itemUnitPrice / 100 : itemUnitPrice;
 
                       const quantity = Number(item.quantity || item.count || 1);
 
                       // 🌸 Buket Detay Kontrolü
                       const isCustom = item.isCustomBouquet || item.is_custom_bouquet || item.product?.isCustomBouquet;
                       const details = item.customBouquetDetails || item.custom_bouquet_details || item.product?.customBouquetDetails;
+
+                      // 🌸 Ürün slug ve ürün sayfasına gitme fonksiyonu
+                      const productSlug = item.product?.slug || item.slug || item.product_id;
+                      const handleProductClick = () => {
+                        if (productSlug && !isCustom) {
+                          // Normal ürün ise ürün sayfasına git
+                          if (navigate) {
+                            navigate({ name: 'product', slug: productSlug });
+                          } else {
+                            window.location.href = `/product/${productSlug}`;
+                          }
+                        }
+                      };
 
                       return (
                         <div key={index} className="py-3 flex items-center justify-between gap-4">
@@ -430,9 +537,15 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
                             )}
 
                             {/* 🟢 DÜZELTİLEN / BUKET DETAYLARININ EKLENDİĞİ ALAN */}
-                            <div>
+                            <div
+                              className={productSlug && !isCustom ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                              onClick={handleProductClick}
+                            >
                               <h4 className="font-semibold text-gray-800 text-sm">{fullName}</h4>
-                              <p className="text-xs text-gray-500">Adet: {quantity}</p>
+                              <p className="text-xs text-gray-500">Adet: {quantity} | Birim Fiyat: ₺{originalPrice.toFixed(2)}</p>
+                              {productSlug && !isCustom && (
+                                <p className="text-xs text-pink-600 mt-1 hover:underline">Ürün sayfasına git →</p>
+                              )}
 
                               {/* 🌸 ÖZEL BUKET İÇERİK DETAYLARI */}
                               {isCustom && details && (
@@ -475,7 +588,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders: initialOrders })
 
                           </div>
                           <p className="text-sm font-semibold text-gray-800">
-                            ₺{(itemUnitPrice * quantity).toFixed(2)}
+                            ₺{(originalPrice * quantity).toFixed(2)}
                           </p>
                         </div>
                       );

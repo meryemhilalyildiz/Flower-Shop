@@ -70,8 +70,6 @@ export function getCurrentCourier(): { id: string; name: string; email: string }
 // Get courier's assigned orders
 export async function getCourierOrders(courierId: string): Promise<CourierOrder[]> {
   try {
-    console.log('getCourierOrders çağrıldı, courierId:', courierId);
-
     const { data, error } = await supabase
       .from('orders')
       .select('*')
@@ -83,7 +81,6 @@ export async function getCourierOrders(courierId: string): Promise<CourierOrder[
       throw error;
     }
 
-    console.log('getCourierOrders sonuç:', data?.map(o => ({ id: o.id, status: o.status })));
     return data || [];
   } catch (error) {
     console.error('Kurye siparişleri yüklenirken hata:', error);
@@ -129,7 +126,6 @@ export function subscribeToCourierOrders(
       }
     )
     .subscribe((status, err) => {
-      console.log('Subscription status:', status);
       if (err) {
         console.error('Realtime subscription error:', err);
       }
@@ -145,8 +141,6 @@ export function subscribeToCourierOrders(
 // Update order status (courier can update their assigned orders)
 export async function updateOrderStatus(orderId: string, status: string): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('updateOrderStatus çağrıldı:', { orderId, status });
-
     // 🌸 Admin API kullanarak güncelleme (RLS politikası bypass için)
     const result = await adminUpdateOrderStatus(orderId, status);
 
@@ -154,7 +148,6 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
       throw new Error('Admin API güncelleme başarısız');
     }
 
-    console.log('Status güncelleme başarılı:', { orderId, status });
     return { success: true };
   } catch (error: any) {
     console.error('Sipariş durumu güncellenirken hata:', error);
@@ -174,16 +167,12 @@ export async function updateOrderStatusWithEmail(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('updateOrderStatusWithEmail çağrıldı:', { orderId, status, orderDetails });
-
     // 🌸 Admin API kullanarak güncelleme (RLS politikası bypass için)
     const result = await adminUpdateOrderStatus(orderId, status);
 
     if (!result) {
       throw new Error('Admin API güncelleme başarısız');
     }
-
-    console.log('Status güncelleme başarılı:', { orderId, status });
 
     // Verify the update by reading the record again
     const { data: verifyData, error: verifyError } = await supabase
@@ -194,8 +183,6 @@ export async function updateOrderStatusWithEmail(
 
     if (verifyError) {
       console.error('Doğrulama hatası:', verifyError);
-    } else {
-      console.log('Doğrulama - DBdeki gerçek status:', verifyData?.status);
     }
 
     // Send email notification if order details provided
@@ -221,8 +208,6 @@ export async function updateOrderStatusWithEmail(
         console.error('Email gönderilirken hata:', emailError);
         // Don't fail the status update if email fails
       }
-    } else {
-      console.log('Email gönderilmedi - customerEmail yok:', orderDetails?.customerEmail);
     }
 
     return { success: true };

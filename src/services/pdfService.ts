@@ -42,7 +42,10 @@ export const generateInvoicePDF = (order: OrderInfo) => {
   const couponCode = (order as any).applied_coupon_code || (order as any).coupon_code || (order as any).couponCode || null;
   const campaignTitle = (order as any).campaign_title || (order as any).campaignTitle || (order as any).campaign_name || null;
   // 🌸 3. DOĞRU TÜM TUTAR HESAPLAMALARI
-  const totalAmount = Number(order.total || (order as any).total_amount || 0);
+  let rawTotalAmount = Number(order.total || (order as any).total_amount || 0);
+  // Toplam tutar doğrulama - çok büyük değerleri düzelt
+  const totalAmount = rawTotalAmount > 10000 ? rawTotalAmount / 100 : rawTotalAmount;
+
   const deliveryFee = Number((order as any).deliveryFee ?? (order as any).delivery_fee ?? 0);
   
   const totalRecordedDiscount = Number((order as any).discountAmount || (order as any).discount_amount || 0);
@@ -51,7 +54,10 @@ export const generateInvoicePDF = (order: OrderInfo) => {
 
   // Ürünler Toplamı = Genel Toplam - Kargo + Toplam İndirim
   let rawSubtotal = Number(order.subtotal || (order as any).subtotal_amount || 0);
-  if (rawSubtotal <= 0) {
+  // Subtotal doğrulama - çok büyük değerleri düzelt
+  const subtotal = rawSubtotal > 10000 ? rawSubtotal / 100 : rawSubtotal;
+
+  if (subtotal <= 0) {
     rawSubtotal = totalAmount - deliveryFee + (couponDiscount + campaignDiscount || totalRecordedDiscount);
   }
 
@@ -78,16 +84,19 @@ export const generateInvoicePDF = (order: OrderInfo) => {
 
           const qty = Number(item.quantity || item.qty || item.count || 1);
 
-          let price = Number(
-            item.price ?? 
-            item.unit_price ?? 
-            item.product?.price ?? 
-            item.product_price ?? 
+          let rawPrice = Number(
+            item.price ??
+            item.unit_price ??
+            item.product?.price ??
+            item.product_price ??
             0
           );
 
-          if (price === 0 && rawSubtotal > 0) {
-            price = rawSubtotal / itemsList.length;
+          // Fiyat doğrulama - çok büyük değerleri düzelt
+          let price = rawPrice > 10000 ? rawPrice / 100 : rawPrice;
+
+          if (price === 0 && subtotal > 0) {
+            price = subtotal / itemsList.length;
           }
   
           const total = price * qty;
@@ -159,8 +168,8 @@ export const generateInvoicePDF = (order: OrderInfo) => {
             <div style="font-size: 11px; color: #888; margin-top: 2px;">Taze Çiçek Sipariş Ürünü</div>
           </td>
           <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500;">1 Adet</td>
-          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${rawSubtotal.toFixed(2)}</td>
-          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827;">₺${rawSubtotal.toFixed(2)}</td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">₺${subtotal.toFixed(2)}</td>
+          <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #111827;">₺${subtotal.toFixed(2)}</td>
         </tr>
       `;
     }
