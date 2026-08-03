@@ -88,7 +88,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
         newStatus,
         {
           customerName: order.recipient_name || order.recipientName || 'Değerli Müşterimiz',
-          customerEmail: customerEmail,
+          customerEmail: customerEmail || '',
           trackingNumber: order.tracking_number || order.tracking_code,
           totalAmount: Number(order.total_amount || 0)
         }
@@ -101,7 +101,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
         // 🌸 Manually update local state immediately
         setOrders(prevOrders =>
           prevOrders.map(o =>
-            o.id === orderId ? { ...o, status: newStatus } : o
+            o.id === orderId ? { ...o, status: newStatus as CourierOrder['status'] } : o
           )
         );
         handleTabChange('in_transit');
@@ -119,7 +119,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
         // 🌸 Manually update local state immediately
         setOrders(prevOrders =>
           prevOrders.map(o =>
-            o.id === orderId ? { ...o, status: newStatus } : o
+            o.id === orderId ? { ...o, status: newStatus as CourierOrder['status'] } : o
           )
         );
 
@@ -196,7 +196,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
   };
 
   const filteredOrders = getFilteredOrders();
-  const activeOrders = orders.filter(o => (o.status === 'shipped' || o.status === 'in_transit') && o.status !== 'cancelled');
+  const activeOrders = orders.filter(o => o.status === 'shipped' || o.status === 'in_transit');
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
   const cancelledOrders = orders.filter(o => o.status === 'cancelled');
 
@@ -390,7 +390,7 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
     return currentStatus;
   };
 
-  const canUpdate = (order.status === 'shipped' || order.status === 'in_transit') && order.status !== 'delivered' && order.status !== 'cancelled';
+  const canUpdate = order.status === 'shipped' || order.status === 'in_transit';
   const nextStatus = getNextStatus(order.status);
   
   const getNextStatusLabel = (currentStatus: string) => {

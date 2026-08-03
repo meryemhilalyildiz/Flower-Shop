@@ -24,52 +24,47 @@ export interface EmailOrderDetails {
    */
   export const generateOrderEmailHtml = (details: EmailOrderDetails) => {
     const storeName = "A şirketi";
-  
-    let emailSubject = `${storeName} - Sipariş Güncellemesi`;
-    let statusTitle = "Siparişiniz Güncellendi";
-    let statusMessage = `${storeName} mağazasından verdiğiniz siparişiniz güncellenmiştir.`;
-    let statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+
+    let emailSubject = `${storeName} - Siparişiniz Hakkında Güzel Haberler!`;
+    let statusTitle = "Siparişinizle İlgili Güncellemeler";
+    let statusMessage = `Sevgili ${details.customerName}, ${storeName} mağazasından verdiğiniz siparişinizle ilgili size güzel haberlerimiz var! 🌸`;
+    let statusDetail = `Siparişinizle ilgili tüm gelişmeleri buradan takip edebilirsiniz.`;
   
     const normalizedStatus = (details.status || '').toLowerCase();
   
     if (['shipped', 'kargoda', 'kargoya verildi'].includes(normalizedStatus)) {
-      emailSubject = `Kargoya Verildi - ${storeName}`;
+      emailSubject = `Çiçekleriniz Yolda! - ${storeName}`;
       statusTitle = "Siparişiniz Kargoya Verildi";
-      statusMessage = `${storeName} mağazasındaki siparişiniz kargo firmasına teslim edilmiştir. Çiçekleriniz yolda!`;
-      statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+      statusMessage = `Sevgili ${details.customerName}, harika çiçekleriniz hazırlanıp kargoya verildi! Yakında sizde olacaklar 🌸`;
+      statusDetail = `Siparişiniz özenle paketlenmiş ve yola çıkmış durumda. Keyifli alımlar! 💐`;
     } else if (['in_transit', 'yolda', 'yola çıktı'].includes(normalizedStatus)) {
-      emailSubject = `Siparişiniz Yolda - ${storeName}`;
-      statusTitle = "Siparişiniz Yolda";
-      statusMessage = `${storeName} mağazasındaki siparişiniz kurye tarafından teslim edilmek üzere yola çıkmıştır. Çiçekleriniz yakında sizde!`;
-      statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
-    } else if (['in_transit', 'yolda', 'yola çıktı'].includes(normalizedStatus)) {
-      emailSubject = `Kurye Yola Çıktı - ${storeName}`;
-      statusTitle = "Kuryeniz Yola Çıktı";
-      statusMessage = `${storeName} mağazasındaki siparişiniz için atanmış kuryeniz teslimat noktasına doğru yola çıktı. Çiçekleriniz yakında!`;
-      statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+      emailSubject = `Çiçekleriniz Yakında Sizde! - ${storeName}`;
+      statusTitle = "Siparişiniz Yola Çıktı";
+      statusMessage = `Sevgili ${details.customerName}, ${storeName} mağazasındaki siparişiniz kuryemiz tarafından teslim edilmek üzere yola çıktı. Çiçekleriniz yakında sizde! 🌸`;
+      statusDetail = `Siparişiniz özel kuryemiz ile özenle taşınmaktadır. Yakında güzel bir sürprizle karşılaşacaksınız! 💐`;
     } else if (['cancellation_requested', 'iptal talebi alındı'].includes(normalizedStatus)) {
-      emailSubject = `Sipariş İptal Talebi Alındı - ${storeName}`;
+      emailSubject = `İptal Talebiniz Alındı - ${storeName}`;
       statusTitle = "İptal Talebiniz Şirkete İletilmiştir";
-      statusMessage = `${storeName} mağazasından verdiğiniz #${details.orderNumber} numaralı siparişiniz için oluşturduğunuz iptal talebi şirketimize ulaşmıştır.`;
+      statusMessage = `Sevgili ${details.customerName}, #${details.orderNumber} numaralı siparişiniz için oluşturduğunuz iptal talebiniz bize ulaştı. En kısa sürede değerlendireceğiz.`;
       statusDetail = details.cancelReason
         ? `<strong>İptal Talebi Gerekçesi:</strong> "${details.cancelReason}"`
         : 'Talebiniz en kısa sürede değerlendirilip tarafınıza bilgilendirme yapılacaktır.';
     } else if (['cancelled', 'iptal edildi', 'iptal'].includes(normalizedStatus)) {
-      emailSubject = `Sipariş İptal Edildi - ${storeName}`;
+      emailSubject = `Sipariş İptal İşlemi - ${storeName}`;
       statusTitle = "Sipariş İptal Edildi";
-      statusMessage = `${storeName} mağazasındaki siparişiniz iptal edilmiştir. Sorularınız için bizimle iletişime geçebilirsiniz.`;
-      
+      statusMessage = `Sevgili ${details.customerName}, siparişiniz iptal edilmiştir. Herhangi bir sorunuz olursa bizimle iletişime geçmekten çekinmeyin.`;
+
       // 🌸 İptal gerekçesi varsa doğrudan Status Box alt yazısına yazıyoruz
       if (details.cancelReason) {
         statusDetail = `<strong>İptal Gerekçesi:</strong> "${details.cancelReason}"`;
       } else {
-        statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+        statusDetail = `Başka bir fırsatta tekrar görüşmek dileğiyle 🌸`;
       }
     } else if (['processing', 'işleniyor', 'hazırlanıyor'].includes(normalizedStatus)) {
-      emailSubject = `Sipariş Hazırlanıyor - ${storeName}`;
+      emailSubject = `Çiçekleriniz Hazırlanıyor! - ${storeName}`;
       statusTitle = "Siparişiniz Hazırlanıyor";
-      statusMessage = `${storeName} ekibi sipariş ettiğiniz çiçekleri özenle hazırlıyor. En kısa sürede kargoya teslim edilecektir.`;
-      statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+      statusMessage = `Sevgili ${details.customerName}, sipariş ettiğiniz güzel çiçekleri özenle hazırlıyoruz. En kısa sürede yola çıkaracaklar 🌸`;
+      statusDetail = `Çiçekleriniz taze ve canlı olarak size ulaşmak için hazırlanıyor. Sabırsızlıkla bekliyoruz! 💐`;
     }
   
     const html = `

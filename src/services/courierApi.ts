@@ -130,7 +130,7 @@ export function subscribeToCourierOrders(
     )
     .subscribe((status, err) => {
       console.log('Subscription status:', status);
-      if (status === 'SUBSCRIPTION_ERROR') {
+      if (err) {
         console.error('Realtime subscription error:', err);
       }
     });
