@@ -38,6 +38,11 @@ export interface EmailOrderDetails {
       statusMessage = `${storeName} mağazasındaki siparişiniz kargo firmasına teslim edilmiştir. Çiçekleriniz yolda!`;
       statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
     } else if (['in_transit', 'yolda', 'yola çıktı'].includes(normalizedStatus)) {
+      emailSubject = `Siparişiniz Yolda - ${storeName}`;
+      statusTitle = "Siparişiniz Yolda";
+      statusMessage = `${storeName} mağazasındaki siparişiniz kurye tarafından teslim edilmek üzere yola çıkmıştır. Çiçekleriniz yakında sizde!`;
+      statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+    } else if (['in_transit', 'yolda', 'yola çıktı'].includes(normalizedStatus)) {
       emailSubject = `Kurye Yola Çıktı - ${storeName}`;
       statusTitle = "Kuryeniz Yola Çıktı";
       statusMessage = `${storeName} mağazasındaki siparişiniz için atanmış kuryeniz teslimat noktasına doğru yola çıktı. Çiçekleriniz yakında!`;

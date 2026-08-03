@@ -63,17 +63,19 @@ export default function CourierDashboardPage({ navigate }: Props) {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     setUpdatingOrderId(orderId);
-    
+
     const order = orders.find(o => o.id === orderId);
     if (!order) {
       setUpdatingOrderId(null);
       return;
     }
 
+    console.log('Status güncelleniyor:', orderId, 'yeni status:', newStatus, 'mevcut status:', order.status);
+
     // 🌸 For in_transit status, send email notification
     if (newStatus === 'in_transit') {
       const result = await updateOrderStatusWithEmail(
-        orderId, 
+        orderId,
         newStatus,
         {
           customerName: order.recipient_name || order.recipientName || 'Değerli Müşterimiz',
@@ -82,9 +84,15 @@ export default function CourierDashboardPage({ navigate }: Props) {
           totalAmount: Number(order.total_amount || 0)
         }
       );
-      
+
       if (result.success) {
-        await loadOrders();
+        console.log('Status güncelleme başarılı, local state güncelleniyor');
+        // 🌸 Manually update local state immediately
+        setOrders(prevOrders =>
+          prevOrders.map(o =>
+            o.id === orderId ? { ...o, status: newStatus } : o
+          )
+        );
         handleTabChange('in_transit');
       } else {
         alert('Durum güncellenemedi: ' + result.error);
@@ -92,10 +100,16 @@ export default function CourierDashboardPage({ navigate }: Props) {
     } else {
       // For other statuses, use simple update
       const result = await updateOrderStatus(orderId, newStatus);
-      
+
       if (result.success) {
-        await loadOrders();
-        
+        console.log('Status güncelleme başarılı, local state güncelleniyor');
+        // 🌸 Manually update local state immediately
+        setOrders(prevOrders =>
+          prevOrders.map(o =>
+            o.id === orderId ? { ...o, status: newStatus } : o
+          )
+        );
+
         // 🌸 Auto-move to appropriate tab based on new status
         if (newStatus === 'delivered') {
           handleTabChange('delivered');
@@ -104,7 +118,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
         alert('Durum güncellenemedi: ' + result.error);
       }
     }
-    
+
     setUpdatingOrderId(null);
   };
 
@@ -169,7 +183,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
   };
 
   const filteredOrders = getFilteredOrders();
-  const activeOrders = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
+  const activeOrders = orders.filter(o => (o.status === 'shipped' || o.status === 'in_transit') && o.status !== 'cancelled');
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
   const cancelledOrders = orders.filter(o => o.status === 'cancelled');
 
@@ -178,7 +192,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
       pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Beklemede', icon: Clock },
       processing: { color: 'bg-blue-100 text-blue-800', label: 'Hazırlanıyor', icon: Package },
       shipped: { color: 'bg-purple-100 text-purple-800', label: 'Kargoda', icon: Package },
-      in_transit: { color: 'bg-orange-100 text-orange-800', label: 'Yolda', icon: Navigation },
+      in_transit: { color: 'bg-cyan-100 text-cyan-800', label: 'Yolda', icon: Navigation },
       delivered: { color: 'bg-green-100 text-green-800', label: 'Teslim Edildi', icon: CheckCircle },
       cancelled: { color: 'bg-red-100 text-red-800', label: 'İptal', icon: AlertCircle },
     };

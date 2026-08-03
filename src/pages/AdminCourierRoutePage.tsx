@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Truck, MapPin, RefreshCw, Car, Bike, Package, ArrowLeft, Clock, CheckCircle, UserPlus, Shield, Trash2, Users, User, Calendar, CheckSquare, Square, ChevronDown, ChevronUp, Map, Mail, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import StatusBadge from '../components/admin/StatusBadge';
 
 type Courier = {
   id: string;
@@ -33,7 +34,7 @@ export default function AdminCourierRoutePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'pending' | 'delivering' | 'couriers' | 'delivered' | 'portal'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'delivering' | 'in_transit' | 'couriers' | 'delivered' | 'portal'>('pending');
   const [selectedPortalCourierId, setSelectedPortalCourierId] = useState<string>('');
 
   // 🏙️ Seçilen İl/Bölge Filtresi (Boşsa tüm iller gösterilir)
@@ -292,8 +293,24 @@ export default function AdminCourierRoutePage() {
     }
   };
 
-  const pendingOrders = orders.filter(o => !o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled');
-  const deliveringOrders = orders.filter(o => o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled');
+  const handleInTransitOrder = async (orderId: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'in_transit' })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'in_transit' } : o));
+      alert('🚀 Sipariş başarıyla yolda olarak işaretlendi!');
+    } catch (err: any) {
+      alert('Güncelleme hatası: ' + err.message);
+    }
+  };
+
+  const pendingOrders = orders.filter(o => !o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'in_transit');
+  const deliveringOrders = orders.filter(o => o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'in_transit');
+  const inTransitOrders = orders.filter(o => o.status === 'in_transit');
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
   const portalCourier = couriers.find(c => c.id === selectedPortalCourierId);
   const portalAssignedOrders = orders.filter(o => o.courier_id === selectedPortalCourierId);
@@ -382,6 +399,19 @@ export default function AdminCourierRoutePage() {
               <h2 className="text-xl font-extrabold text-brand-600 mt-0.5">{deliveringOrders.length}</h2>
             </div>
             <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+              <Truck className="w-5 h-5" />
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('in_transit')}
+            className={`p-4 rounded-3xl border text-left transition-all cursor-pointer flex items-center justify-between ${activeTab === 'in_transit' ? 'bg-white border-cyan-500 shadow-md ring-2 ring-cyan-500/20' : 'bg-white/80 border-sand-200 hover:bg-white'}`}
+          >
+            <div>
+              <span className="text-[10px] font-bold uppercase text-sand-500 tracking-wider">Yolda</span>
+              <h2 className="text-xl font-extrabold text-cyan-600 mt-0.5">{inTransitOrders.length}</h2>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
               <Truck className="w-5 h-5" />
             </div>
           </button>
@@ -525,10 +555,11 @@ export default function AdminCourierRoutePage() {
                               <span className="font-mono text-xs font-bold bg-sand-100 text-sand-800 px-2 py-0.5 rounded">
                                 #{order.id.slice(0, 8)}
                               </span>
+                              <StatusBadge status={order.status} />
                               <span className="text-sm font-bold text-sand-900">
                                 {order.recipientName || order.recipient_name || 'Alıcı Müşteri'}
                               </span>
-                              
+
                               <span className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
                                 <Calendar className="w-3 h-3" /> Veriliş: {createdDate}
                               </span>
@@ -599,11 +630,12 @@ export default function AdminCourierRoutePage() {
                             <span className="font-mono text-xs font-bold bg-sand-100 text-sand-800 px-2 py-0.5 rounded">
                               #{order.id.slice(0, 8)}
                             </span>
+                            <StatusBadge status={order.status} />
                             <span className="text-sm font-bold text-sand-900">
                               {order.recipientName || order.recipient_name || 'Alıcı Müşteri'}
                             </span>
                             <span className="text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-brand-100 text-brand-800">
-                              Kargoda ({assignedCourier?.name || 'Kurye'})
+                              {assignedCourier?.name || 'Kurye'}
                             </span>
                             <span className="text-[11px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-bold">
                               🎯 Teslim Hedefi: {deliveryDate}
@@ -639,7 +671,70 @@ export default function AdminCourierRoutePage() {
             </div>
           )}
 
-          {/* 3. KURYE YÖNETİMİ SEKMESİ */}
+          {/* 3. YOLDA SEKMESİ */}
+          {activeTab === 'in_transit' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-sand-100 pb-4">
+                <h2 className="text-xl font-bold text-sand-900 font-display flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-cyan-600" />
+                  Yolda Olan Siparişler ({inTransitOrders.length})
+                </h2>
+                <span className="text-xs text-sand-500 font-medium">Kurye teslimatta</span>
+              </div>
+
+              {inTransitOrders.length === 0 ? (
+                <div className="text-center py-16 text-sand-500">
+                  <Package className="w-10 h-10 text-sand-400 mx-auto mb-2" />
+                  <p>Şu an yolda olan sipariş bulunmuyor.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {inTransitOrders.map((order) => {
+                    const assignedCourier = couriers.find(c => c.id === order.courier_id);
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address + ' ' + order.city)}`;
+                    const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Bugün';
+
+                    return (
+                      <div key={order.id} className="p-4 rounded-2xl border border-sand-200 bg-sand-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-bold bg-sand-100 text-sand-800 px-2 py-0.5 rounded">
+                              #{order.id.slice(0, 8)}
+                            </span>
+                            <StatusBadge status={order.status} />
+                          </div>
+                          <p className="text-sm font-semibold text-sand-900">{order.recipient_name || order.recipientName || 'Belirtilmedi'}</p>
+                          <p className="text-xs text-sand-600">
+                            <MapPin className="w-3.5 h-3.5 text-cyan-600 inline mr-1" />
+                            {order.address} ({order.city})
+                          </p>
+                          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline">
+                            📍 Google Maps Yol Tarifi Aç
+                          </a>
+                        </div>
+
+                        <div className="w-full sm:w-auto text-right">
+                          <label className="block text-[10px] uppercase font-bold text-sand-500 mb-1">Kurye Değiştir</label>
+                          <select
+                            value={order.courier_id || ''}
+                            onChange={(e) => handleAssignCourier(order.id, e.target.value)}
+                            className="input text-xs py-1.5 w-full sm:w-[160px] cursor-pointer font-bold"
+                          >
+                            <option value="">-- Kurye Seçilmedi --</option>
+                            {couriers.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name} ({c.vehicle_type})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4. KURYE YÖNETİMİ SEKMESİ */}
           {activeTab === 'couriers' && (
             <div className="grid lg:grid-cols-3 gap-8">
               <div className="bg-sand-50/50 rounded-2xl p-5 border border-sand-200 space-y-4">
@@ -928,12 +1023,22 @@ export default function AdminCourierRoutePage() {
                               </a>
 
                               {!isDelivered ? (
-                                <button
-                                  onClick={() => handleDeliverOrder(order.id)}
-                                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                                >
-                                  <CheckCircle className="w-4 h-4" /> Teslim Edildi İşaretle ✓
-                                </button>
+                                <div className="flex gap-2">
+                                  {order.status !== 'in_transit' && (
+                                    <button
+                                      onClick={() => handleInTransitOrder(order.id)}
+                                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    >
+                                      <Truck className="w-4 h-4" /> Yolda İşaretle 🚀
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeliverOrder(order.id)}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                  >
+                                    <CheckCircle className="w-4 h-4" /> Teslim Edildi İşaretle ✓
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                                   <CheckCircle className="w-4 h-4" /> Teslim Tamamlandı
