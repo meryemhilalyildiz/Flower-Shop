@@ -58,8 +58,17 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
     };
   }, [searchOpen]);
 
-  // 🌸 Supabase Oturum Dinleyicisi
+  // 🌸 Supabase Oturum Dinleyicisi ve Şifre Kurtarma Yakalayıcısı
   useEffect(() => {
+    // 1. URL'de recovery (şifre sıfırlama) belirteci var mı kontrol et
+    const hash = window.location.hash;
+    const searchParams = new URLSearchParams(window.location.search);
+    const type = searchParams.get('type');
+
+    if (hash.includes('type=recovery') || type === 'recovery') {
+      setIsAuthOpen(true); // Modal'ı otomatik aç
+    }
+
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUser(user);
       if (user) {
@@ -70,7 +79,12 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // 2. Supabase Password Recovery olayı tetiklendiğinde modalı aç
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsAuthOpen(true);
+      }
+
       setUser(session?.user ?? null);
       if (session?.user) {
         const adminCheck = await checkAdminAccess(session.user.id);
@@ -186,23 +200,23 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
             </button>
 
             <nav className="hidden md:flex items-center gap-8">
-  {navLinks.map((link) => {
-    const isActive = currentRoute.name === link.route.name;
-    return (
-      <button
-        key={link.label}
-        onClick={() => navigate(link.route)}
-        className={`text-sm font-medium transition-colors cursor-pointer ${
-          isActive
-            ? 'text-brand-600 font-semibold px-3 py-1 bg-brand-50 rounded-full'
-            : 'text-sand-600 hover:text-sand-900'
-        }`}
-      >
-        {link.label}
-      </button>
-    );
-  })}
-</nav>
+              {navLinks.map((link) => {
+                const isActive = currentRoute.name === link.route.name;
+                return (
+                  <button
+                    key={link.label}
+                    onClick={() => navigate(link.route)}
+                    className={`text-sm font-medium transition-colors cursor-pointer ${
+                      isActive
+                        ? 'text-brand-600 font-semibold px-3 py-1 bg-brand-50 rounded-full'
+                        : 'text-sand-600 hover:text-sand-900'
+                    }`}
+                  >
+                    {link.label}
+                  </button>
+                );
+              })}
+            </nav>
 
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center bg-sand-100 rounded-full px-4 py-2 w-64 relative search-container">
@@ -214,12 +228,10 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
                     const value = e.target.value;
                     setSearchQuery(value);
                     
-                    // Clear previous timeout
                     if (searchTimeoutRef.current) {
                       clearTimeout(searchTimeoutRef.current);
                     }
                     
-                    // Debounce search for dropdown
                     searchTimeoutRef.current = setTimeout(() => {
                       handleSearch(value);
                     }, 300);
@@ -237,7 +249,6 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
                   className="bg-transparent text-sm text-sand-700 placeholder-sand-400 outline-none w-full"
                 />
                 
-                {/* Dropdown Results */}
                 {searchOpen && searchResults.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-sand-100 overflow-hidden z-50">
                     {searchResults.map((product) => (
@@ -266,62 +277,69 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
                 )}
               </div>
 
-              {/* 🌸 Favoriler butonu */}
-              <button
-                onClick={() => navigate({ name: 'favorites' })}
-                className="relative btn-ghost"
-                aria-label="Favorilerim"
-              >
-                <Heart
-                  className={`w-5 h-5 ${
-                    currentRoute.name === 'favorites' ? 'fill-brand-600 text-brand-600' : 'text-sand-600'
-                  }`}
-                />
-                {favoriteCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 text-white text-xs font-bold rounded-full flex items-center justify-center animate-scale-in">
-                    {favoriteCount}
-                  </span>
-                )}
-              </button>
+              {/* 🌸 Sadece Müşteri ise Favoriler butonu görünür */}
+              {!isAdmin && (
+                <button
+                  onClick={() => navigate({ name: 'favorites' })}
+                  className="relative btn-ghost"
+                  aria-label="Favorilerim"
+                >
+                  <Heart
+                    className={`w-5 h-5 ${
+                      currentRoute.name === 'favorites' ? 'fill-brand-600 text-brand-600' : 'text-sand-600'
+                    }`}
+                  />
+                  {favoriteCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 text-white text-xs font-bold rounded-full flex items-center justify-center animate-scale-in">
+                      {favoriteCount}
+                    </span>
+                  )}
+                </button>
+              )}
 
-              <button
-                onClick={() => navigate({ name: 'cart' })}
-                className="relative btn-ghost"
-                aria-label="Sepet"
-              >
-                <ShoppingBag className="w-5 h-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 text-white text-xs font-bold rounded-full flex items-center justify-center animate-scale-in">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
+              {/* 🌸 Sadece Müşteri ise Sepet butonu görünür */}
+              {!isAdmin && (
+                <button
+                  onClick={() => navigate({ name: 'cart' })}
+                  className="relative btn-ghost"
+                  aria-label="Sepet"
+                >
+                  <ShoppingBag className="w-5 h-5" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 text-white text-xs font-bold rounded-full flex items-center justify-center animate-scale-in">
+                      {cartCount}
+                    </span>
+                  )}
+                </button>
+              )}
 
-              {/* 🌸 Giriş Yapılmışsa "Sipariş Geçmişi", "Kullanıcı Adı" ve "Çıkış Yap" Butonu */}
+              {/* 🌸 Giriş Yapılmışsa */}
               {user ? (
                 <div className="flex items-center gap-1.5 ml-1">
-                  {/* 🕒 Geçmiş Siparişlerim İkonu */}
-                  <button
-                    onClick={() => {
-                      window.location.hash = '#/siparislerim';
-                      if (typeof navigate === 'function') {
-                        navigate({ name: 'orders' as any });
-                      }
-                    }}
-                    title="Geçmiş Siparişlerim"
-                    className="p-2 text-sand-600 hover:text-brand-700 hover:bg-brand-50 rounded-full transition-all cursor-pointer"
-                  >
-                    <History className="w-5 h-5" />
-                  </button>
+                  {/* 🕒 Sadece Müşteri ise Geçmiş Siparişlerim İkonu Görünür */}
+                  {!isAdmin && (
+                    <button
+                      onClick={() => {
+                        window.location.hash = '#/siparislerim';
+                        if (typeof navigate === 'function') {
+                          navigate({ name: 'orders' as any });
+                        }
+                      }}
+                      title="Geçmiş Siparişlerim"
+                      className="p-2 text-sand-600 hover:text-brand-700 hover:bg-brand-50 rounded-full transition-all cursor-pointer"
+                    >
+                      <History className="w-5 h-5" />
+                    </button>
+                  )}
 
                   <button
-  onClick={() => {
-    window.location.hash = '#/profil';
-  }}
-  className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200 hover:bg-brand-100 transition-all cursor-pointer"
->
-  {user.user_metadata?.full_name || user.email?.split('@')[0]}
-</button>
+                    onClick={() => {
+                      window.location.hash = '#/profil';
+                    }}
+                    className="text-xs font-semibold text-brand-700 hidden md:inline bg-brand-50 px-2.5 py-1.5 rounded-full border border-brand-200 hover:bg-brand-100 transition-all cursor-pointer"
+                  >
+                    {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                  </button>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-red-500 text-red-600 hover:bg-red-50 text-sm font-semibold transition-all ml-1"
@@ -371,34 +389,38 @@ export default function Header({ cartCount, favoriteCount, navigate, currentRout
                   {link.label}
                 </a>
               ))}
-              <button
-                onClick={() => {
-                  setMobileOpen(false);
-                  window.location.hash = '#/favoriler';
-                  if (typeof navigate === 'function') {
-                    navigate({ name: 'favorites' as any });
-                  }
-                }}
-                className="mt-2 w-full py-3 rounded-xl bg-brand-50 text-brand-700 font-semibold flex items-center justify-center gap-2 border border-brand-200"
-              >
-                <Heart className="w-5 h-5" />
-                Favorilerim ({favoriteCount})
-              </button>
+              {!isAdmin && (
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    window.location.hash = '#/favoriler';
+                    if (typeof navigate === 'function') {
+                      navigate({ name: 'favorites' as any });
+                    }
+                  }}
+                  className="mt-2 w-full py-3 rounded-xl bg-brand-50 text-brand-700 font-semibold flex items-center justify-center gap-2 border border-brand-200"
+                >
+                  <Heart className="w-5 h-5" />
+                  Favorilerim ({favoriteCount})
+                </button>
+              )}
               {user ? (
                 <>
-                  <button
-                    onClick={() => {
-                      setMobileOpen(false);
-                      window.location.hash = '#/siparislerim';
-                      if (typeof navigate === 'function') {
-                        navigate({ name: 'orders' as any });
-                      }
-                    }}
-                    className="mt-2 w-full py-3 rounded-xl bg-brand-50 text-brand-700 font-semibold flex items-center justify-center gap-2 border border-brand-200"
-                  >
-                    <History className="w-5 h-5" />
-                    Geçmiş Siparişlerim
-                  </button>
+                  {!isAdmin && (
+                    <button
+                      onClick={() => {
+                        setMobileOpen(false);
+                        window.location.hash = '#/siparislerim';
+                        if (typeof navigate === 'function') {
+                          navigate({ name: 'orders' as any });
+                        }
+                      }}
+                      className="mt-2 w-full py-3 rounded-xl bg-brand-50 text-brand-700 font-semibold flex items-center justify-center gap-2 border border-brand-200"
+                    >
+                      <History className="w-5 h-5" />
+                      Geçmiş Siparişlerim
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setMobileOpen(false);

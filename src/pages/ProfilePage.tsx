@@ -54,6 +54,8 @@ export default function ProfilePage() {
   const [userEmail, setUserEmail] = useState('');
   const [userPhone, setUserPhone] = useState('Henüz eklenmedi');
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [userName, setUserName] = useState('Kullanıcı');
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Yeni Adres Form State'leri
   const [newTitle, setNewTitle] = useState('');
@@ -188,15 +190,23 @@ export default function ProfilePage() {
       if (user) {
         setUserEmail(user.email || '');
 
-        // 🌸 Kullanıcının telefon numarasını profiles tablosundan çekiyoruz
+        // 🌸 Kullanıcının adını ve telefon numarasını profiles tablosundan çekiyoruz
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('phone')
+          .select('full_name, phone, role')
           .eq('id', user.id)
           .maybeSingle();
 
-        if (profileData && profileData.phone) {
-          setUserPhone(profileData.phone);
+        if (profileData) {
+          if (profileData.full_name) {
+            setUserName(profileData.full_name);
+          }
+          if (profileData.phone) {
+            setUserPhone(profileData.phone);
+          }
+          if (profileData.role === 'admin') {
+            setIsAdmin(true);
+          }
         }
 
         const { data: addresses, error } = await supabase
@@ -224,10 +234,10 @@ export default function ProfilePage() {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-  
+ 
         // İl ve ilçeyi açık adresle birleştiriyoruz ki veritabanı hata vermesin
         const fullAddress = `${newAddressText} - ${selectedDistrict} / ${selectedCity}`;
-  
+ 
         const { data, error } = await supabase
           .from('saved_addresses')
           .insert([
@@ -283,142 +293,145 @@ export default function ProfilePage() {
         <div className="bg-gradient-to-r from-brand-600 to-brand-700 text-white p-8 rounded-3xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-white text-2xl font-bold">
-              ŞÜ
+              {userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <h1 className="text-xl font-extrabold font-display">Şehriban Ümmü İnce</h1>
+              <h1 className="text-xl font-extrabold font-display">{userName}</h1>
               <p className="text-xs text-brand-100">{userEmail}</p>
             </div>
           </div>
 
-          <button
-            onClick={() => { window.location.hash = '#/siparislerim'; }}
-            className="px-5 py-2.5 bg-white text-brand-800 rounded-2xl text-xs font-bold shadow-sm hover:bg-brand-50 transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <Package className="w-4 h-4" /> Siparişlerim Geçmişi <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          {/* 🌸 Sadece Müşteri ise Siparişlerim Geçmişi Görünür */}
+          {!isAdmin && (
+            <button
+              onClick={() => { window.location.hash = '#/siparislerim'; }}
+              className="px-5 py-2.5 bg-white text-brand-800 rounded-2xl text-xs font-bold shadow-sm hover:bg-brand-50 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Package className="w-4 h-4" /> Siparişlerim Geçmişi <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className={isAdmin ? "space-y-6" : "grid lg:grid-cols-3 gap-8"}>
           
-          {/* 📍 SOL KONUM: KAYITLI ADRESLER VE YENİ ADRES EKLEME */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white p-6 rounded-3xl border border-sand-200 shadow-xs space-y-4">
-              <h3 className="text-sm font-bold text-sand-900 uppercase tracking-wider flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-brand-600" /> Kayıtlı Adreslerim
-              </h3>
-              
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {savedAddresses.length === 0 ? (
-                  <p className="text-xs text-sand-400">Henüz kayıtlı adresiniz bulunmuyor.</p>
-                ) : (
-                  savedAddresses.map((addr) => (
-                    <div key={addr.id} className="p-3.5 rounded-2xl bg-sand-50/70 border border-sand-100 space-y-1 relative group">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-extrabold bg-brand-100 text-brand-800 px-2.5 py-0.5 rounded-full">
-                          {addr.title}
-                        </span>
-                        <button 
-                          onClick={() => handleDeleteAddress(addr.id)}
-                          className="text-sand-400 hover:text-red-600 transition-colors cursor-pointer"
-                          title="Adresi Sil"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+          {/* 📍 SOL KONUM: Sadece müşteri ise görünür (Adresler ve Yeni Adres Ekle) */}
+          {!isAdmin && (
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white p-6 rounded-3xl border border-sand-200 shadow-xs space-y-4">
+                <h3 className="text-sm font-bold text-sand-900 uppercase tracking-wider flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-brand-600" /> Kayıtlı Adreslerim
+                </h3>
+                
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {savedAddresses.length === 0 ? (
+                    <p className="text-xs text-sand-400">Henüz kayıtlı adresiniz bulunmuyor.</p>
+                  ) : (
+                    savedAddresses.map((addr) => (
+                      <div key={addr.id} className="p-3.5 rounded-2xl bg-sand-50/70 border border-sand-100 space-y-1 relative group">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-extrabold bg-brand-100 text-brand-800 px-2.5 py-0.5 rounded-full">
+                            {addr.title}
+                          </span>
+                          <button 
+                            onClick={() => handleDeleteAddress(addr.id)}
+                            className="text-sand-400 hover:text-red-600 transition-colors cursor-pointer"
+                            title="Adresi Sil"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-xs font-bold text-sand-900 pt-1">{addr.address}</p>
+                        <p className="text-[11px] text-sand-500">{addr.city} / {addr.district} ({addr.recipient_name})</p>
                       </div>
-                      <p className="text-xs font-bold text-sand-900 pt-1">{addr.address}</p>
-                      <p className="text-[11px] text-sand-500">{addr.city} / {addr.district} ({addr.recipient_name})</p>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Yeni Adres Ekleme Formu */}
+              <div className="bg-white p-6 rounded-3xl border border-sand-200 shadow-xs space-y-4">
+                <h3 className="text-xs font-bold text-sand-900 flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-brand-600" /> Yeni Adres Ekle
+                </h3>
+                <form onSubmit={handleAddAddress} className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Adres Başlığı (Örn: Ev, Ofis)"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="input text-xs py-2 w-full"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Alıcı Adı Soyadı"
+                    value={newRecipient}
+                    onChange={(e) => setNewRecipient(e.target.value)}
+                    className="input text-xs py-2 w-full"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Alıcı Telefon (5XXXXXXXXX)"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    className="input text-xs py-2 w-full"
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={selectedCity}
+                      onChange={(e) => {
+                        const city = e.target.value;
+                        const firstDistrict = districtsMap[city]?.[0] || '';
+                        handleCityOrDistrictChange(city, firstDistrict);
+                      }}
+                      className="input text-xs py-2 w-full bg-white cursor-pointer"
+                    >
+                      {cities.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={selectedDistrict}
+                      onChange={(e) => {
+                        handleCityOrDistrictChange(selectedCity, e.target.value);
+                      }}
+                      className="input text-xs py-2 w-full bg-white cursor-pointer"
+                    >
+                      {(districtsMap[selectedCity] || []).map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-sand-600">Haritadan Konum Seç</label>
+                    <div className="w-full h-40 rounded-2xl overflow-hidden border border-sand-200 z-0 relative">
+                      <MapContainer center={position} zoom={13} style={{ height: '100%', width: '100%' }}>
+                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                        <MapController center={position} />
+                        <LocationSelector position={position} setPosition={setPosition} setAddressText={setNewAddressText} />
+                      </MapContainer>
                     </div>
-                  ))
-                )}
+                  </div>
+
+                  <textarea
+                    placeholder="Açık Adres"
+                    value={newAddressText}
+                    onChange={(e) => setNewAddressText(e.target.value)}
+                    className="input text-xs py-2 w-full resize-none h-16"
+                  />
+
+                  <button type="submit" className="btn-primary text-xs w-full py-2.5 cursor-pointer">
+                    Adresi Kaydet
+                  </button>
+                </form>
               </div>
             </div>
+          )}
 
-            {/* Yeni Adres Ekleme Formu */}
-            <div className="bg-white p-6 rounded-3xl border border-sand-200 shadow-xs space-y-4">
-              <h3 className="text-xs font-bold text-sand-900 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-brand-600" /> Yeni Adres Ekle
-              </h3>
-              <form onSubmit={handleAddAddress} className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Adres Başlığı (Örn: Ev, Ofis)"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="input text-xs py-2 w-full"
-                />
-                <input
-                  type="text"
-                  placeholder="Alıcı Adı Soyadı"
-                  value={newRecipient}
-                  onChange={(e) => setNewRecipient(e.target.value)}
-                  className="input text-xs py-2 w-full"
-                />
-                <input
-                  type="text"
-                  placeholder="Alıcı Telefon (5XXXXXXXXX)"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  className="input text-xs py-2 w-full"
-                />
-
-                {/* 🌸 İL VE İLÇE SEÇİM KUTULARI (Harita ile Senkronize) */}
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={selectedCity}
-                    onChange={(e) => {
-                      const city = e.target.value;
-                      const firstDistrict = districtsMap[city]?.[0] || '';
-                      handleCityOrDistrictChange(city, firstDistrict);
-                    }}
-                    className="input text-xs py-2 w-full bg-white cursor-pointer"
-                  >
-                    {cities.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedDistrict}
-                    onChange={(e) => {
-                      handleCityOrDistrictChange(selectedCity, e.target.value);
-                    }}
-                    className="input text-xs py-2 w-full bg-white cursor-pointer"
-                  >
-                    {(districtsMap[selectedCity] || []).map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 🗺️ HARİTA ALANI */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-sand-600">Haritadan Konum Seç</label>
-                  <div className="w-full h-40 rounded-2xl overflow-hidden border border-sand-200 z-0 relative">
-                    <MapContainer center={position} zoom={13} style={{ height: '100%', width: '100%' }}>
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      <MapController center={position} />
-                      <LocationSelector position={position} setPosition={setPosition} setAddressText={setNewAddressText} />
-                    </MapContainer>
-                  </div>
-                </div>
-
-                <textarea
-                  placeholder="Açık Adres (Haritadan seçince veya il/ilçe seçince güncellenir)"
-                  value={newAddressText}
-                  onChange={(e) => setNewAddressText(e.target.value)}
-                  className="input text-xs py-2 w-full resize-none h-16"
-                />
-
-                <button type="submit" className="btn-primary text-xs w-full py-2.5 cursor-pointer">
-                  Adresi Kaydet
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* ⚙️ SAĞ KONUM: BİLGİ GÜNCELLEME ALANLARI */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* ⚙️ SAĞ KONUM (Admin ise tam genişlik, müşteri ise 2 kolon): Bilgi Güncelleme Alanları */}
+          <div className={isAdmin ? "space-y-6 max-w-3xl mx-auto w-full" : "lg:col-span-2 space-y-6"}>
             
             {/* Telefon Numarası Güncelleme */}
             <div className="bg-white p-6 rounded-3xl border border-sand-200 shadow-xs space-y-4">
