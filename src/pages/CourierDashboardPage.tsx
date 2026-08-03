@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Truck, Package, MapPin, Phone, CheckCircle, Clock, RefreshCw, AlertCircle, Map, CheckSquare, Square, Navigation, Send } from 'lucide-react';
-import { getCurrentCourier, getCourierOrders, updateOrderStatus, updateOrderStatusWithEmail, subscribeToCourierOrders, type RealtimeSubscription } from '../services/courierApi';
+import { getCurrentCourier, getCourierOrders, updateOrderStatus, updateOrderStatusWithEmail, subscribeToCourierOrders, getStoreLocation, type RealtimeSubscription } from '../services/courierApi';
 import type { CourierOrder } from '../types';
 import CourierMap from '../components/courier/CourierMap';
 
@@ -9,13 +9,6 @@ interface Props {
   currentPage?: string;
 }
 
-// 🌸 Store location configuration - safe fallback values
-const STORE_LOCATION = {
-  lat: 39.9334,
-  lng: 32.8597,
-  address: 'Ankara, Türkiye'
-};
-
 export default function CourierDashboardPage({ navigate, currentPage }: Props) {
   const [orders, setOrders] = useState<CourierOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +16,25 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
   const [subscription, setSubscription] = useState<RealtimeSubscription | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [currentTab, setCurrentTab] = useState<'pending' | 'in_transit' | 'delivered' | 'all'>('pending');
+  const [storeLocation, setStoreLocation] = useState({
+    lat: 39.9334,
+    lng: 32.8597,
+    address: 'Ankara, Türkiye'
+  });
+
+  // 🌸 Mağaza konumunu dinamik olarak al
+  useEffect(() => {
+    const loadStoreLocation = async () => {
+      try {
+        const location = await getStoreLocation();
+        setStoreLocation(location);
+      } catch (error) {
+        console.error('Mağaza konumu yüklenemedi:', error);
+      }
+    };
+
+    loadStoreLocation();
+  }, []);
 
   // 🌸 Sync currentTab with currentPage from router
   useEffect(() => {
@@ -47,7 +59,6 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
   const handleSubTabChange = (subTab: 'pending' | 'in_transit') => {
     setCurrentTab(subTab);
     setSelectedOrderIds([]); // Clear selection when sub-tab changes
-    onSubTabChange?.(subTab); // Propagate sub-tab change to parent
   };
 
   const loadOrders = async () => {
@@ -191,7 +202,7 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
     const selectedOrders = orders.filter(o => selectedOrderIds.includes(o.id));
 
     // 🌸 Create Google Maps URL with multiple waypoints
-    const storeLocation = `${STORE_LOCATION.lat},${STORE_LOCATION.lng}`;
+    const storeLocationCoords = `${storeLocation.lat},${storeLocation.lng}`;
     const destinations = selectedOrders.map(order => {
       // 🌸 Filter out null/undefined/empty values to prevent "null" in address string
       const addressParts = [
@@ -209,9 +220,9 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
     const baseUrl = 'https://www.google.com/maps/dir/?api=1';
     const waypoints = destinations.slice(0, -1).join('|');
     const destination = destinations[destinations.length - 1];
-    
-    const mapsUrl = `${baseUrl}&origin=${storeLocation}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
-    
+
+    const mapsUrl = `${baseUrl}&origin=${storeLocationCoords}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
+
     window.open(mapsUrl, '_blank');
   };
 
@@ -402,6 +413,7 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
                   isSelected={selectedOrderIds.includes(order.id)}
                   onToggleSelect={() => handleToggleSelectOrder(order.id)}
                   showSelect={currentTab !== 'delivered' && currentTab !== 'all'}
+                  storeLocation={storeLocation}
                 />
               ))}
             </div>
@@ -411,13 +423,14 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
     );
 }
 
-function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggleSelect, showSelect }: { 
-  order: CourierOrder; 
+function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggleSelect, showSelect, storeLocation }: {
+  order: CourierOrder;
   onStatusUpdate: (id: string, status: string) => void;
   updatingOrderId: string | null;
   isSelected: boolean;
   onToggleSelect: () => void;
   showSelect: boolean;
+  storeLocation: { lat: number; lng: number; address: string };
 }) {
   // 🌸 Kurye yetkileri: Sadece "processing" -> "shipped" ve "shipped" -> "delivered" yapabilir
   const getNextStatus = (currentStatus: string) => {
@@ -520,7 +533,7 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
           destinationAddress={order.shipping_address}
           destinationCity={order.city}
           destinationDistrict={order.district}
-          storeLocation={STORE_LOCATION}
+          storeLocation={storeLocation}
         />
       </div>
     </div>

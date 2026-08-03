@@ -160,7 +160,9 @@ export type StoreSettings = {
   id: number;
   city: string;            // İl (örn: "Ankara")
   district: string;        // İlçe (örn: "Çankaya")
-  address: string;         // Açık adres (örn: "Kızılay Sakarya Cad.")
+  neighborhood?: string;  // Mahalle (örn: "Kızılay")
+  street?: string;         // Cadde (örn: "Sakarya Cad.")
+  address: string;         // Açık adres (örn: "No: 123")
   latitude?: number | null;   // Koordinat (opsiyonel)
   longitude?: number | null;  // Koordinat (opsiyonel)
   is_active: boolean;

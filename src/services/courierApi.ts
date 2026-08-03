@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import type { Courier, CourierOrder } from '../types';
+import { fetchStoreSettings } from './shipping';
 
 // 🌸 Realtime subscription type
 export type RealtimeSubscription = {
@@ -52,6 +53,33 @@ export function courierLogout() {
   localStorage.removeItem('courierId');
   localStorage.removeItem('courierName');
   localStorage.removeItem('courierEmail');
+}
+
+// 🌸 Mağaza konumunu getir
+export async function getStoreLocation(): Promise<{ lat: number; lng: number; address: string }> {
+  try {
+    const storeSettings = await fetchStoreSettings();
+    if (storeSettings.latitude && storeSettings.longitude) {
+      return {
+        lat: storeSettings.latitude,
+        lng: storeSettings.longitude,
+        address: `${storeSettings.district}, ${storeSettings.city}, Türkiye`
+      };
+    }
+    // Fallback to default
+    return {
+      lat: 39.9334,
+      lng: 32.8597,
+      address: 'Ankara, Türkiye'
+    };
+  } catch (error) {
+    console.error('Mağaza konumu alınamadı:', error);
+    return {
+      lat: 39.9334,
+      lng: 32.8597,
+      address: 'Ankara, Türkiye'
+    };
+  }
 }
 
 // Get current courier from localStorage
@@ -122,7 +150,7 @@ export function subscribeToCourierOrders(
     )
     .subscribe((status, err) => {
       console.log('Subscription status:', status);
-      if (status === 'SUBSCRIPTION_ERROR') {
+      if (err) {
         console.error('Realtime subscription error:', err);
       }
     });

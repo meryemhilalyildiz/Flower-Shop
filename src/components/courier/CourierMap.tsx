@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import { getStoreLocation } from '../../services/courierApi';
 
 // 🌸 Leaflet marker icon fix
 let DefaultIcon = L.icon({
@@ -27,7 +28,7 @@ interface Props {
   destinationAddress: string;
   destinationCity: string;
   destinationDistrict: string;
-  storeLocation?: { lat: number; lng: number };
+  storeLocation?: { lat: number; lng: number; address?: string };
 }
 
 // 🌸 Custom store icon
@@ -66,10 +67,25 @@ export default function CourierMap({
   destinationAddress,
   destinationCity,
   destinationDistrict,
-  storeLocation = DEFAULT_STORE_LOCATION
+  storeLocation: propStoreLocation
 }: Props) {
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [storeLocation, setStoreLocation] = useState(DEFAULT_STORE_LOCATION);
+
+  // 🌸 Mağaza konumunu dinamik olarak al
+  useEffect(() => {
+    const loadStoreLocation = async () => {
+      try {
+        const location = await getStoreLocation();
+        setStoreLocation(location);
+      } catch (error) {
+        console.error('Mağaza konumu yüklenemedi:', error);
+      }
+    };
+
+    loadStoreLocation();
+  }, []);
 
   useEffect(() => {
     // 🌸 Geocode destination address using Nominatim (OpenStreetMap)
