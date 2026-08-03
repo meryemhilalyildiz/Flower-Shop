@@ -108,7 +108,45 @@ export type Route =
   | { name: 'admin-shipping' }
   | { name: 'admin-wiki' }
   |{name: 'admin-kargo-rota'}  
-  | { name: 'courier-portal', courierId?: string };
+  | { name: 'courier-portal', courierId?: string }
+  | { name: 'courier-dashboard' }
+  | { name: 'courier-delivered' }
+  | { name: 'courier-all' };
+
+// =====================================================================
+// 🌸 Kurye Yönetim Sistemi Tipleri
+// =====================================================================
+
+export type Courier = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  vehicle_type: 'motor' | 'araba';
+  password_hash?: string;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type CourierOrder = {
+  id: string;
+  recipient_name: string;
+  recipient_phone: string;
+  shipping_address: string;
+  city: string;
+  district: string;
+  status: 'pending' | 'processing' | 'shipped' | 'in_transit' | 'delivered' | 'cancelled';
+  total_amount: number;
+  tracking_code?: string;
+  delivery_order?: number;
+  estimated_delivery_time?: string;
+  items: any[];
+  created_at: string;
+  user_email?: string;
+  email?: string;
+  recipientName?: string;
+  tracking_number?: string;
+};
 
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri

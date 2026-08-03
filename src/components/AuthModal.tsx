@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User, X, Flower2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { courierLogin } from '../services/courierApi';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -124,36 +125,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         setMode('signin');
       }
     } else {
+      // 🌸 Önce normal kullanıcı girişini dene
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-      if (error) {
+      if (!error) {
+        // Normal kullanıcı girişi başarılı
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
         setLoading(false);
-        setMessage('❌ ' + error.message);
-        return;
-      }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+        if (profile?.role === 'admin') {
+          setMessage('✅ Yönetici girişi başarılı!');
+          setTimeout(() => {
+            onClose();
+            window.location.hash = '#/admin/dashboard';
+          }, 500);
+          return;
+        }
 
-      setLoading(false);
-
-      if (profile?.role === 'admin') {
-        setMessage('✅ Yönetici girişi başarılı!');
+        setMessage('✅ Giriş başarılı!');
         setTimeout(() => {
           onClose();
-          window.location.hash = '#/admin/dashboard';
+          window.location.hash = '#/magaza';
         }, 500);
         return;
       }
 
-      setMessage('✅ Giriş başarılı!');
-      setTimeout(() => {
-        onClose();
-        window.location.hash = '#/magaza';
-      }, 500);
+      // 🌸 Normal kullanıcı girişi başarısız oldu, kurye kontrolü yap
+      const courierResult = await courierLogin(email, password);
+      
+      if (courierResult.success) {
+        setLoading(false);
+        setMessage('✅ Kurye girişi başarılı!');
+        setTimeout(() => {
+          onClose();
+          window.location.hash = '#/kurye/dashboard';
+        }, 500);
+        return;
+      }
+
+      setLoading(false);
+      setMessage('❌ Giriş başarısız: ' + (error?.message || courierResult.error || 'Bilinmeyen hata'));
     }
   };
 

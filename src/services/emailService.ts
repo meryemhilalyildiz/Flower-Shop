@@ -37,6 +37,11 @@ export interface EmailOrderDetails {
       statusTitle = "Siparişiniz Kargoya Verildi";
       statusMessage = `${storeName} mağazasındaki siparişiniz kargo firmasına teslim edilmiştir. Çiçekleriniz yolda!`;
       statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
+    } else if (['in_transit', 'yolda', 'yola çıktı'].includes(normalizedStatus)) {
+      emailSubject = `Kurye Yola Çıktı - ${storeName}`;
+      statusTitle = "Kuryeniz Yola Çıktı";
+      statusMessage = `${storeName} mağazasındaki siparişiniz için atanmış kuryeniz teslimat noktasına doğru yola çıktı. Çiçekleriniz yakında!`;
+      statusDetail = `${storeName} siparişiniz ile ilgili güncellemeleri bu e-posta üzerinden takip edebilirsiniz.`;
     } else if (['cancellation_requested', 'iptal talebi alındı'].includes(normalizedStatus)) {
       emailSubject = `Sipariş İptal Talebi Alındı - ${storeName}`;
       statusTitle = "İptal Talebiniz Şirkete İletilmiştir";

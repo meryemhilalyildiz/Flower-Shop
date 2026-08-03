@@ -41,6 +41,8 @@ import AdminFaqPage from './pages/AdminFaqPage';
 import CustomBouquetPage from './pages/CustomBouquetPage';
 import AdminCourierRoutePage from './pages/AdminCourierRoutePage';
 import LegalPages from './pages/LegalPages';
+import CourierDashboardPage from './pages/CourierDashboardPage';
+import CourierLayout from './components/courier/CourierLayout';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -386,9 +388,6 @@ function App() {
         />
       );
 
-      case 'admin-kargo-rota':
-        return <AdminCourierRoutePage />;
-
       case 'shop':
         return (
           <ShopPage
@@ -551,6 +550,24 @@ function App() {
           </AdminLayout>
         );
 
+      case 'admin-kargo-rota':
+        return (
+          <AdminLayout currentPage="admin-kargo-rota" navigate={navigate}>
+            <AdminCourierRoutePage />
+          </AdminLayout>
+        );
+
+      /* 🚚 KURYE ROTALARI */
+      case 'courier-dashboard':
+      case 'courier-delivered':
+      case 'courier-all': {
+        return (
+          <CourierLayout currentPage={route.name} navigate={navigate}>
+            <CourierDashboardPage navigate={navigate} />
+          </CourierLayout>
+        );
+      }
+
       default:
         return (
           <HomePage
@@ -567,8 +584,9 @@ function App() {
   };
 
   const isAdminRoute = route.name.startsWith('admin');
+  const isCourierRoute = route.name.startsWith('courier');
 
-  if (isAdminRoute) {
+  if (isAdminRoute || isCourierRoute) {
     return (
       <div className="min-h-screen bg-sand-50">
         {renderPage()}
