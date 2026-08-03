@@ -285,6 +285,10 @@ export function AdminShippingPage() {
       setStoreSettings(updated);
       setShowStoreModal(false);
       clearShippingCache();
+      
+      // 🌸 ContactPage ve diğer bileşenleri güncelleme event'i tetikle
+      window.dispatchEvent(new CustomEvent('storeSettingsUpdated', { detail: updated }));
+      
       alert('✅ Mağaza ayarları güncellendi!');
     } catch (err: any) {
       alert(`❌ Güncelleme hatası: ${err.message}`);

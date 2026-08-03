@@ -2,13 +2,48 @@ import { Flower2, Instagram, Facebook, Twitter, Mail, Phone, MapPin } from 'luci
 import { routeToHash } from '../router';
 import type { Route } from '../types';
 import { usePageContent } from '../hooks/usePageContent';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 export default function Footer() {
   // 🌸 Hakkımızda sayfasının canlı içeriğini çekiyoruz
   const { content: aboutContent, refresh: refreshAbout } = usePageContent('about');
   // 🌸 İletişim sayfasının canlı içeriğini çekiyoruz
   const { content: contactContent, refresh: refreshContact } = usePageContent('contact');
+  
+  // 🌸 Store settings'ten mağaza adresini çek
+  const [storeSettings, setStoreSettings] = useState<any>(null);
+
+  // 🌸 Store settings'ten mağaza adresini çek
+  const fetchStoreSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('store_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      
+      if (data && !error) {
+        setStoreSettings(data);
+      }
+    } catch (error) {
+      console.error('Mağaza ayarları çekilirken hata:', error);
+    }
+  };
+
+  // 🌸 Store settings'i yükle ve güncellemeleri dinle
+  useEffect(() => {
+    fetchStoreSettings();
+
+    const handleStoreSettingsUpdate = () => {
+      fetchStoreSettings();
+    };
+
+    window.addEventListener('storeSettingsUpdated', handleStoreSettingsUpdate);
+    return () => {
+      window.removeEventListener('storeSettingsUpdated', handleStoreSettingsUpdate);
+    };
+  }, []);
 
   // 🌸 Admin panelinden kayıt yapıldığında footer'ı güncelle
   useEffect(() => {
@@ -40,7 +75,24 @@ export default function Footer() {
     { icon: 'Phone', title: 'Telefon', value: '0850 123 45 67' },
     { icon: 'Mail', title: 'E-posta', value: 'destek@cicekci.com' },
   ];
-  const contactInfo = contactContent?.contact_info || defaultContactInfo;
+  
+  // 🌸 Store settings'ten adres bilgisi varsa onu kullan
+  let contactInfo = contactContent?.contact_info || defaultContactInfo;
+  
+  if (storeSettings) {
+    const fullAddress = [
+      storeSettings.address,
+      storeSettings.street,
+      storeSettings.neighborhood,
+      storeSettings.district,
+      storeSettings.city
+    ].filter(part => part && typeof part === 'string' && part.trim() !== '').join(', ');
+    
+    contactInfo = [
+      { icon: 'MapPin', title: 'Adres', value: fullAddress },
+      ...contactInfo.slice(1) // Diğer bilgileri koru
+    ];
+  }
   const linkGroups = [
     {
       title: 'Mağaza',

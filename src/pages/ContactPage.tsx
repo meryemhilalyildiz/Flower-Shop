@@ -34,6 +34,34 @@ export default function ContactPage({ navigate, adminContent }: Props) {
   const [phoneVal, setPhoneVal] = useState('');
   const [emailVal, setEmailVal] = useState('');
   const [hoursVal, setHoursVal] = useState('');
+  const [storeSettings, setStoreSettings] = useState<any>(null);
+
+  // 🌸 Store settings'ten mağaza adresini çek
+  const fetchStoreSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('store_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      
+      if (data && !error) {
+        setStoreSettings(data);
+        // 🌸 Store settings'ten gelen adres bilgilerini ContactPage'e uygula
+        const fullAddress = [
+          data.address,
+          data.street,
+          data.neighborhood,
+          data.district,
+          data.city
+        ].filter(part => part && typeof part === 'string' && part.trim() !== '').join(', ');
+        
+        setAddressVal(fullAddress);
+      }
+    } catch (error) {
+      console.error('Mağaza ayarları çekilirken hata:', error);
+    }
+  };
 
   // Veritabanından gelen veriler yüklendiğinde state'leri doldur
   useEffect(() => {
@@ -42,12 +70,30 @@ export default function ContactPage({ navigate, adminContent }: Props) {
       setEditableHeroDesc(displayContent.hero_description || 'Sorularınız, özel siparişler veya işbirlikleri için bize ulaşın. Size yardımcı olmaktan mutluluk duyarız.');
       
       const infoList = displayContent.contact_info || [];
-      setAddressVal(infoList[0]?.value || 'İstiklal Cd. No:123, Beyoğlu, İstanbul');
+      // 🌸 Store settings'ten adres bilgisi yoksa page_contents'ten kullan
+      if (!storeSettings) {
+        setAddressVal(infoList[0]?.value || 'İstiklal Cd. No:123, Beyoğlu, İstanbul');
+      }
       setPhoneVal(infoList[1]?.value || '0850 123 45 67');
       setEmailVal(infoList[2]?.value || 'flowershop.iletisim@gmail.com');
       setHoursVal(infoList[3]?.value || 'Her gün 08:00 - 22:00');
     }
-  }, [displayContent]);
+  }, [displayContent, storeSettings]);
+
+  // 🌸 Store settings'i yükle ve güncellemeleri dinle
+  useEffect(() => {
+    fetchStoreSettings();
+
+    // 🌸 Store settings güncellendiğinde yeniden yükle
+    const handleStoreSettingsUpdate = () => {
+      fetchStoreSettings();
+    };
+
+    window.addEventListener('storeSettingsUpdated', handleStoreSettingsUpdate);
+    return () => {
+      window.removeEventListener('storeSettingsUpdated', handleStoreSettingsUpdate);
+    };
+  }, []);
 
   // 🌸 Admin editing context ile değişiklikleri sync et
   const handleContactFieldChange = (field: string, value: string) => {
