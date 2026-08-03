@@ -6,15 +6,49 @@ import CourierMap from '../components/courier/CourierMap';
 
 interface Props {
   navigate: (route: any) => void;
+  currentPage?: string;
 }
 
-export default function CourierDashboardPage({ navigate }: Props) {
+// 🌸 Store location configuration - safe fallback values
+const STORE_LOCATION = {
+  lat: 39.9334,
+  lng: 32.8597,
+  address: 'Ankara, Türkiye'
+};
+
+export default function CourierDashboardPage({ navigate, currentPage }: Props) {
   const [orders, setOrders] = useState<CourierOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<RealtimeSubscription | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [currentTab, setCurrentTab] = useState<'pending' | 'in_transit' | 'delivered' | 'all'>('pending');
+
+  // 🌸 Sync currentTab with currentPage from router
+  useEffect(() => {
+    if (currentPage) {
+      switch (currentPage) {
+        case 'courier-dashboard':
+          setCurrentTab('pending');
+          break;
+        case 'courier-delivered':
+          setCurrentTab('delivered');
+          break;
+        case 'courier-all':
+          setCurrentTab('all');
+          break;
+        default:
+          setCurrentTab('pending');
+      }
+    }
+  }, [currentPage]);
+
+  // 🌸 Sub-tab change handler for "Aktif Siparişler" section
+  const handleSubTabChange = (subTab: 'pending' | 'in_transit') => {
+    setCurrentTab(subTab);
+    setSelectedOrderIds([]); // Clear selection when sub-tab changes
+    onSubTabChange?.(subTab); // Propagate sub-tab change to parent
+  };
 
   const loadOrders = async () => {
     const courier = getCurrentCourier();
@@ -37,14 +71,14 @@ export default function CourierDashboardPage({ navigate }: Props) {
 
     // Load initial orders
     loadOrders();
-    
+
     // 🌸 Setup realtime subscription
     try {
       const sub = subscribeToCourierOrders(courier.id, (updatedOrders) => {
         setOrders(updatedOrders);
       });
       setSubscription(sub);
-      
+
       // 🌸 Cleanup subscription on unmount
       return () => {
         sub.unsubscribe();
@@ -54,7 +88,7 @@ export default function CourierDashboardPage({ navigate }: Props) {
       // Continue without realtime if it fails
       return () => {};
     }
-  }, [navigate]);
+  }, [navigate, currentPage]); // 🌸 Add currentPage to reload orders when tab changes
 
   const handleTabChange = (newTab: 'pending' | 'in_transit' | 'delivered' | 'all') => {
     setCurrentTab(newTab);
@@ -62,18 +96,24 @@ export default function CourierDashboardPage({ navigate }: Props) {
   };
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    console.log('handleStatusUpdate called:', { orderId, newStatus });
     setUpdatingOrderId(orderId);
-    
+
     const order = orders.find(o => o.id === orderId);
     if (!order) {
+      console.error('Order not found:', orderId);
+      alert('Sipariş bulunamadı');
       setUpdatingOrderId(null);
       return;
     }
 
+    console.log('Updating order status:', { orderId, currentStatus: order.status, newStatus });
+
     // 🌸 For in_transit status, send email notification
     if (newStatus === 'in_transit') {
+      console.log('Attempting in_transit update with email notification');
       const result = await updateOrderStatusWithEmail(
-        orderId, 
+        orderId,
         newStatus,
         {
           customerName: order.recipient_name || order.recipientName || 'Değerli Müşterimiz',
@@ -82,29 +122,36 @@ export default function CourierDashboardPage({ navigate }: Props) {
           totalAmount: Number(order.total_amount || 0)
         }
       );
-      
+
+      console.log('Update result:', result);
+
       if (result.success) {
         await loadOrders();
         handleTabChange('in_transit');
       } else {
+        console.error('Update failed:', result.error);
         alert('Durum güncellenemedi: ' + result.error);
       }
     } else {
       // For other statuses, use simple update
+      console.log('Attempting simple status update');
       const result = await updateOrderStatus(orderId, newStatus);
-      
+
+      console.log('Simple update result:', result);
+
       if (result.success) {
         await loadOrders();
-        
+
         // 🌸 Auto-move to appropriate tab based on new status
         if (newStatus === 'delivered') {
           handleTabChange('delivered');
         }
       } else {
+        console.error('Simple update failed:', result.error);
         alert('Durum güncellenemedi: ' + result.error);
       }
     }
-    
+
     setUpdatingOrderId(null);
   };
 
@@ -134,11 +181,19 @@ export default function CourierDashboardPage({ navigate }: Props) {
     }
 
     const selectedOrders = orders.filter(o => selectedOrderIds.includes(o.id));
-    
+
     // 🌸 Create Google Maps URL with multiple waypoints
-    const storeLocation = '39.9334,32.8597'; // Ankara (default store location)
+    const storeLocation = `${STORE_LOCATION.lat},${STORE_LOCATION.lng}`;
     const destinations = selectedOrders.map(order => {
-      const address = encodeURIComponent(`${order.shipping_address}, ${order.city}, ${order.district}, Türkiye`);
+      // 🌸 Filter out null/undefined/empty values to prevent "null" in address string
+      const addressParts = [
+        order.shipping_address,
+        order.city,
+        order.district,
+        'Türkiye'
+      ].filter(part => part && typeof part === 'string' && part.trim() !== '');
+
+      const address = encodeURIComponent(addressParts.join(', '));
       return address;
     });
 
@@ -399,8 +454,10 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
               <MapPin className="h-4 w-4 text-sand-400 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-sand-900">{order.recipient_name}</p>
-                <p className="text-sm text-sand-600">{order.shipping_address}</p>
-                <p className="text-xs text-sand-500">{order.city}, {order.district}</p>
+                <p className="text-sm text-sand-600">{order.shipping_address || 'Adres bilgisi yok'}</p>
+                <p className="text-xs text-sand-500">
+                  {[order.city, order.district].filter(Boolean).join(', ') || 'Konum bilgisi yok'}
+                </p>
               </div>
             </div>
             
@@ -429,7 +486,10 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
         {canUpdate && (
           <div className="flex flex-col gap-2">
             <button
-              onClick={() => onStatusUpdate(order.id, nextStatus)}
+              onClick={() => {
+                console.log('Button clicked:', { orderId: order.id, nextStatus, currentStatus: order.status });
+                onStatusUpdate(order.id, nextStatus);
+              }}
               disabled={updatingOrderId === order.id}
               className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -452,6 +512,7 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
           destinationAddress={order.shipping_address}
           destinationCity={order.city}
           destinationDistrict={order.district}
+          storeLocation={STORE_LOCATION}
         />
       </div>
     </div>

@@ -16,6 +16,13 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+// 🌸 Store location configuration - safe fallback values
+const DEFAULT_STORE_LOCATION = {
+  lat: 39.9334,
+  lng: 32.8597,
+  address: 'Ankara, Türkiye'
+};
+
 interface Props {
   destinationAddress: string;
   destinationCity: string;
@@ -55,11 +62,11 @@ function MapController({ center }: { center: [number, number] }) {
   return null;
 }
 
-export default function CourierMap({ 
-  destinationAddress, 
-  destinationCity, 
+export default function CourierMap({
+  destinationAddress,
+  destinationCity,
   destinationDistrict,
-  storeLocation = { lat: 39.9334, lng: 32.8597 } // Default Ankara
+  storeLocation = DEFAULT_STORE_LOCATION
 }: Props) {
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +75,15 @@ export default function CourierMap({
     // 🌸 Geocode destination address using Nominatim (OpenStreetMap)
     const geocodeAddress = async () => {
       try {
-        const query = `${destinationAddress}, ${destinationDistrict}, ${destinationCity}, Türkiye`;
+        // 🌸 Filter out null/undefined/empty values to prevent "null" in address string
+        const addressParts = [
+          destinationAddress,
+          destinationDistrict,
+          destinationCity,
+          'Türkiye'
+        ].filter(part => part && typeof part === 'string' && part.trim() !== '');
+
+        const query = addressParts.join(', ');
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
         );
@@ -80,8 +95,9 @@ export default function CourierMap({
           setDestinationCoords([lat, lng]);
         } else {
           // Fallback to city center if exact address not found
+          const cityQuery = destinationCity ? `${destinationCity}, Türkiye` : 'Türkiye';
           const cityResponse = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinationCity + ', Türkiye')}&limit=1`
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityQuery)}&limit=1`
           );
           const cityData = await cityResponse.json();
           if (cityData && cityData.length > 0) {
@@ -142,9 +158,9 @@ export default function CourierMap({
             <div className="text-sm">
               <strong>Teslimat Adresi</strong>
               <br />
-              {destinationAddress}
+              {destinationAddress || 'Adres bilgisi yok'}
               <br />
-              {destinationDistrict}, {destinationCity}
+              {[destinationDistrict, destinationCity].filter(Boolean).join(', ') || 'Konum bilgisi yok'}
             </div>
           </Popup>
         </Marker>

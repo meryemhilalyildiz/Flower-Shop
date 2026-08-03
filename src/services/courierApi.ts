@@ -152,7 +152,7 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
 
 // Update order status with email notification
 export async function updateOrderStatusWithEmail(
-  orderId: string, 
+  orderId: string,
   status: string,
   orderDetails?: {
     customerName: string;
@@ -162,16 +162,24 @@ export async function updateOrderStatusWithEmail(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    console.log('Updating order status in database:', { orderId, status });
+
     const { error } = await supabase
       .from('orders')
       .update({ status })
       .eq('id', orderId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Database update error:', error);
+      throw error;
+    }
+
+    console.log('Database update successful');
 
     // Send email notification if order details provided
     if (orderDetails && orderDetails.customerEmail) {
       try {
+        console.log('Attempting to send email notification to:', orderDetails.customerEmail);
         const { generateOrderEmailHtml } = await import('./emailService');
         const { emailSubject, html } = generateOrderEmailHtml({
           customerName: orderDetails.customerName,
@@ -181,6 +189,7 @@ export async function updateOrderStatusWithEmail(
           trackingNumber: orderDetails.trackingNumber
         });
 
+        console.log('Email HTML generated, invoking send-email function');
         await supabase.functions.invoke('send-email', {
           body: {
             to: orderDetails.customerEmail,
@@ -188,6 +197,7 @@ export async function updateOrderStatusWithEmail(
             html: html
           }
         });
+        console.log('Email sent successfully');
       } catch (emailError) {
         console.error('Email gönderilirken hata:', emailError);
         // Don't fail the status update if email fails

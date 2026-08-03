@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, RefreshCw, X, LogOut, Truck, Store } from 'lucide-react';
+import { Menu, RefreshCw, X, LogOut, Truck } from 'lucide-react';
 import CourierSidebar from './CourierSidebar';
 import { getCurrentCourier, courierLogout } from '../../services/courierApi';
 
@@ -35,10 +35,6 @@ export default function CourierLayout({ children, currentPage, navigate }: Props
     navigate({ name: 'home' });
   };
 
-  const handleGoToStore = () => {
-    navigate({ name: 'shop' });
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen grid place-items-center bg-sand-50">
@@ -60,9 +56,9 @@ export default function CourierLayout({ children, currentPage, navigate }: Props
     <div className="min-h-screen bg-sand-50 flex">
       {/* Desktop sidebar */}
       <div className="hidden md:block sticky top-0 h-screen">
-        <CourierSidebar 
-          currentPage={currentPage} 
-          navigate={navigate} 
+        <CourierSidebar
+          currentPage={currentPage}
+          navigate={navigate}
           onSignOut={handleSignOut}
         />
       </div>
@@ -72,9 +68,9 @@ export default function CourierLayout({ children, currentPage, navigate }: Props
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-sand-900/40" onClick={() => setSidebarOpen(false)} />
           <div className="absolute left-0 top-0 h-full">
-            <CourierSidebar 
-              currentPage={currentPage} 
-              navigate={navigate} 
+            <CourierSidebar
+              currentPage={currentPage}
+              navigate={navigate}
               onSignOut={handleSignOut}
               onClose={() => setSidebarOpen(false)}
             />
@@ -105,12 +101,6 @@ export default function CourierLayout({ children, currentPage, navigate }: Props
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleGoToStore}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm cursor-pointer"
-              >
-                <Store className="h-4 w-4" /> Mağaza
-              </button>
               <button
                 onClick={() => window.location.reload()}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm cursor-pointer"

@@ -561,8 +561,11 @@ function App() {
       case 'courier-delivered':
       case 'courier-all': {
         return (
-          <CourierLayout currentPage={route.name} navigate={navigate}>
-            <CourierDashboardPage navigate={navigate} />
+          <CourierLayout
+            currentPage={route.name}
+            navigate={navigate}
+          >
+            <CourierDashboardPage navigate={navigate} currentPage={route.name} />
           </CourierLayout>
         );
       }

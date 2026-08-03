@@ -8,9 +8,9 @@ interface Props {
 }
 
 const menuItems = [
-  { 
-    id: 'courier-dashboard', 
-    label: 'Aktif Siparişler', 
+  {
+    id: 'courier-dashboard',
+    label: 'Aktif Siparişler',
     icon: Truck,
   },
   { id: 'courier-delivered', label: 'Teslim Edilenler', icon: CheckCircle },
@@ -38,8 +38,7 @@ export default function CourierSidebar({ currentPage, navigate, onSignOut, onClo
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
-          const hasSubTabs = item.subTabs && item.subTabs.length > 0;
-          
+
           return (
             <div key={item.id}>
               <button
@@ -56,8 +55,6 @@ export default function CourierSidebar({ currentPage, navigate, onSignOut, onClo
                 <Icon className="h-5 w-5" />
                 {item.label}
               </button>
-              
-
             </div>
           );
         })}
