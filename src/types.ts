@@ -144,6 +144,7 @@ export type CourierOrder = {
   created_at: string;
   user_email?: string;
   email?: string;
+  recipient_email?: string;
   recipientName?: string;
   tracking_number?: string;
 };

@@ -83,23 +83,23 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
     // Load initial orders
     loadOrders();
 
-    // 🌸 Setup realtime subscription
-    try {
-      const sub = subscribeToCourierOrders(courier.id, (updatedOrders) => {
-        setOrders(updatedOrders);
-      });
-      setSubscription(sub);
-
-      // 🌸 Cleanup subscription on unmount
-      return () => {
-        sub.unsubscribe();
-      };
-    } catch (error) {
-      console.error('Failed to setup realtime subscription:', error);
-      // Continue without realtime if it fails
-      return () => {};
-    }
-  }, [navigate, currentPage]); // 🌸 Add currentPage to reload orders when tab changes
+    // 🌸 Realtime subscription temporarily disabled to fix status update issues
+    // try {
+    //   const sub = subscribeToCourierOrders(courier.id, (updatedOrders) => {
+    //     setOrders(updatedOrders);
+    //   });
+    //   setSubscription(sub);
+    //
+    //   // 🌸 Cleanup subscription on unmount
+    //   return () => {
+    //     sub.unsubscribe();
+    //   };
+    // } catch (error) {
+    //   console.error('Failed to setup realtime subscription:', error);
+    //   // Continue without realtime if it fails
+    //   return () => {};
+    // }
+  }, [navigate]);
 
   const handleTabChange = (newTab: 'pending' | 'in_transit' | 'delivered' | 'all') => {
     setCurrentTab(newTab);
@@ -118,28 +118,26 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
       return;
     }
 
-    console.log('Status güncelleniyor:', orderId, 'yeni status:', newStatus, 'mevcut status:', order.status);
-
     // 🌸 For in_transit status, send email notification
     if (newStatus === 'in_transit') {
-      console.log('Attempting in_transit update with email notification');
+      const customerEmail = order.user_email || order.email || order.recipient_email;
+
       const result = await updateOrderStatusWithEmail(
         orderId,
         newStatus,
         {
           customerName: order.recipient_name || order.recipientName || 'Değerli Müşterimiz',
-          customerEmail: order.user_email || order.email,
+          customerEmail: customerEmail || '',
           trackingNumber: order.tracking_number || order.tracking_code,
           totalAmount: Number(order.total_amount || 0)
         }
       );
 
       if (result.success) {
-        console.log('Status güncelleme başarılı, local state güncelleniyor');
         // 🌸 Manually update local state immediately
         setOrders(prevOrders =>
           prevOrders.map(o =>
-            o.id === orderId ? { ...o, status: newStatus } : o
+            o.id === orderId ? { ...o, status: newStatus as CourierOrder['status'] } : o
           )
         );
         handleTabChange('in_transit');
@@ -153,11 +151,10 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
       const result = await updateOrderStatus(orderId, newStatus);
 
       if (result.success) {
-        console.log('Status güncelleme başarılı, local state güncelleniyor');
         // 🌸 Manually update local state immediately
         setOrders(prevOrders =>
           prevOrders.map(o =>
-            o.id === orderId ? { ...o, status: newStatus } : o
+            o.id === orderId ? { ...o, status: newStatus as CourierOrder['status'] } : o
           )
         );
 
@@ -243,7 +240,7 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
   };
 
   const filteredOrders = getFilteredOrders();
-  const activeOrders = orders.filter(o => (o.status === 'shipped' || o.status === 'in_transit') && o.status !== 'cancelled');
+  const activeOrders = orders.filter(o => o.status === 'shipped' || o.status === 'in_transit');
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
   const cancelledOrders = orders.filter(o => o.status === 'cancelled');
 
@@ -439,7 +436,7 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
     return currentStatus;
   };
 
-  const canUpdate = (order.status === 'shipped' || order.status === 'in_transit') && order.status !== 'delivered' && order.status !== 'cancelled';
+  const canUpdate = order.status === 'shipped' || order.status === 'in_transit';
   const nextStatus = getNextStatus(order.status);
   
   const getNextStatusLabel = (currentStatus: string) => {

@@ -174,9 +174,18 @@ function App() {
           unit_price: item.product?.price || item.unit_price || item.price || 0,
         }));
 
+        // Unit price doğrulama - çok büyük değerleri düzelt
+        const normalizedItems = itemsToInsert.map((item: any) => {
+          const rawPrice = Number(item.unit_price || 0);
+          return {
+            ...item,
+            unit_price: rawPrice > 10000 ? rawPrice / 100 : rawPrice
+          };
+        });
+
         const { error: itemsError } = await supabase
           .from('order_items')
-          .insert(itemsToInsert);
+          .insert(normalizedItems);
 
         if (itemsError) {
           console.error('ORDER_ITEMS HATASI:', itemsError);

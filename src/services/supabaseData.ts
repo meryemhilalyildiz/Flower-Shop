@@ -124,14 +124,10 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
     return [];
   }
 
-  console.log('🔍 Review Stats from DB:', reviewStats);
-
   return (data || []).map((item: any) => {
     const stats = reviewStats.get(item.id);
     const rating = stats ? stats.rating : 0;
     const reviewCount = stats ? stats.reviewCount : 0;
-    
-    console.log(`🔍 Product ${item.id}: rating=${rating}, reviewCount=${reviewCount}`);
     
     return {
       id: item.id,

@@ -33,7 +33,6 @@ export default function AdminDistrictsPage() {
       
       if (error) {
         if (error.code === 'PGRST205') {
-          console.log('Districts tablosu henüz oluşturulmadı');
           setDistricts([]);
           return;
         }
