@@ -282,6 +282,7 @@ export default function AdminOrdersPage() {
     pending: orders.filter((o) => o.status === 'pending').length,
     processing: orders.filter((o) => o.status === 'processing').length,
     shipped: orders.filter((o) => o.status === 'shipped').length,
+    in_transit: orders.filter((o) => o.status === 'in_transit').length,
     delivered: orders.filter((o) => o.status === 'delivered').length,
     cancellation_requested: orders.filter((o) => o.status === 'cancellation_requested').length,
     cancelled: orders.filter((o) => o.status === 'cancelled').length,
@@ -331,6 +332,7 @@ export default function AdminOrdersPage() {
               pending: 'Beklemede',
               processing: 'İşleniyor',
               shipped: 'Kargoda',
+              in_transit: 'Yolda',
               delivered: 'Teslim Edildi',
               cancellation_requested: 'İptal Talepleri',
               cancelled: 'İptal',
@@ -443,12 +445,16 @@ export default function AdminOrdersPage() {
                     <div className="mt-3 pt-3 border-t border-sand-100">
                       <p className="text-xs font-semibold text-sand-700 mb-2">Sipariş Detayları:</p>
                       <div className="space-y-1">
-                        {order.order_items.map((item: any) => (
-                          <div key={item.id} className="text-xs text-sand-600 flex justify-between">
-                            <span>Ürün ID: {item.product_id} x {item.quantity}</span>
-                            <span>₺{Number(item.unit_price * item.quantity).toLocaleString('tr-TR')}</span>
-                          </div>
-                        ))}
+                        {order.order_items.map((item: any) => {
+                          const rawPrice = Number(item.unit_price || 0);
+                          const normalizedPrice = rawPrice > 10000 ? rawPrice / 100 : rawPrice;
+                          return (
+                            <div key={item.id} className="text-xs text-sand-600 flex justify-between">
+                              <span>Ürün ID: {item.product_id} x {item.quantity}</span>
+                              <span>₺{Number(normalizedPrice * item.quantity).toLocaleString('tr-TR')}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -473,6 +479,7 @@ export default function AdminOrdersPage() {
                       <option value="pending">⏳ Beklemede</option>
                       <option value="processing">⚙️ İşleniyor</option>
                       <option value="shipped">🚚 Kargoda</option>
+                      <option value="in_transit">🚀 Yolda</option>
                       <option value="delivered">✅ Teslim Edildi</option>
                       <option value="cancellation_requested">⚠️ İptal Talebi Var</option>
                       <option value="cancelled">❌ İptal Edildi</option>

@@ -35,6 +35,9 @@ function parseHash(): Route {
   if (parts[0] === 'iletisim') return { name: 'contact' };
   if (parts[0] === 'sss') return { name: 'faq' };
   if (parts[0] === 'kurye') {
+    if (parts[1] === 'dashboard') return { name: 'courier-dashboard' };
+    if (parts[1] === 'teslim-edilenler') return { name: 'courier-delivered' };
+    if (parts[1] === 'toplam') return { name: 'courier-all' };
     return { name: 'courier-portal', courierId: parts[1] };
   }
   if (parts[0] === 'admin') {
@@ -59,15 +62,16 @@ export function routeToHash(route: Route): string {
   switch (route.name) {
     case 'home':
       return '#/';
-      case 'legal':
-        return route.tab ? `#/legal?tab=${route.tab}` : '#/legal';
+    case 'legal':
+      return route.tab ? `#/legal?tab=${route.tab}` : '#/legal';
     case 'shop':
       return route.categorySlug ? `#/magaza/${route.categorySlug}` : '#/magaza';
-      case 'profile': return '#/profil';
+    case 'profile':
+      return '#/profil';
     case 'product':
       return `#/urun/${route.slug}`;
-      case 'custom-bouquet':
-        return '#/tasarla';
+    case 'custom-bouquet':
+      return '#/tasarla';
     case 'cart':
       return '#/sepet';
     case 'checkout':
@@ -96,10 +100,16 @@ export function routeToHash(route: Route): string {
       return '#/admin/siparisler';
     case 'admin-shipping':
       return '#/admin/kargo';
-      case 'admin-kargo-rota':
-        return '#/admin/kargo-rota';
-        case 'courier-portal':
-          return route.courierId ? `#/kurye/${route.courierId}` : '#/kurye';
+    case 'admin-kargo-rota':
+      return '#/admin/kargo-rota';
+    case 'courier-portal':
+      return route.courierId ? `#/kurye/${route.courierId}` : '#/kurye';
+    case 'courier-dashboard':
+      return '#/kurye/dashboard';
+    case 'courier-delivered':
+      return '#/kurye/teslim-edilenler';
+    case 'courier-all':
+      return '#/kurye/toplam';
     case 'admin-wiki':
       return '#/admin/wiki';
     case 'admin-reviews':
@@ -110,8 +120,8 @@ export function routeToHash(route: Route): string {
       return '#/admin/kampanyalar';
     case 'admin-editor':
       return '#/admin/duzenleme';
-      case 'admin-faq':
-        return '#/admin/faq';
+    case 'admin-faq':
+      return '#/admin/faq';
     default:
       return '#/';
   }

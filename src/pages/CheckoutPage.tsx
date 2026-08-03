@@ -501,7 +501,7 @@ const handleOpenCheckout = () => {
   // 🌸 📦 VERİTABANINDAN STOK DÜŞME FONKSİYONU
   // 🌸 📦 VERİTABANINDAN STOK DÜŞME FONKSİYONU (İsim & ID Çift Korumalı)
   const decreaseStockOnOrder = async (cartItems: CartItem[]) => {
-    console.log('📦 Stok düşme işlemi başlatıldı. Sepet ögeleri:', cartItems);
+
 
     try {
       for (const item of cartItems) {
@@ -512,14 +512,14 @@ const handleOpenCheckout = () => {
         const customDetails = cartObj.customBouquetDetails || cartObj.custom_bouquet_details || cartObj.product?.customBouquetDetails;
 
         if (isCustom && customDetails?.items && Array.isArray(customDetails.items)) {
-          console.log('💐 Özel buket tespit edildi, çiçekler işleniyor:', customDetails.items);
+
 
           for (const flower of customDetails.items) {
             const flowerName = flower.name || flower.title;
             const flowerId = flower.id || flower.stem_flower_id;
             const orderedQty = Number(flower.quantity || flower.count || 1) * Number(item.quantity || 1);
 
-            console.log(`🔍 Çiçek aranıyor: ID=[${flowerId}], İsim=[${flowerName}], Düşülecek Miktar=[${orderedQty}]`);
+
 
             let currentStem = null;
 
@@ -556,7 +556,7 @@ const handleOpenCheckout = () => {
               if (updateErr) {
                 console.error(`❌ [${currentStem.name}] stoğu güncellenirken hata:`, updateErr);
               } else {
-                console.log(`✅ [${currentStem.name}] stoğu başarıyla düşürüldü: ${oldStock} ➔ ${newStock}`);
+
               }
             } else {
               console.warn(`⚠️ Veritabanında [${flowerName || flowerId}] adında tekli çiçek bulunamadı.`);
@@ -584,7 +584,7 @@ const handleOpenCheckout = () => {
                 .update({ stock: newStock, stock_quantity: newStock })
                 .eq('id', currentProduct.id);
 
-              console.log(`✅ Katalog Ürünü [${productId}] stoğu düşürüldü: ${oldStock} ➔ ${newStock}`);
+
             }
           }
         }

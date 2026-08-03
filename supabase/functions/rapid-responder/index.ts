@@ -126,6 +126,10 @@ serve(async (req)=>{
       subject = `🚚 Siparişiniz Hazırlanıyor / Kargoda! - ${storeName}`;
       statusTitle = "Siparişiniz İşleme Alındı!";
       statusText = `<b>${storeName}</b> ekibi sipariş ettiğiniz çiçekleri özenle hazırlıyor / kargo firmasına teslim etti.`;
+    } else if (record.status === "in_transit" || record.status === "Yolda" || record.status === "Yola Çıktı") {
+      subject = `🚀 Siparişiniz Yolda! - ${storeName}`;
+      statusTitle = "Siparişiniz Yolda!";
+      statusText = `<b>${storeName}</b> mağazasındaki siparişiniz kurye tarafından teslim edilmek üzere yola çıkmıştır. Çiçekleriniz yakında sizde!`;
     } else if (record.status === "delivered" || record.status === "Teslim Edildi") {
       subject = `🌸 Siparişiniz Teslim Edildi! - ${storeName}`;
       statusTitle = "Çiçekleriniz Teslim Edildi!";

@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Truck, MapPin, RefreshCw, Car, Bike, Package, ArrowLeft, Clock, CheckCircle, UserPlus, Shield, Trash2, Users, User, Calendar, CheckSquare, Square, ChevronDown, ChevronUp, Map } from 'lucide-react';
+import { Truck, MapPin, RefreshCw, Car, Bike, Package, ArrowLeft, Clock, CheckCircle, UserPlus, Shield, Trash2, Users, User, Calendar, CheckSquare, Square, ChevronDown, ChevronUp, Map, Mail, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import StatusBadge from '../components/admin/StatusBadge';
 
 type Courier = {
   id: string;
   name: string;
   vehicle_type: 'motor' | 'araba';
   phone: string;
+  email: string;
   plate: string;
+  password_hash?: string;
   is_active: boolean;
 };
 
@@ -21,7 +24,7 @@ type Order = {
   created_at?: string;
   delivery_date?: string;
   tracking_code?: string;
-  courier_id?: string;
+  courier_id?: string | null;
   delivery_order?: number;
   items?: any[];
 };
@@ -31,7 +34,7 @@ export default function AdminCourierRoutePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'pending' | 'delivering' | 'couriers' | 'delivered' | 'portal'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'delivering' | 'in_transit' | 'couriers' | 'delivered' | 'portal'>('pending');
   const [selectedPortalCourierId, setSelectedPortalCourierId] = useState<string>('');
 
   // 🏙️ Seçilen İl/Bölge Filtresi (Boşsa tüm iller gösterilir)
@@ -43,8 +46,16 @@ export default function AdminCourierRoutePage() {
 
   const [newCourierName, setNewCourierName] = useState('');
   const [newCourierPhone, setNewCourierPhone] = useState('');
+  const [newCourierEmail, setNewCourierEmail] = useState('');
+  const [newCourierPassword, setNewCourierPassword] = useState('');
   const [newCourierPlate, setNewCourierPlate] = useState('');
   const [newCourierVehicle, setNewCourierVehicle] = useState<'motor' | 'araba'>('motor');
+
+  // 📦 Kargo Modal State'leri
+  const [selectedOrderForCourier, setSelectedOrderForCourier] = useState<Order | null>(null);
+  const [selectedCourierId, setSelectedCourierId] = useState<string>('');
+  const [trackingInput, setTrackingInput] = useState('');
+  const [bulkTrackingInput, setBulkTrackingInput] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -68,16 +79,25 @@ export default function AdminCourierRoutePage() {
 
   const handleAddCourier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCourierName || !newCourierPhone) {
-      alert('Lütfen kurye adı ve telefonunu giriniz.');
+    if (!newCourierName || !newCourierPhone || !newCourierEmail || !newCourierPassword) {
+      alert('Lütfen kurye adı, telefon, e-posta ve şifre alanlarını doldurunuz.');
       return;
     }
 
     try {
+      // Simple password hashing (in production, do this on backend)
+      const encoder = new TextEncoder();
+      const data = encoder.encode(newCourierPassword);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
       const { error } = await supabase.from('couriers').insert([
         {
           name: newCourierName,
           phone: newCourierPhone,
+          email: newCourierEmail,
+          password_hash: passwordHash,
           plate: newCourierPlate,
           vehicle_type: newCourierVehicle,
           is_active: true
@@ -87,6 +107,10 @@ export default function AdminCourierRoutePage() {
       if (error) throw error;
       alert('✅ Kurye başarıyla eklendi!');
       setNewCourierName('');
+      setNewCourierPhone('');
+      setNewCourierEmail('');
+      setNewCourierPassword('');
+      setNewCourierPlate('');
       setNewCourierPhone('');
       setNewCourierPlate('');
       loadData();
@@ -107,23 +131,77 @@ export default function AdminCourierRoutePage() {
   };
 
   const handleAssignCourier = async (orderId: string, courierId: string) => {
+    // Eğer kurye atanıyorsa modal aç
+    if (courierId) {
+      const currentAssignedCount = orders.filter(o => o.courier_id === courierId && o.status !== 'delivered' && o.id !== orderId).length;
+      if (currentAssignedCount >= 20) {
+        alert('⚠️ Bu kurye maksimum paket sınırına (20 paket) ulaştı! Daha fazla atanamaz.');
+        return;
+      }
+
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        setSelectedOrderForCourier(order);
+        setSelectedCourierId(courierId);
+        setTrackingInput(order.tracking_code || '');
+      }
+      return;
+    }
+
+    // Kurye kaldırılıyorsa direkt işlem yap
     try {
-      if (courierId) {
-        const currentAssignedCount = orders.filter(o => o.courier_id === courierId && o.status !== 'delivered' && o.id !== orderId).length;
-        if (currentAssignedCount >= 20) {
-          alert('⚠️ Bu kurye maksimum paket sınırına (20 paket) ulaştı! Daha fazla atanamaz.');
-          return;
-        }
+      const updateData: any = { courier_id: null };
+      const order = orders.find(o => o.id === orderId);
+      if (order && (order.status === 'shipped' || order.status === 'processing')) {
+        updateData.status = 'pending';
       }
 
       const { error } = await supabase
         .from('orders')
-        .update({ courier_id: courierId ? courierId : null })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: courierId } : o));
-      alert('✅ Kurye başarıyla atandı!');
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_id: null, status: updateData.status || o.status } : o));
+      alert('✅ Kurye başarıyla kaldırıldı!');
+    } catch (err: any) {
+      alert('Atama hatası: ' + err.message);
+    }
+  };
+
+  // 📦 Kurye Atama Modal Onayı
+  const confirmCourierAssignment = async () => {
+    if (!trackingInput.trim()) {
+      alert("Lütfen kargo takip kodunu giriniz.");
+      return;
+    }
+
+    if (!selectedOrderForCourier || !selectedCourierId) {
+      alert('Kurye veya sipariş seçili değil!');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          courier_id: selectedCourierId,
+          status: 'shipped',
+          tracking_code: trackingInput,
+          tracking_number: trackingInput
+        })
+        .eq('id', selectedOrderForCourier.id);
+
+      if (error) throw error;
+      
+      setOrders(prev => prev.map(o => o.id === selectedOrderForCourier.id ? { ...o, courier_id: selectedCourierId, status: 'shipped', tracking_code: trackingInput, tracking_number: trackingInput } : o));
+      
+      await loadData();
+      
+      setSelectedOrderForCourier(null);
+      setSelectedCourierId('');
+      setTrackingInput('');
+      alert('✅ Kurye başarıyla atandı ve sipariş kargoya verildi!');
     } catch (err: any) {
       alert('Atama hatası: ' + err.message);
     }
@@ -145,18 +223,29 @@ export default function AdminCourierRoutePage() {
       return;
     }
 
+    if (!bulkTrackingInput.trim()) {
+      alert("Lütfen kargo takip kodunu giriniz.");
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('orders')
-        .update({ courier_id: bulkCourierId })
+        .update({ 
+          courier_id: bulkCourierId,
+          status: 'shipped',
+          tracking_code: bulkTrackingInput,
+          tracking_number: bulkTrackingInput
+        })
         .in('id', selectedOrderIds);
 
       if (error) throw error;
 
-      alert(`✅ Seçilen ${selectedOrderIds.length} sipariş kuryeye başarıyla atandı!`);
+      alert(`✅ Seçilen ${selectedOrderIds.length} sipariş kuryeye başarıyla atandı ve kargoya verildi!`);
       setSelectedOrderIds([]);
       setBulkCourierId('');
-      loadData();
+      setBulkTrackingInput('');
+      await loadData();
     } catch (err: any) {
       alert('Toplu atama hatası: ' + err.message);
     }
@@ -204,8 +293,24 @@ export default function AdminCourierRoutePage() {
     }
   };
 
-  const pendingOrders = orders.filter(o => !o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled');
-  const deliveringOrders = orders.filter(o => o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled');
+  const handleInTransitOrder = async (orderId: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'in_transit' })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'in_transit' } : o));
+      alert('🚀 Sipariş başarıyla yolda olarak işaretlendi!');
+    } catch (err: any) {
+      alert('Güncelleme hatası: ' + err.message);
+    }
+  };
+
+  const pendingOrders = orders.filter(o => !o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'in_transit');
+  const deliveringOrders = orders.filter(o => o.courier_id && o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'in_transit');
+  const inTransitOrders = orders.filter(o => o.status === 'in_transit');
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
   const portalCourier = couriers.find(c => c.id === selectedPortalCourierId);
   const portalAssignedOrders = orders.filter(o => o.courier_id === selectedPortalCourierId);
@@ -299,6 +404,19 @@ export default function AdminCourierRoutePage() {
           </button>
 
           <button
+            onClick={() => setActiveTab('in_transit')}
+            className={`p-4 rounded-3xl border text-left transition-all cursor-pointer flex items-center justify-between ${activeTab === 'in_transit' ? 'bg-white border-cyan-500 shadow-md ring-2 ring-cyan-500/20' : 'bg-white/80 border-sand-200 hover:bg-white'}`}
+          >
+            <div>
+              <span className="text-[10px] font-bold uppercase text-sand-500 tracking-wider">Yolda</span>
+              <h2 className="text-xl font-extrabold text-cyan-600 mt-0.5">{inTransitOrders.length}</h2>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+              <Truck className="w-5 h-5" />
+            </div>
+          </button>
+
+          <button
             onClick={() => setActiveTab('couriers')}
             className={`p-4 rounded-3xl border text-left transition-all cursor-pointer flex items-center justify-between ${activeTab === 'couriers' ? 'bg-white border-brand-500 shadow-md ring-2 ring-brand-500/20' : 'bg-white/80 border-sand-200 hover:bg-white'}`}
           >
@@ -354,7 +472,7 @@ export default function AdminCourierRoutePage() {
                 </div>
 
                 {filteredPendingOrders.length > 0 && (
-                  <div className="flex items-center gap-2 bg-sand-50 p-2.5 rounded-2xl border border-sand-200 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-sand-50 p-2.5 rounded-2xl border border-sand-200 w-full sm:w-auto">
                     <button
                       onClick={() => handleToggleSelectAll(filteredPendingOrders)}
                       className="text-xs font-bold text-brand-700 px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 rounded-xl transition-all cursor-pointer"
@@ -371,6 +489,13 @@ export default function AdminCourierRoutePage() {
                         <option key={c.id} value={c.id}>{c.name} ({c.vehicle_type})</option>
                       ))}
                     </select>
+                    <input
+                      type="text"
+                      placeholder="Kargo Kodu"
+                      value={bulkTrackingInput}
+                      onChange={(e) => setBulkTrackingInput(e.target.value)}
+                      className="input text-xs py-1.5 w-[120px] cursor-pointer font-bold bg-white"
+                    />
                     <button
                       onClick={handleBulkAssignCourier}
                       className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs flex-shrink-0"
@@ -430,10 +555,11 @@ export default function AdminCourierRoutePage() {
                               <span className="font-mono text-xs font-bold bg-sand-100 text-sand-800 px-2 py-0.5 rounded">
                                 #{order.id.slice(0, 8)}
                               </span>
+                              <StatusBadge status={order.status} />
                               <span className="text-sm font-bold text-sand-900">
                                 {order.recipientName || order.recipient_name || 'Alıcı Müşteri'}
                               </span>
-                              
+
                               <span className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
                                 <Calendar className="w-3 h-3" /> Veriliş: {createdDate}
                               </span>
@@ -504,11 +630,12 @@ export default function AdminCourierRoutePage() {
                             <span className="font-mono text-xs font-bold bg-sand-100 text-sand-800 px-2 py-0.5 rounded">
                               #{order.id.slice(0, 8)}
                             </span>
+                            <StatusBadge status={order.status} />
                             <span className="text-sm font-bold text-sand-900">
                               {order.recipientName || order.recipient_name || 'Alıcı Müşteri'}
                             </span>
                             <span className="text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-brand-100 text-brand-800">
-                              Kargoda ({assignedCourier?.name || 'Kurye'})
+                              {assignedCourier?.name || 'Kurye'}
                             </span>
                             <span className="text-[11px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-bold">
                               🎯 Teslim Hedefi: {deliveryDate}
@@ -544,7 +671,70 @@ export default function AdminCourierRoutePage() {
             </div>
           )}
 
-          {/* 3. KURYE YÖNETİMİ SEKMESİ */}
+          {/* 3. YOLDA SEKMESİ */}
+          {activeTab === 'in_transit' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-sand-100 pb-4">
+                <h2 className="text-xl font-bold text-sand-900 font-display flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-cyan-600" />
+                  Yolda Olan Siparişler ({inTransitOrders.length})
+                </h2>
+                <span className="text-xs text-sand-500 font-medium">Kurye teslimatta</span>
+              </div>
+
+              {inTransitOrders.length === 0 ? (
+                <div className="text-center py-16 text-sand-500">
+                  <Package className="w-10 h-10 text-sand-400 mx-auto mb-2" />
+                  <p>Şu an yolda olan sipariş bulunmuyor.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {inTransitOrders.map((order) => {
+                    const assignedCourier = couriers.find(c => c.id === order.courier_id);
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address + ' ' + order.city)}`;
+                    const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Bugün';
+
+                    return (
+                      <div key={order.id} className="p-4 rounded-2xl border border-sand-200 bg-sand-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-bold bg-sand-100 text-sand-800 px-2 py-0.5 rounded">
+                              #{order.id.slice(0, 8)}
+                            </span>
+                            <StatusBadge status={order.status} />
+                          </div>
+                          <p className="text-sm font-semibold text-sand-900">{order.recipient_name || order.recipientName || 'Belirtilmedi'}</p>
+                          <p className="text-xs text-sand-600">
+                            <MapPin className="w-3.5 h-3.5 text-cyan-600 inline mr-1" />
+                            {order.address} ({order.city})
+                          </p>
+                          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline">
+                            📍 Google Maps Yol Tarifi Aç
+                          </a>
+                        </div>
+
+                        <div className="w-full sm:w-auto text-right">
+                          <label className="block text-[10px] uppercase font-bold text-sand-500 mb-1">Kurye Değiştir</label>
+                          <select
+                            value={order.courier_id || ''}
+                            onChange={(e) => handleAssignCourier(order.id, e.target.value)}
+                            className="input text-xs py-1.5 w-full sm:w-[160px] cursor-pointer font-bold"
+                          >
+                            <option value="">-- Kurye Seçilmedi --</option>
+                            {couriers.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name} ({c.vehicle_type})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4. KURYE YÖNETİMİ SEKMESİ */}
           {activeTab === 'couriers' && (
             <div className="grid lg:grid-cols-3 gap-8">
               <div className="bg-sand-50/50 rounded-2xl p-5 border border-sand-200 space-y-4">
@@ -557,8 +747,16 @@ export default function AdminCourierRoutePage() {
                     <input type="text" value={newCourierName} onChange={e => setNewCourierName(e.target.value)} placeholder="Ahmet Yılmaz" className="input text-xs w-full" />
                   </div>
                   <div>
+                    <label className="block text-xs font-semibold text-sand-600 mb-1">E-posta</label>
+                    <input type="email" value={newCourierEmail} onChange={e => setNewCourierEmail(e.target.value)} placeholder="ahmet@flowershop.com" className="input text-xs w-full" />
+                  </div>
+                  <div>
                     <label className="block text-xs font-semibold text-sand-600 mb-1">Telefon</label>
                     <input type="text" value={newCourierPhone} onChange={e => setNewCourierPhone(e.target.value)} placeholder="0555..." className="input text-xs w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-sand-600 mb-1">Şifre</label>
+                    <input type="password" value={newCourierPassword} onChange={e => setNewCourierPassword(e.target.value)} placeholder="••••••••" className="input text-xs w-full" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-sand-600 mb-1">Plaka</label>
@@ -591,6 +789,12 @@ export default function AdminCourierRoutePage() {
                           <div>
                             <h4 className="font-bold text-sand-900 text-sm">{c.name}</h4>
                             <p className="text-[11px] text-sand-500">{c.plate || 'Plakasız'} · {c.phone}</p>
+                            {c.email && (
+                              <p className="text-[11px] text-sand-400 flex items-center gap-1">
+                                <Mail className="w-3 h-3" />
+                                {c.email}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -819,12 +1023,22 @@ export default function AdminCourierRoutePage() {
                               </a>
 
                               {!isDelivered ? (
-                                <button
-                                  onClick={() => handleDeliverOrder(order.id)}
-                                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                                >
-                                  <CheckCircle className="w-4 h-4" /> Teslim Edildi İşaretle ✓
-                                </button>
+                                <div className="flex gap-2">
+                                  {order.status !== 'in_transit' && (
+                                    <button
+                                      onClick={() => handleInTransitOrder(order.id)}
+                                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    >
+                                      <Truck className="w-4 h-4" /> Yolda İşaretle 🚀
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeliverOrder(order.id)}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                  >
+                                    <CheckCircle className="w-4 h-4" /> Teslim Edildi İşaretle ✓
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                                   <CheckCircle className="w-4 h-4" /> Teslim Tamamlandı
@@ -843,6 +1057,53 @@ export default function AdminCourierRoutePage() {
 
         </div>
       </main>
+
+      {/* 📦 KURYE ATAMA KARGO KODU MODALI */}
+      {selectedOrderForCourier && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 relative">
+            <button 
+              onClick={() => setSelectedOrderForCourier(null)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              📦 Kurye Atama - Kargo Kodu
+            </h3>
+            <p className="text-sm text-gray-500">
+              #{selectedOrderForCourier.id.slice(0, 8)} numaralı siparişi <strong>{couriers.find(c => c.id === selectedCourierId)?.name || 'seçilen kuryeye'}</strong> atamak üzeresiniz. Kargo takip kodunu giriniz:
+            </p>
+            
+            <input
+              type="text"
+              placeholder="Örn: 1234567890"
+              value={trackingInput}
+              onChange={(e) => setTrackingInput(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+            />
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => {
+                  setSelectedOrderForCourier(null);
+                  setSelectedCourierId('');
+                  setTrackingInput('');
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={confirmCourierAssignment}
+                className="px-5 py-2 text-sm text-white bg-brand-600 hover:bg-brand-700 rounded-xl font-medium shadow-sm transition-colors"
+              >
+                Kuryeye Ata & Kargoya Ver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

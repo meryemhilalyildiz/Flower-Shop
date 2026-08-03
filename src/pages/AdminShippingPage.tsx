@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Truck,
   MapPin,
@@ -12,6 +12,9 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
+import StoreLocationMap from '../components/admin/StoreLocationMap';
+import AutocompleteInput from '../components/admin/AutocompleteInput';
+import { searchNeighborhoods, searchStreets } from '../services/locationApi';
 import {
   fetchStoreSettings,
   fetchAllShippingRules,
@@ -54,13 +57,25 @@ export function AdminShippingPage() {
   const [storeForm, setStoreForm] = useState({
     city: '',
     district: '',
+    neighborhood: '',
+    street: '',
     address: '',
+    latitude: '',
+    longitude: '',
   });
 
   // İlçe state'leri
   const [cities] = useState<City[]>(CITIES_DATA);
   const [districts, setDistricts] = useState<District[]>([]);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+
+  // Autocomplete state'leri
+  const [neighborhoodSuggestions, setNeighborhoodSuggestions] = useState<any[]>([]);
+  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([]);
+  const [loadingNeighborhoods, setLoadingNeighborhoods] = useState(false);
+  const [loadingStreets, setLoadingStreets] = useState(false);
+  const neighborhoodTimeoutRef = useRef<number | null>(null);
+  const streetTimeoutRef = useRef<number | null>(null);
 
   // =====================================================================
   // 📦 Veri Yükleme
@@ -72,7 +87,11 @@ export function AdminShippingPage() {
       setStoreForm({
         city: settings.city,
         district: settings.district,
+        neighborhood: settings.neighborhood || '',
+        street: settings.street || '',
         address: settings.address,
+        latitude: settings.latitude?.toString() || '',
+        longitude: settings.longitude?.toString() || '',
       });
       // İlçe listesini yükle
       const cityObj = cities.find((c) => c.name === settings.city);
@@ -106,6 +125,12 @@ export function AdminShippingPage() {
 
   useEffect(() => {
     loadData();
+
+    // 🌸 Cleanup timeouts on unmount
+    return () => {
+      if (neighborhoodTimeoutRef.current) window.clearTimeout(neighborhoodTimeoutRef.current);
+      if (streetTimeoutRef.current) window.clearTimeout(streetTimeoutRef.current);
+    };
   }, []);
 
   // =====================================================================
@@ -114,7 +139,9 @@ export function AdminShippingPage() {
   const handleCityChange = async (cityIdStr: string) => {
     const cityId = Number(cityIdStr);
     setSelectedCityId(cityId);
-    setStoreForm((f) => ({ ...f, district: '' }));
+    setStoreForm((f) => ({ ...f, district: '', neighborhood: '', street: '' }));
+    setNeighborhoodSuggestions([]);
+    setStreetSuggestions([]);
 
     if (cityId) {
       const distList = await fetchDistrictsByCity(cityId);
@@ -125,7 +152,119 @@ export function AdminShippingPage() {
   };
 
   // =====================================================================
-  // 🏪 Mağaza Ayarlarını Güncelleme
+  // 🌸 Mahalle Autocomplete (Debounced)
+  // =====================================================================
+  const handleNeighborhoodSearch = async (query: string) => {
+    // 🌸 Önceki timeout'u temizle
+    if (neighborhoodTimeoutRef.current) {
+      window.clearTimeout(neighborhoodTimeoutRef.current);
+    }
+
+    if (query.length < 2) {
+      setNeighborhoodSuggestions([]);
+      return;
+    }
+
+    // 🌸 500ms debounce
+    const timeout = window.setTimeout(async () => {
+      setLoadingNeighborhoods(true);
+      try {
+        const results = await searchNeighborhoods(query, storeForm.city, storeForm.district);
+        setNeighborhoodSuggestions(results);
+      } catch (error) {
+        console.error('Mahalle arama hatası:', error);
+        setNeighborhoodSuggestions([]);
+      } finally {
+        setLoadingNeighborhoods(false);
+      }
+    }, 500);
+
+    neighborhoodTimeoutRef.current = timeout;
+  };
+
+  // =====================================================================
+  // 🌸 Cadde Autocomplete (Debounced)
+  // =====================================================================
+  const handleStreetSearch = async (query: string) => {
+    // 🌸 Önceki timeout'u temizle
+    if (streetTimeoutRef.current) {
+      window.clearTimeout(streetTimeoutRef.current);
+    }
+
+    if (query.length < 2) {
+      setStreetSuggestions([]);
+      return;
+    }
+
+    // 🌸 500ms debounce
+    const timeout = window.setTimeout(async () => {
+      setLoadingStreets(true);
+      try {
+        const results = await searchStreets(query, storeForm.city, storeForm.district);
+        setStreetSuggestions(results);
+      } catch (error) {
+        console.error('Cadde arama hatası:', error);
+        setStreetSuggestions([]);
+      } finally {
+        setLoadingStreets(false);
+      }
+    }, 500);
+
+    streetTimeoutRef.current = timeout;
+  };
+
+  // =====================================================================
+  // 🌸 Mahalle seçildiğinde koordinatları güncelle
+  // =====================================================================
+  const handleNeighborhoodSelect = (suggestion: any) => {
+    if (suggestion.lat && suggestion.lng) {
+      setStoreForm((f) => ({
+        ...f,
+        latitude: suggestion.lat.toString(),
+        longitude: suggestion.lng.toString()
+      }));
+      // Autocomplete input değerini güncelle
+      setNeighborhoodSuggestions([]);
+    }
+  };
+
+  // =====================================================================
+  // 🌸 Cadde seçildiğinde koordinatları güncelle
+  // =====================================================================
+  const handleStreetSelect = (suggestion: any) => {
+    if (suggestion.lat && suggestion.lng) {
+      setStoreForm((f) => ({
+        ...f,
+        latitude: suggestion.lat.toString(),
+        longitude: suggestion.lng.toString()
+      }));
+      // Autocomplete input değerini güncelle
+      setStreetSuggestions([]);
+    }
+  };
+
+  // =====================================================================
+  // � Haritadan konum seçildiğinde adres bilgilerini güncelle
+  // =====================================================================
+  const handleMapAddressUpdate = (addressData: {
+    city?: string;
+    district?: string;
+    neighborhood?: string;
+    street?: string;
+    address?: string;
+  }) => {
+    setStoreForm((f) => ({
+      ...f,
+      city: addressData.city || f.city,
+      district: addressData.district || f.district,
+      neighborhood: addressData.neighborhood || f.neighborhood,
+      street: addressData.street || f.street,
+      address: addressData.address || f.address,
+    }));
+  };
+
+  // =====================================================================
+  // �🏪 Mağaza Ayarlarını Güncelleme
   // =====================================================================
   const handleUpdateStore = async () => {
     if (!storeForm.city || !storeForm.district) {
@@ -137,7 +276,11 @@ export function AdminShippingPage() {
       const updated = await updateStoreSettings({
         city: storeForm.city,
         district: storeForm.district,
+        neighborhood: storeForm.neighborhood,
+        street: storeForm.street,
         address: storeForm.address,
+        latitude: storeForm.latitude ? parseFloat(storeForm.latitude) : null,
+        longitude: storeForm.longitude ? parseFloat(storeForm.longitude) : null,
       });
       setStoreSettings(updated);
       setShowStoreModal(false);
@@ -321,6 +464,18 @@ export function AdminShippingPage() {
                 <span className="text-xs font-semibold text-sand-500 uppercase">İlçe</span>
                 <p className="text-sand-800 font-medium">{storeSettings.district}</p>
               </div>
+              {storeSettings.neighborhood && (
+                <div>
+                  <span className="text-xs font-semibold text-sand-500 uppercase">Mahalle</span>
+                  <p className="text-sand-800 font-medium">{storeSettings.neighborhood}</p>
+                </div>
+              )}
+              {storeSettings.street && (
+                <div>
+                  <span className="text-xs font-semibold text-sand-500 uppercase">Cadde/Sokak</span>
+                  <p className="text-sand-800 font-medium">{storeSettings.street}</p>
+                </div>
+              )}
               <div>
                 <span className="text-xs font-semibold text-sand-500 uppercase">Açık Adres</span>
                 <p className="text-sand-800 font-medium">{storeSettings.address || '-'}</p>
@@ -674,7 +829,7 @@ export function AdminShippingPage() {
       {/* ===================================================================== */}
       {showStoreModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl relative">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowStoreModal(false)}
               className="absolute top-4 right-4 text-sand-400 hover:text-sand-700"
@@ -713,7 +868,11 @@ export function AdminShippingPage() {
                 <label className="label">Teslimat İlçesi *</label>
                 <select
                   value={storeForm.district}
-                  onChange={(e) => setStoreForm((f) => ({ ...f, district: e.target.value }))}
+                  onChange={(e) => {
+                    setStoreForm((f) => ({ ...f, district: e.target.value, neighborhood: '', street: '' }));
+                    setNeighborhoodSuggestions([]);
+                    setStreetSuggestions([]);
+                  }}
                   className="input"
                   disabled={!selectedCityId}
                 >
@@ -729,14 +888,97 @@ export function AdminShippingPage() {
               </div>
 
               <div>
+                <label className="label">Mahalle</label>
+                <AutocompleteInput
+                  value={storeForm.neighborhood}
+                  onChange={(value) => {
+                    setStoreForm((f) => ({ ...f, neighborhood: value }));
+                    handleNeighborhoodSearch(value);
+                  }}
+                  onSuggestionSelect={handleNeighborhoodSelect}
+                  suggestions={neighborhoodSuggestions}
+                  loading={loadingNeighborhoods}
+                  placeholder="Mahalle adı ara..."
+                  disabled={!storeForm.city}
+                />
+              </div>
+
+              <div>
+                <label className="label">Cadde/Sokak</label>
+                <AutocompleteInput
+                  value={storeForm.street}
+                  onChange={(value) => {
+                    setStoreForm((f) => ({ ...f, street: value }));
+                    handleStreetSearch(value);
+                  }}
+                  onSuggestionSelect={handleStreetSelect}
+                  suggestions={streetSuggestions}
+                  loading={loadingStreets}
+                  placeholder="Cadde veya sokak adı ara..."
+                  disabled={!storeForm.city}
+                />
+              </div>
+
+              <div>
                 <label className="label">Açık Adres</label>
                 <input
                   type="text"
                   value={storeForm.address}
                   onChange={(e) => setStoreForm((f) => ({ ...f, address: e.target.value }))}
                   className="input"
-                  placeholder="Mahalle, sokak, bina, daire..."
+                  placeholder="Bina no, daire, kat..."
                 />
+                <p className="text-xs text-sand-500 mt-1">
+                  Adres değiştiğinde harita otomatik güncellenir
+                </p>
+              </div>
+
+              {/* 🌸 Harita ile konum seçimi */}
+              <div>
+                <label className="label">Mağaza Konumu (Haritadan Seçin)</label>
+                <StoreLocationMap
+                  key={`${storeForm.city}-${storeForm.district}-${storeForm.neighborhood}-${storeForm.street}-${storeForm.address}`}
+                  city={storeForm.city}
+                  district={storeForm.district}
+                  neighborhood={storeForm.neighborhood}
+                  street={storeForm.street}
+                  address={storeForm.address}
+                  initialLocation={
+                    storeForm.latitude && storeForm.longitude
+                      ? { lat: parseFloat(storeForm.latitude), lng: parseFloat(storeForm.longitude) }
+                      : undefined
+                  }
+                  onLocationSelect={(lat, lng) => {
+                    setStoreForm((f) => ({ ...f, latitude: lat.toString(), longitude: lng.toString() }));
+                  }}
+                  onAddressUpdate={handleMapAddressUpdate}
+                />
+              </div>
+
+              {/* 🌸 Koordinatları manuel girişi (opsiyonel) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Enlem (Latitude)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={storeForm.latitude}
+                    onChange={(e) => setStoreForm((f) => ({ ...f, latitude: e.target.value }))}
+                    className="input"
+                    placeholder="39.9334"
+                  />
+                </div>
+                <div>
+                  <label className="label">Boylam (Longitude)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={storeForm.longitude}
+                    onChange={(e) => setStoreForm((f) => ({ ...f, longitude: e.target.value }))}
+                    className="input"
+                    placeholder="32.8597"
+                  />
+                </div>
               </div>
             </div>
 

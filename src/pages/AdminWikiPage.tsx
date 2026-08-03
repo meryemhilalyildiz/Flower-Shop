@@ -53,7 +53,6 @@ export default function AdminWikiPage() {
       
       if (error) {
         if (error.code === 'PGRST205') {
-          console.log('Wiki tablosu henüz oluşturulmadı');
           setEntries([]);
           return;
         }

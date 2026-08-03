@@ -133,7 +133,6 @@ export default function AdminEditorPage({ navigate }: Props) {
 
   // Helper fonksiyonlar
   const handleAddToCart = (product: Product) => {
-    console.log('Sepete ekle:', product.name);
   };
 
   const isFavorite = (productId: string) => false;

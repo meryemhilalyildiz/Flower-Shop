@@ -41,6 +41,8 @@ import AdminFaqPage from './pages/AdminFaqPage';
 import CustomBouquetPage from './pages/CustomBouquetPage';
 import AdminCourierRoutePage from './pages/AdminCourierRoutePage';
 import LegalPages from './pages/LegalPages';
+import CourierDashboardPage from './pages/CourierDashboardPage';
+import CourierLayout from './components/courier/CourierLayout';
 
 function App() {
   const { route, navigate } = useRouter();
@@ -172,9 +174,18 @@ function App() {
           unit_price: item.product?.price || item.unit_price || item.price || 0,
         }));
 
+        // Unit price doğrulama - çok büyük değerleri düzelt
+        const normalizedItems = itemsToInsert.map((item: any) => {
+          const rawPrice = Number(item.unit_price || 0);
+          return {
+            ...item,
+            unit_price: rawPrice > 10000 ? rawPrice / 100 : rawPrice
+          };
+        });
+
         const { error: itemsError } = await supabase
           .from('order_items')
-          .insert(itemsToInsert);
+          .insert(normalizedItems);
 
         if (itemsError) {
           console.error('ORDER_ITEMS HATASI:', itemsError);
@@ -386,9 +397,6 @@ function App() {
         />
       );
 
-      case 'admin-kargo-rota':
-        return <AdminCourierRoutePage />;
-
       case 'shop':
         return (
           <ShopPage
@@ -551,6 +559,27 @@ function App() {
           </AdminLayout>
         );
 
+      case 'admin-kargo-rota':
+        return (
+          <AdminLayout currentPage="admin-kargo-rota" navigate={navigate}>
+            <AdminCourierRoutePage />
+          </AdminLayout>
+        );
+
+      /* 🚚 KURYE ROTALARI */
+      case 'courier-dashboard':
+      case 'courier-delivered':
+      case 'courier-all': {
+        return (
+          <CourierLayout
+            currentPage={route.name}
+            navigate={navigate}
+          >
+            <CourierDashboardPage navigate={navigate} currentPage={route.name} />
+          </CourierLayout>
+        );
+      }
+
       default:
         return (
           <HomePage
@@ -567,8 +596,9 @@ function App() {
   };
 
   const isAdminRoute = route.name.startsWith('admin');
+  const isCourierRoute = route.name.startsWith('courier');
 
-  if (isAdminRoute) {
+  if (isAdminRoute || isCourierRoute) {
     return (
       <div className="min-h-screen bg-sand-50">
         {renderPage()}

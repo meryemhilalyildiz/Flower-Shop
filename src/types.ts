@@ -66,7 +66,7 @@ export interface OrderInfo {
   delivery_fee?: number;   // Supabase sütun uyumluluğu için
   total: number;           // Genel Toplam
 
-  status?: 'Hazırlanıyor' | 'Yola Çıktı' | 'Teslim Edildi' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | string;
+  status?: 'Hazırlanıyor' | 'Yola Çıktı' | 'Yolda' | 'Teslim Edildi' | 'pending' | 'processing' | 'shipped' | 'in_transit' | 'delivered' | 'cancelled' | string;
   tracking_number?: string; // Kargo takip numarası
   cancel_reason?: string;
   couponCode?: string;
@@ -108,7 +108,46 @@ export type Route =
   | { name: 'admin-shipping' }
   | { name: 'admin-wiki' }
   |{name: 'admin-kargo-rota'}  
-  | { name: 'courier-portal', courierId?: string };
+  | { name: 'courier-portal', courierId?: string }
+  | { name: 'courier-dashboard' }
+  | { name: 'courier-delivered' }
+  | { name: 'courier-all' };
+
+// =====================================================================
+// 🌸 Kurye Yönetim Sistemi Tipleri
+// =====================================================================
+
+export type Courier = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  vehicle_type: 'motor' | 'araba';
+  password_hash?: string;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type CourierOrder = {
+  id: string;
+  recipient_name: string;
+  recipient_phone: string;
+  shipping_address: string;
+  city: string;
+  district: string;
+  status: 'pending' | 'processing' | 'shipped' | 'in_transit' | 'delivered' | 'cancelled';
+  total_amount: number;
+  tracking_code?: string;
+  delivery_order?: number;
+  estimated_delivery_time?: string;
+  items: any[];
+  created_at: string;
+  user_email?: string;
+  email?: string;
+  recipient_email?: string;
+  recipientName?: string;
+  tracking_number?: string;
+};
 
 // =====================================================================
 // 🌸 Kargo Ücretlendirme ve Teslimat Tarihi Hesaplama Modülü Tipleri
@@ -122,7 +161,9 @@ export type StoreSettings = {
   id: number;
   city: string;            // İl (örn: "Ankara")
   district: string;        // İlçe (örn: "Çankaya")
-  address: string;         // Açık adres (örn: "Kızılay Sakarya Cad.")
+  neighborhood?: string;  // Mahalle (örn: "Kızılay")
+  street?: string;         // Cadde (örn: "Sakarya Cad.")
+  address: string;         // Açık adres (örn: "No: 123")
   latitude?: number | null;   // Koordinat (opsiyonel)
   longitude?: number | null;  // Koordinat (opsiyonel)
   is_active: boolean;
