@@ -28,6 +28,27 @@ export default function OrderSuccessPage({ order, navigate, onPlaceOrder }: Prop
           setOrderCreated(true); // Bayrağı hemen ayarla
           const orderData = JSON.parse(pendingOrderData);
           
+          // 🌸 1. EĞER KOORDİNATLAR EKSİKSE, İLÇE/ADRESE GÖRE ANINDA HESAPLA!
+          if (!orderData.latitude || !orderData.longitude) {
+            const addr = (orderData.address || '').toLowerCase();
+            const cityDistrict = (orderData.city || '').toLowerCase();
+            const fullText = `${addr} ${cityDistrict}`;
+
+            let lat = 39.9334;
+            let lng = 32.8597;
+
+            if (fullText.includes('etimesgut')) { lat = 39.9499; lng = 32.6826; }
+            else if (fullText.includes('çankaya')) { lat = 39.9334; lng = 32.8597; }
+            else if (fullText.includes('keçiören')) { lat = 40.0122; lng = 32.8586; }
+            else if (fullText.includes('yenimahalle')) { lat = 39.9687; lng = 32.7825; }
+            else if (fullText.includes('mamak')) { lat = 39.9247, lng = 32.9361; }
+            else if (fullText.includes('altındağ')) { lat = 39.9531; lng = 32.8647; }
+            else if (fullText.includes('pursaklar')) { lat = 40.1344; lng = 33.0242; }
+
+            orderData.latitude = lat;
+            orderData.longitude = lng;
+          }
+
           // Sipariş oluşturulduktan sonra session storage'ı temizle
           sessionStorage.removeItem('pendingOrderData');
           sessionStorage.removeItem('tempOrderId');
@@ -47,7 +68,6 @@ export default function OrderSuccessPage({ order, navigate, onPlaceOrder }: Prop
         }
       } catch (error) {
         console.error('Sipariş oluşturma hatası:', error);
-        // Hata durumunda da session storage'ı temizle
         sessionStorage.removeItem('pendingOrderData');
         sessionStorage.removeItem('tempOrderId');
       } finally {

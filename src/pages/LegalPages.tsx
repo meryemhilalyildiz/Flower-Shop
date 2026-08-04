@@ -133,7 +133,7 @@ export default function LegalPages({ navigate }: Props) {
           </div>
         )}
 
-        {activeTab === 'mesafeli' && (
+{activeTab === 'mesafeli' && (
           <div className="space-y-4">
             <h2 className="font-display text-xl font-bold text-sand-900">Mesafeli Satış Sözleşmesi</h2>
             <p>
@@ -145,6 +145,9 @@ export default function LegalPages({ navigate }: Props) {
             <h3 className="font-bold text-sand-900 pt-2">2. Konu ve Teslimat</h3>
             <p>
               İşbu sözleşmenin konusu, Alıcı'nın Satıcı'ya ait internet sitesinden elektronik ortamda siparişini yaptığı, nitelikleri ve satış fiyatı belirtilen ürünlerin satışı ve teslimi ile ilgili tarafların hak ve yükümlülüklerinin belirlenmesidir. Teslimat, alıcının belirttiği adrese kurye aracılığıyla gerçekleştirilir.
+            </p>
+            <p className="mt-2">
+              <strong>Firmamız yalnızca Ankara ili sınırları içerisinde</strong> kendi özel kurye filosuyla teslimat hizmeti vermektedir. Ankara dışı verilen siparişlerde teslimat, anlaşmalı kargo şirketleri aracılığıyla gerçekleştirilir ve kargo teslim süreleri mesafeye göre değişiklik gösterebilir.
             </p>
 
             <h3 className="font-bold text-sand-900 pt-2">3. Cayma Hakkının İstisnaları</h3>

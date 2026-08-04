@@ -240,10 +240,11 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
   };
 
   const filteredOrders = getFilteredOrders();
-  const activeOrders = orders.filter(o => o.status === 'shipped' || o.status === 'in_transit');
-  const deliveredOrders = orders.filter(o => o.status === 'delivered');
-  const cancelledOrders = orders.filter(o => o.status === 'cancelled');
-
+const activeOrders = orders.filter(o => o.status === 'shipped' || o.status === 'in_transit');
+const deliveredOrders = orders.filter(o => o.status === 'delivered');
+// 🌸 Burada 'delivery_failed' durumunu da ekliyoruz ki listeden düşsünler
+const cancelledOrders = orders.filter(o => o.status === 'cancelled' || (o.status as string) === 'delivery_failed');
+  
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; label: string; icon: any }> = {
       pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Beklemede', icon: Clock },
@@ -252,6 +253,7 @@ export default function CourierDashboardPage({ navigate, currentPage }: Props) {
       in_transit: { color: 'bg-cyan-100 text-cyan-800', label: 'Yolda', icon: Navigation },
       delivered: { color: 'bg-green-100 text-green-800', label: 'Teslim Edildi', icon: CheckCircle },
       cancelled: { color: 'bg-red-100 text-red-800', label: 'İptal', icon: AlertCircle },
+      delivery_failed: { color: 'bg-red-100 text-red-800', label: 'Teslim Edilemedi', icon: AlertCircle },
     };
 
     const config = statusConfig[status] || statusConfig.pending;
@@ -502,26 +504,29 @@ function OrderCard({ order, onStatusUpdate, updatingOrderId, isSelected, onToggl
         </div>
 
         {canUpdate && (
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => {
-                console.log('Button clicked:', { orderId: order.id, nextStatus, currentStatus: order.status });
-                onStatusUpdate(order.id, nextStatus);
-              }}
-              disabled={updatingOrderId === order.id}
-              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {updatingOrderId === order.id ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Güncelleniyor...
-                </>
-              ) : (
-                getNextStatusLabel(order.status)
-              )}
-            </button>
-          </div>
-        )}
+  <div className="flex flex-col gap-2">
+    <button
+      onClick={() => {
+        const reason = prompt('Teslim edilemedi gerekçesini giriniz:');
+        if (reason) {
+          // status değerini 'delivery_failed' olarak güncelliyoruz
+          onStatusUpdate(order.id, 'delivery_failed');
+        }
+      }}
+      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors"
+    >
+      Teslim Edilemedi
+    </button>
+
+    <button
+      onClick={() => onStatusUpdate(order.id, nextStatus)}
+      disabled={updatingOrderId === order.id}
+      className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
+    >
+      {updatingOrderId === order.id ? 'Güncelleniyor...' : getNextStatusLabel(order.status)}
+    </button>
+  </div>
+)}
       </div>
 
       {/* 🌸 Harita Gösterimi */}

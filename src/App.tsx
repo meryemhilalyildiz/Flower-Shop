@@ -151,6 +151,10 @@ function App() {
     
         applied_coupon_code: orderData.couponCode || orderData.applied_coupon_code || null,
         status: 'pending',
+
+        // 🌸 İŞTE BURASI: Artık hep aynı koordinat değil, siparişe özel hesaplanan değerler yazılacak!
+        latitude: orderData.latitude || 39.9334,
+        longitude: orderData.longitude || 32.8597,
     
         // 🌸 BİNGO! İŞTE EKSİK OLAN KISIM: Sepetteki ürün listesini Supabase'e kaydediyoruz
         items: orderData.items || orderData.order_items || []
