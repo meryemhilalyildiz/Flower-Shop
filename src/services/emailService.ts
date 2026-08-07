@@ -54,7 +54,6 @@ export interface EmailOrderDetails {
       statusTitle = "Sipariş İptal Edildi";
       statusMessage = `Sevgili ${details.customerName}, siparişiniz iptal edilmiştir. Herhangi bir sorunuz olursa bizimle iletişime geçmekten çekinmeyin.`;
 
-      // 🌸 İptal gerekçesi varsa doğrudan Status Box alt yazısına yazıyoruz
       if (details.cancelReason) {
         statusDetail = `<strong>İptal Gerekçesi:</strong> "${details.cancelReason}"`;
       } else {
@@ -65,6 +64,16 @@ export interface EmailOrderDetails {
       statusTitle = "Siparişiniz Hazırlanıyor";
       statusMessage = `Sevgili ${details.customerName}, sipariş ettiğiniz güzel çiçekleri özenle hazırlıyoruz. En kısa sürede yola çıkaracaklar 🌸`;
       statusDetail = `Çiçekleriniz taze ve canlı olarak size ulaşmak için hazırlanıyor. Sabırsızlıkla bekliyoruz! 💐`;
+    } else if (['delivery_failed', 'teslim edilemedi'].includes(normalizedStatus)) {
+      emailSubject = `Siparişiniz Teslim Edilemedi - ${storeName}`;
+      statusTitle = "Sipariş Teslim Edilemedi";
+      statusMessage = `Sevgili ${details.customerName}, siparişiniz kuryemiz tarafından adresinize getirildi ancak maalesef teslim edilemedi. Sorularınız için bizimle iletişime geçebilirsiniz.`;
+
+      if (details.cancelReason) {
+        statusDetail = `<strong>Teslim Edilememe Nedeni:</strong> "${details.cancelReason}"`;
+      } else {
+        statusDetail = `Destek ekibimizle iletişime geçerek detaylı bilgi alabilirsiniz 🌸`;
+      }
     }
   
     const html = `
