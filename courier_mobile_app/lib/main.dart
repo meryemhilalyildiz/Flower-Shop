@@ -5,6 +5,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:math';
 import 'package:geocoding/geocoding.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -889,7 +891,6 @@ class FullRouteMapPage extends StatefulWidget {
   final LatLng storeLocation;
   final String storeAddress;
   final List<Map<String, dynamic>> initialActiveOrders;
-  // 🌸 getCoordinates parametresini buradan sildik!
   final Future<void> Function(String) makePhoneCall;
   final Future<void> Function(String, String, {String? failureReason}) updateOrderStatus;
   final void Function(String) showNotDeliveredDialog;
@@ -901,7 +902,6 @@ class FullRouteMapPage extends StatefulWidget {
     required this.storeLocation,
     required this.storeAddress,
     required this.initialActiveOrders,
-    // 🌸 Buradan da sildik!
     required this.makePhoneCall,
     required this.updateOrderStatus,
     required this.showNotDeliveredDialog,
@@ -918,6 +918,8 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
   bool isLoading = true;
   late MapController _mapController;
 
+  List<LatLng> streetRoutePoints = [];
+
   @override
   void initState() {
     super.initState();
@@ -927,7 +929,7 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
     _refreshRouteOrders();
   }
 
- void _sortOrdersByDistance() {
+  void _sortOrdersByDistance() {
     activeOrders.sort((a, b) => _calculateDistance(
       widget.storeLocation, 
       LatLng((a['latitude'] as num?)?.toDouble() ?? 39.9334, (a['longitude'] as num?)?.toDouble() ?? 32.8597)
@@ -935,6 +937,56 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
       widget.storeLocation, 
       LatLng((b['latitude'] as num?)?.toDouble() ?? 39.9334, (b['longitude'] as num?)?.toDouble() ?? 32.8597)
     )));
+  }
+
+  // 🌸 OSRM API ile gerçek sokak rotasını çeken fonksiyon
+  // 🌸 Her durak arasında tek tek sokak rotası çizen gelişmiş fonksiyon
+  Future<void> _fetchStreetRoute() async {
+    if (activeOrders.isEmpty) return;
+
+    try {
+      List<LatLng> allRoutePoints = [];
+      
+      // Noktalar listesini oluştur: Dükkan -> Durak 1 -> Durak 2 -> Durak 3 ...
+      List<LatLng> stops = [widget.storeLocation];
+      for (var order in activeOrders) {
+        final double lat = (order['latitude'] as num?)?.toDouble() ?? 39.9334;
+        final double lng = (order['longitude'] as num?)?.toDouble() ?? 32.8597;
+        stops.add(LatLng(lat, lng));
+      }
+
+      // Her durak arası için OSRM'den sokak yollarını parça parça çekelim
+      for (int i = 0; i < stops.length - 1; i++) {
+        final start = stops[i];
+        final end = stops[i + 1];
+
+        final url = Uri.parse(
+          'https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson'
+        );
+        
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final routes = data['routes'] as List;
+          if (routes.isNotEmpty) {
+            final geometry = routes[0]['geometry'];
+            final coordinates = geometry['coordinates'] as List;
+
+            for (var coord in coordinates) {
+              allRoutePoints.add(LatLng(coord[1], coord[0]));
+            }
+          }
+        }
+      }
+
+      if (mounted && allRoutePoints.isNotEmpty) {
+        setState(() {
+          streetRoutePoints = allRoutePoints;
+        });
+      }
+    } catch (e) {
+      print('Sokak rota parça çekme hatası: $e');
+    }
   }
 
   Future<void> _refreshRouteOrders() async {
@@ -969,6 +1021,9 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
           activeOrders = currentActive;
           isLoading = false;
         });
+
+        // 🌸 Sokak rotasını API'den güncelle
+        await _fetchStreetRoute();
 
         if (activeOrders.isNotEmpty) {
           final double firstLat = (activeOrders.first['latitude'] as num?)?.toDouble() ?? 39.9334;
@@ -1016,19 +1071,24 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
           point: orderLatLng,
           width: 45,
           height: 45,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFBE185D),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2)),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                '${i + 1}',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+          child: GestureDetector(
+            onTap: () {
+              _mapController.move(orderLatLng, 15.0);
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFBE185D),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  '${i + 1}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
               ),
             ),
           ),
@@ -1043,9 +1103,15 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
       initialCenter = LatLng(firstLat, firstLng);
     }
 
+    // 1. Önce points listemizi hazırlıyoruz:
+    List<LatLng> polylinePoints = streetRoutePoints.isNotEmpty 
+        ? streetRoutePoints 
+        : [widget.storeLocation, if (activeOrders.isNotEmpty) LatLng((activeOrders[0]['latitude'] as num?)?.toDouble() ?? 39.9334, (activeOrders[0]['longitude'] as num?)?.toDouble() ?? 32.8597)];
+
+    // 2. Ardından PolylineLayer içinde güvenle kullanıyoruz:
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tüm Dağıtım Rotası', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Akıllı Dağıtım ve Rota Rehberi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFFBE185D),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -1072,14 +1138,7 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: [
-                      widget.storeLocation,
-                      for (var order in activeOrders)
-                        LatLng(
-                          (order['latitude'] as num?)?.toDouble() ?? 39.9334,
-                          (order['longitude'] as num?)?.toDouble() ?? 32.8597,
-                        ),
-                    ],
+                    points: polylinePoints, // 🌸 İşte buraya veriyoruz!
                     color: const Color(0xFFBE185D),
                     strokeWidth: 4.0,
                   ),
@@ -1092,10 +1151,10 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
             top: 16,
             right: 16,
             bottom: 16,
-            width: 340,
+            width: 350,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.96),
+                color: Colors.white.withOpacity(0.97),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 15, offset: const Offset(0, 6)),
@@ -1105,13 +1164,35 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Padding(
-                    padding: EdgeInsets.all(16.0),
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
                     child: Text(
-                      '📋 Durak Listesi & İşlemler',
+                      '📋 Sıralı Durak Listesi & Rota',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFFBE185D)),
                     ),
                   ),
-                  const Divider(height: 1, color: Color(0xFFEFECE6)),
+                  if (activeOrders.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDF2F8),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFCE7F3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.directions_bike_rounded, color: Color(0xFFBE185D), size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Önce 1. Durak (${activeOrders[0]['city'] ?? 'Ankara'}) noktasına gitmeniz önerilir.',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF831843)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const Divider(height: 12, color: Color(0xFFEFECE6)),
                   Expanded(
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator(color: Color(0xFFBE185D)))
@@ -1131,82 +1212,90 @@ class _FullRouteMapPageState extends State<FullRouteMapPage> {
                                   final double orderLng = (order['longitude'] as num?)?.toDouble() ?? 32.8597;
                                   final distance = _calculateDistance(widget.storeLocation, LatLng(orderLat, orderLng)).toStringAsFixed(1);
 
-                                  return Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: Colors.grey.shade200),
+                                  return InkWell(
+                                    onTap: () {
+                                      _mapController.move(LatLng(orderLat, orderLng), 15.0);
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: index == 0 ? const Color(0xFFFFF1F2) : Colors.white,
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: index == 0 ? const Color(0xFFFECDD3) : Colors.grey.shade200),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF831843).withOpacity(0.1),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    index == 0 ? '🚀 1. Durak (Sıradaki) - $distance km' : '${index + 1}. Durak ($distance km)', 
+                                                    style: const TextStyle(fontSize: 10, color: Color(0xFF831843), fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  constraints: const BoxConstraints(),
+                                                  padding: EdgeInsets.zero,
+                                                  icon: const Icon(Icons.phone_rounded, color: Color(0xFFBE185D), size: 18),
+                                                  onPressed: () => widget.makePhoneCall(phone),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(recipient, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF292524))),
+                                            const SizedBox(height: 2),
+                                            Text('Adres: $address, $city', style: const TextStyle(fontSize: 11, color: Colors.grey), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                OutlinedButton(
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: Colors.red.shade600,
+                                                    side: BorderSide(color: Colors.red.shade200),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                                                    minimumSize: const Size(80, 28),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  onPressed: () {
+                                                    widget.showNotDeliveredDialog(orderId);
+                                                    Future.delayed(const Duration(seconds: 1), _refreshRouteOrders);
+                                                  },
+                                                  child: const Text('Edilemedi', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                                                ),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.green.shade600,
+                                                    foregroundColor: Colors.white,
+                                                    elevation: 0,
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                                                    minimumSize: const Size(65, 28),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  onPressed: () async {
+                                                    await widget.updateOrderStatus(orderId, 'delivered');
+                                                    await _refreshRouteOrders();
+                                                  },
+                                                  child: const Text('Teslim Et', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF831843).withOpacity(0.1),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text('${index + 1}. Durak ($distance km)', style: const TextStyle(fontSize: 10, color: Color(0xFF831843), fontWeight: FontWeight.bold)),
-                                              ),
-                                              IconButton(
-                                                constraints: const BoxConstraints(),
-                                                padding: EdgeInsets.zero,
-                                                icon: const Icon(Icons.phone_rounded, color: Color(0xFFBE185D), size: 18),
-                                                onPressed: () => widget.makePhoneCall(phone),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(recipient, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF292524))),
-                                          const SizedBox(height: 2),
-                                          Text('Adres: $address, $city', style: const TextStyle(fontSize: 11, color: Colors.grey), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              OutlinedButton(
-                                                style: OutlinedButton.styleFrom(
-                                                  foregroundColor: Colors.red.shade600,
-                                                  side: BorderSide(color: Colors.red.shade200),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                                                  minimumSize: const Size(80, 28),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                ),
-                                                onPressed: () {
-                                                  widget.showNotDeliveredDialog(orderId);
-                                                  Future.delayed(const Duration(seconds: 1), _refreshRouteOrders);
-                                                },
-                                                child: const Text('Edilemedi', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
-                                              ),
-                                              ElevatedButton(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.green.shade600,
-                                                  foregroundColor: Colors.white,
-                                                  elevation: 0,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                                                  minimumSize: const Size(65, 28),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                ),
-                                                onPressed: () async {
-                                                  await widget.updateOrderStatus(orderId, 'delivered');
-                                                  await _refreshRouteOrders();
-                                                },
-                                                child: const Text('Teslim Et', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                              ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                                  );
+                                },
+                              ),
                   ),
                 ],
               ),
